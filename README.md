@@ -1,4 +1,4 @@
-# Competitive Ad Spend Dashboard
+# JKH Group Dashboard
 
 A full-screen competitive media spend dashboard (John Keells Group branding) for Sri Lankan advertisers. Upload a spot log (`.xlsx` or `.csv`, 400k+ rows), choose a product group, pick your advertiser and your competitors, and compare spend, share of spend, medium split, channel mix and duration mix.
 
@@ -54,7 +54,7 @@ Required: `Advertiser, Channel, Dd, Mn, Yr, Cost`. Header names are matched igno
 * **Category avg.** (trend) = category spend in the month / advertisers active that month.
 * **Channel mix** = every channel in the medium, ordered by category spend in the selection.
 * **Duration mix** = % of ads (TV and Radio) in each length bucket: ads of that length / total ads. Press has no duration.
-* **ACD** (average commercial duration) = sum of raw `Dur` / number of ads, for my advertiser, each competitor and the category.
+* **ACD** (average commercial duration) = sum of raw `Dur` / number of ads, for my advertiser, each competitor and the category, shown rounded to whole seconds.
 * **Month drill down** = the leader is the top spender in the whole category that month. The earliest run of quiet months (category spend below 80% of the monthly average, 2 or more months) is combined into one row.
 
 ## Run locally
@@ -63,6 +63,7 @@ Required: `Advertiser, Channel, Dd, Mn, Yr, Cost`. Header names are matched igno
 npm install
 npm start            # http://localhost:3000
 npm test             # smoke tests for the derived fields and metrics
+npm run check        # cross-checks every drill-down total against its chart (needs npm run sample first)
 npm run sample       # writes samples/sample_420000.csv and .xlsx for testing
 ```
 

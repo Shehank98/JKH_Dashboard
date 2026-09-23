@@ -1,14 +1,15 @@
 {
-  "name": "competitive-ad-spend-dashboard",
+  "name": "jkh-group-dashboard",
   "version": "1.0.0",
-  "description": "Competitive media spend dashboard for Sri Lankan advertisers. Upload an .xlsx or .csv spot log and compare your spend against competitors.",
+  "description": "JKH Group Dashboard: competitive media spend for Sri Lankan advertisers. Upload an .xlsx or .csv spot log and compare your spend against competitors.",
   "main": "server.js",
   "private": true,
   "scripts": {
     "start": "node --max-old-space-size=3072 server.js",
     "dev": "node server.js",
     "sample": "node scripts/generate-sample.js",
-    "test": "node scripts/smoke-test.js"
+    "test": "node scripts/smoke-test.js",
+    "check": "node scripts/check-drilldowns.js samples/sample_420000.csv"
   },
   "engines": {
     "node": ">=18"

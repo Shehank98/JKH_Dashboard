@@ -502,6 +502,9 @@
       .concat([`<div class="lg${off('__avg')}"${lgA('__avg')}><span class="sw" style="background:repeating-linear-gradient(90deg,#B4BCD0 0 3px,transparent 3px 6px);height:2px;width:18px"></span>Category avg.</div>`]).join('');
   }
 
+  const monthEnd = key => { const [y, m] = key.split('-').map(Number); return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); };
+  const maxIso = (a, b) => (a > b ? a : b), minIso = (a, b) => (a < b ? a : b);
+
   function renderDrill(d) {
     const months = d.drill;
     if (!months.length) { $('drill').innerHTML = '<div class="nodata">No months in range</div>'; return; }
@@ -543,7 +546,8 @@
       const single = byLeader.size === 1 ? [...byLeader][0] : null;
       const tag = single ? (single[1].mine ? '<span class="tagme">MINE LEADS</span>' : `<span class="tag tagr">${esc(single[0].toUpperCase())}</span>`) : '<span class="tag tagr">MIXED</span>';
       html.push(`<details${singles.length ? '' : ' open'}><summary><span class="chev">▶</span> ${first.label}${first.year !== last.year ? ' ' + first.year : ''} to ${last.label} ${last.year} ${tag}</summary>
-        <div class="dbody"><p id="p-m-q">${lines.join(' ')} Quieter period, category ${money(total)}, mine ${mn(mineTot)}.</p></div></details>`);
+        <div class="dbody"><p id="p-m-q">${lines.join(' ')} Quieter period, category ${money(total)}, mine ${mn(mineTot)}.<br>
+        <span class="mlink"${detA({ title: `${first.label} to ${last.label} ${last.year}`, from: maxIso(first.key + '-01', d.filters.from), to: minIso(monthEnd(last.key), d.filters.to), tab: 'adv' })}>View ${first.label} to ${last.label} details ›</span></p></div></details>`);
     }
     $('drill').innerHTML = html.join('');
   }
@@ -579,7 +583,7 @@
     const showText = n <= 16;
     const scopeFor = (j, m, mine) => (j < top
       ? { title: `${mix.channels[j]} · ${m.label} ${m.year}`, month: m.key, channel: mix.keys[j], mine: mine || undefined, tab: 'adv' }
-      : { title: `${otherName} · ${m.label} ${m.year}`, month: m.key, medium, mine: mine || undefined, tab: 'ch' });
+      : { title: `${otherName} · ${m.label} ${m.year}`, month: m.key, medium, exclude: mix.keys.slice(0, top), mine: mine || undefined, tab: 'ch' });
     const bars = (series, colors, mine) => `<div class="bars" style="grid-template-columns:repeat(${n},minmax(0,1fr))">` + series.map((raw, i) => {
       const parts = fold(raw), m = d.months[i];
       const segs = parts ? parts.map((p, j) => ({ p, c: colors[j], j })).reverse()
@@ -632,8 +636,8 @@
       const bar = r.split
         ? r.split.map((p, j) => (p > 0 ? `<div style="width:${p}%;background:${colors[j]};color:${textOn(colors[j])}"${tipA(`${r.name}\n${buckets[j]}: ${pctS(p)} of ads · ${nf(r.counts[j])} of ${nf(r.ads)} ads\nClick for details`)}${detA(scope)}>${p >= 7 ? Math.round(p) + '%' : ''}</div>` : '')).join('')
         : '<div style="width:100%;color:#9AA3BC;font-weight:500">No TV or Radio ads</div>';
-      const acd = r.acd == null ? '<span class="acdv na">n/a</span>' : `<span class="acdv${r.mine ? ' me' : ''}">${nf(r.acd, 1)}s</span>`;
-      return `<div class="durline"${detA(scope)}${tipA(`${r.name}\n${nf(r.ads)} ads · ACD ${r.acd == null ? 'n/a' : nf(r.acd, 1) + 's'}\nClick for details`)}>
+      const acd = r.acd == null ? '<span class="acdv na">n/a</span>' : `<span class="acdv${r.mine ? ' me' : ''}">${Math.round(r.acd)}s</span>`;
+      return `<div class="durline"${detA(scope)}${tipA(`${r.name}\n${nf(r.ads)} ads · ACD ${r.acd == null ? 'n/a' : Math.round(r.acd) + 's'}\nClick for details`)}>
         <span class="durname" style="${nameStyle}" title="${esc(r.mine ? r.name + ' (mine)' : r.name)}">${esc(r.name)}</span>
         <div class="durrow" style="flex:1;height:${barH}px;${r.avg ? 'opacity:.6' : ''}">${bar}</div>${acd}</div>`;
     }).join('');
@@ -723,9 +727,10 @@
   const scopeText = sc => {
     const parts = [];
     if (sc.month) { const [y, m] = sc.month.split('-'); parts.push(`${MON[+m - 1]} ${y}`); }
+    else if (sc.from) parts.push(`${fmtDate(sc.from)} to ${fmtDate(sc.to)}`);
     else parts.push(`${fmtDate(data.filters.from)} to ${fmtDate(data.filters.to)}`);
     parts.push(data.filters.pg);
-    if (sc.medium) parts.push(sc.medium);
+    if (sc.medium) parts.push(sc.exclude ? `Other ${sc.medium} channels` : sc.medium);
     if (sc.channel) parts.push(sc.channel);
     if (sc.advertiser) parts.push(sc.advertiser);
     if (sc.mine) parts.push('mine only');
@@ -733,6 +738,12 @@
     if (data.filters.daypart) parts.push(dpLabel(data.filters.daypart));
     return parts.join(' · ');
   };
+
+  // The filters behind what is on screen (the drawer may hold unapplied edits).
+  function appliedFilters() {
+    const { from, to, pg, mine, comps, medium, channel, daypart } = data.filters;
+    return { from, to, pg, mine: mine.slice(), comps: comps.slice(), medium, channel, daypart };
+  }
 
   async function openDetail(scope, fresh) {
     if (fresh) detailStack = [];
@@ -747,7 +758,7 @@
     modal.classList.add('on');
     try {
       const { title, tab, ...s2 } = scope;
-      detailData = await api('/api/detail', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filters: state, scope: s2 }) });
+      detailData = await api('/api/detail', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filters: appliedFilters(), scope: s2 }) });
       renderDetail(scope);
     } catch (e) {
       $('mBody').innerHTML = `<div class="mload">${esc(e.message)}</div>`;
@@ -762,7 +773,7 @@
       stat('Avg per spot', money(x.spots ? x.total / x.spots : 0));
     // Actions that push what you found back into the dashboard.
     const acts = [];
-    if (scope.month) acts.push(`<button class="abtn pri" data-act="month">Zoom dashboard to ${esc($('mSub').textContent.split(' · ')[0])}</button>`);
+    if (scope.month || scope.from) acts.push(`<button class="abtn pri" data-act="month">Zoom dashboard to ${esc($('mSub').textContent.split(' · ')[0])}</button>`);
     if (scope.channel) acts.push(`<button class="abtn" data-act="channel">Filter dashboard to ${esc(scope.channel)}</button>`);
     if (scope.medium && !scope.channel) acts.push(`<button class="abtn" data-act="medium">Show ${esc(scope.medium)} only</button>`);
     if (scope.advertiser && !state.mine.includes(scope.advertiser) && !state.comps.includes(scope.advertiser)) acts.push(`<button class="abtn" data-act="comp">Add ${esc(scope.advertiser)} as competitor</button>`);
@@ -774,7 +785,10 @@
     const b = e.target.closest('[data-act]');
     if (!b) return;
     const sc = detailStack[detailStack.length - 1];
-    if (b.dataset.act === 'month') {
+    Object.assign(state, appliedFilters());
+    if (b.dataset.act === 'month' && sc.from) {
+      state.from = sc.from; state.to = sc.to;
+    } else if (b.dataset.act === 'month') {
       const [y, m] = sc.month.split('-').map(Number);
       const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
       state.from = sc.month + '-01' < overview.minDate ? overview.minDate : sc.month + '-01';
@@ -840,7 +854,7 @@
     if (!data) return toast('Nothing to export yet');
     ({ jpg: exportImage, pdf: exportPdf, csv: exportCsv })[b.dataset.x]();
   });
-  const fileBase = () => `JKH_ad-spend_${data.filters.pg.replace(/[^\w]+/g, '-')}_${data.filters.from}_to_${data.filters.to}`;
+  const fileBase = () => `JKH_Group_Dashboard_${data.filters.pg.replace(/[^\w]+/g, '-')}_${data.filters.from}_to_${data.filters.to}`;
   const loadScript = src => new Promise((ok, fail) => {
     if (document.querySelector(`script[src="${src}"]`)) return ok();
     const el = document.createElement('script');
@@ -877,7 +891,7 @@
       const [{ url, w, h }] = await Promise.all([captureDashboard(), loadScript('vendor/jspdf/jspdf.umd.min.js')]);
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({ orientation: w >= h ? 'landscape' : 'portrait', unit: 'pt', format: [w, h] });
-      pdf.setProperties({ title: 'Competitive Ad Spend Dashboard', author: 'John Keells Group' });
+      pdf.setProperties({ title: 'JKH Group Dashboard', author: 'John Keells Group' });
       pdf.addImage(url, 'JPEG', 0, 0, w, h);
       pdf.save(fileBase() + '.pdf');
       toast('PDF downloaded');
@@ -886,7 +900,7 @@
   function exportCsv() {
     const d = data, q = v => `"${String(v).replace(/"/g, '""')}"`;
     const lines = [
-      ['Competitive Ad Spend Dashboard'], ['Period', `${fmtDate(d.filters.from)} to ${fmtDate(d.filters.to)}`], ['Product group', d.filters.pg],
+      ['JKH Group Dashboard'], ['Period', `${fmtDate(d.filters.from)} to ${fmtDate(d.filters.to)}`], ['Product group', d.filters.pg],
       ['Medium', d.filters.medium], ['Channel', d.filters.channel || 'All'], ['Daypart', d.filters.daypart || 'All'], ['Spend basis', 'Rate card (LKR)'], [],
       ['KPI', 'Value'], ['Category spend', d.kpi.catSpend], ['My spend', d.kpi.mineSpend], ['Share of spend %', d.kpi.sos.toFixed(2)],
       ['Rank', d.kpi.rank ? `${d.kpi.rank} of ${d.kpi.rankOf}` : ''], ['Category spots', d.kpi.catSpots], ['My spots', d.kpi.mineSpots], [],

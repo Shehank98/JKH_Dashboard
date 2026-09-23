@@ -270,6 +270,12 @@ function detail(ds, f, scope = {}) {
   const sCh = scope.channel ? dicts.channel.indexOf(scope.channel) : -1;
   const sAdv = scope.advertiser ? dicts.adv.indexOf(scope.advertiser) : -1;
   const onlyMine = !!scope.mine;
+  // "Other" segments leave out the channels shown on their own.
+  const skipCh = new Uint8Array(nCh);
+  for (const k of scope.exclude || []) { const c = dicts.channel.indexOf(k); if (c >= 0) skipCh[c] = 1; }
+  // A sub-range inside the dashboard dates, e.g. a group of quiet months.
+  const rFrom = scope.from ? Math.max(from, toDay(scope.from)) : from;
+  const rTo = scope.to ? Math.min(to, toDay(scope.to)) : to;
 
   const advSpend = new Float64Array(nAdv), advSpots = new Float64Array(nAdv);
   const chSpend = new Float64Array(nCh), chSpots = new Float64Array(nCh), chMine = new Float64Array(nCh);
@@ -288,11 +294,12 @@ function detail(ds, f, scope = {}) {
     if (dpId >= 0 && dp[i] !== dpId) continue;
     if (sMed >= 0 && md !== sMed) continue;
     if (sCh >= 0 && c !== sCh) continue;
+    if (skipCh[c]) continue;
     const a = adv[i];
     if (sAdv >= 0 && a !== sAdv) continue;
     if (onlyMine && role[a] !== 1) continue;
     const v = cost[i];
-    if (d < from || d > to || (mon >= 0 && monCol[i] !== mon)) continue;
+    if (d < rFrom || d > rTo || (mon >= 0 && monCol[i] !== mon)) continue;
     total += v; spots++;
     advSpend[a] += v; advSpots[a]++;
     chSpend[c] += v; chSpots[c]++;
