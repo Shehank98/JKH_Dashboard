@@ -681,64 +681,39 @@
       <div class="heat" style="grid-template-columns:minmax(70px,110px) repeat(${n},minmax(0,1fr));grid-template-rows:16px">${head}${rows}</div>`;
   }
 
-  // Duration mix as a bubble grid: rows are advertisers, columns are standard lengths.
-  // The number is the ad count; bubble area follows the count so a column compares at a glance.
-  // Advertisers share one scale; the category row has its own scale so it does not dwarf them.
+  // Duration mix as a grid of ad counts: rows are advertisers, columns are standard lengths.
+  // Only my advertiser's row is highlighted.
   function renderDuration(d) {
     const { buckets, legacy } = d.duration;
     const rows = durMedium === 'All' ? d.duration.rows : d.duration.byMedium[durMedium];
     const med = durMedium === 'All' ? undefined : durMedium;
-    const advRows = rows.filter(r => !r.avg);
-    const maxAdv = Math.max(1, ...advRows.flatMap(r => r.counts));
-    const catRow = rows.find(r => r.avg);
-    const maxCat = Math.max(1, ...(catRow ? catRow.counts : [1]));
-    // Winner per length among advertisers (not the category row).
-    const lead = buckets.map((_, j) => {
-      let best = -1, bestV = 0;
-      advRows.forEach((r, i) => { if (r.counts[j] > bestV) { bestV = r.counts[j]; best = i; } });
-      return best;
-    });
-    const n = rows.length;
-    const maxD = n <= 6 ? 42 : Math.max(24, 42 - (n - 6) * 3); // bubble diameter limit in px
-    const cell = (r, j, iAdv) => {
-      const v = r.counts[j];
-      const scaleMax = r.avg ? maxCat : maxAdv;
-      const dia = v > 0 ? Math.max(10, Math.sqrt(v / scaleMax) * maxD) : 0;
-      const cls = r.mine ? 'me' : r.avg ? 'cat' : 'cp';
-      const win = !r.avg && lead[j] === iAdv && v > 0 ? ' win' : '';
+    const cell = r => (v, j) => {
       const share = r.ads ? pctS((v / r.ads) * 100) : '0%';
       const what = `${buckets[j]} ${med ? med + ' ' : ''}ads`;
       const scope = r.mine ? { title: `${r.name} (mine) · ${what}`, mine: true, dur: buckets[j], medium: med, tab: 'ch' }
         : r.avg ? { title: `Category · ${what}`, dur: buckets[j], medium: med, tab: 'adv' }
         : { title: `${r.name} · ${what}`, advertiser: r.name, dur: buckets[j], medium: med, tab: 'ch' };
       const label = v >= 100000 ? nf(v / 1000, 0) + 'K' : nf(v);
-      return `<div class="bc"${tipA(`${r.name} · ${buckets[j]}\n${nf(v)} ads (${share} of their ${nf(r.ads)} ads)${win ? '\nMost ' + buckets[j] + ' ads among advertisers' : ''}\nClick for details`)}${detA(scope)}>
-        ${v > 0 ? `<span class="bub ${cls}${win}" style="width:${dia.toFixed(1)}px;height:${dia.toFixed(1)}px"></span>` : ''}
-        <span class="bn ${v ? '' : 'zero'}${r.avg ? ' sm' : ''}">${v ? label : '0'}</span></div>`;
+      return `<div class="bc"${tipA(`${r.name} · ${buckets[j]}\n${nf(v)} ads (${share} of their ${nf(r.ads)} ads)\nClick for details`)}${detA(scope)}>
+        <span class="bn ${v ? '' : 'zero'}">${v ? label : '0'}</span></div>`;
     };
-    let iAdv = -1;
     const body = rows.map(r => {
-      if (!r.avg) iAdv++;
-      const nameStyle = r.mine ? `color:${C.deep};font-weight:700` : r.avg ? 'color:#4A5570;font-weight:700' : '';
       const acd = r.acd == null ? '<span class="acdp na">n/a</span>' : `<span class="acdp${r.mine ? ' me' : r.avg ? ' cat' : ''}">${Math.round(r.acd)}s</span>`;
       const scope = r.mine ? { title: r.name + ' (mine)', mine: true, medium: med, tab: 'camp' } : r.avg ? { title: 'Category spend', medium: med, tab: 'adv' } : { title: r.name, advertiser: r.name, medium: med, tab: 'camp' };
-      const cells = r.ads ? buckets.map((_, j) => cell(r, j, iAdv)).join('') : `<div class="bc none" style="grid-column:span ${buckets.length}">No TV or Radio ads</div>`;
-      return `<div class="brow${r.avg ? ' catrow' : ''}">
-        <span class="durname" style="${nameStyle}" title="${esc(r.name)} · ${nf(r.ads)} ads"${detA(scope)}><span class="nm2">${esc(r.name)}</span></span>
+      const cells = r.ads ? r.counts.map(cell(r)).join('') : `<div class="bc none" style="grid-column:span ${buckets.length}">No TV or Radio ads</div>`;
+      return `<div class="brow${r.mine ? ' me' : ''}${r.avg ? ' catrow' : ''}">
+        <span class="durname" title="${esc(r.name)} · ${nf(r.ads)} ads"${detA(scope)}><span class="nm2">${esc(r.name)}</span></span>
         ${cells}${acd}</div>`;
     }).join('');
-    const cols = `grid-template-columns:minmax(88px,1.6fr) repeat(${buckets.length},minmax(34px,1fr)) 40px`;
+    const cols = `grid-template-columns:minmax(74px,1.2fr) repeat(${buckets.length},minmax(34px,1fr)) 36px`;
     $('duration').innerHTML = `${legacy ? '<div class="durnote">Re-upload your file to apply the new length buckets and ACD</div>' : ''}
       <div class="bgrid" style="${cols}">
         <span class="bh" style="text-align:left">${med ? med.toUpperCase() + ' ADS' : 'NUMBER OF ADS'}</span>${buckets.map(b => `<span class="bh">${b}</span>`).join('')}<span class="bh">ACD</span>
       </div>
       <div class="bbody" style="--cols:${cols.replace('grid-template-columns:', '')}">${body}</div>
-      <div class="legend" style="margin-top:6px">
-        <div class="lg"><span class="bub me" style="width:10px;height:10px;position:static"></span>Mine</div>
-        <div class="lg"><span class="bub cp" style="width:10px;height:10px;position:static"></span>Competitor</div>
-        <div class="lg"><span class="bub cp win" style="width:9px;height:9px;position:static"></span>Most in that length</div>
-        <div class="lg" style="margin-left:auto;color:#8A93AD">Bubble size = ads · ACD = seconds / ads</div></div>`;
+      <div class="legend" style="margin-top:6px"><div class="lg" style="margin-left:auto;color:#8A93AD">ACD = total seconds / ads</div></div>`;
   }
+
 
 
 

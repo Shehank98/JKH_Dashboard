@@ -174,12 +174,20 @@ details[open] .chev{transform:rotate(90deg)}
 .acdv{width:46px;text-align:right;font-size:12px;font-weight:700;color:#1A1F36;flex-shrink:0;font-variant-numeric:tabular-nums}
 .acdv.me{color:#E4702A}.acdv.na{color:#B4BCD0;font-weight:500;font-size:10.5px}
 .durnote{font-size:10px;color:#9A4A16;background:#FFF7F1;border-radius:6px;padding:4px 8px;margin-top:6px;flex-shrink:0}
-.bgrid{display:grid;align-items:end;gap:0 4px;margin-top:8px;flex-shrink:0;padding-bottom:4px;border-bottom:1px solid #EEF1F7}
+.bgrid{display:grid;align-items:end;gap:0 5px;margin-top:8px;flex-shrink:0;padding-bottom:4px;border-bottom:1px solid #EEF1F7}
 .bh{font-size:9px;font-weight:700;letter-spacing:.8px;color:#8A93AD;text-align:center;white-space:nowrap}
 .bh:last-child{color:#4A5570;text-align:right}
 .bbody{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly}
-.brow{display:grid;grid-template-columns:var(--cols);gap:0 4px;align-items:center;flex:1;max-height:62px;min-height:0;border-radius:8px}
+.brow{display:grid;grid-template-columns:var(--cols);gap:0 5px;align-items:center;flex:1;max-height:62px;min-height:0;border-radius:8px}
 .brow:hover{background:#F7F9FD}
+.brow.me{background:#FFF7F1;box-shadow:inset 3px 0 0 #FF8A3D}
+.brow.me:hover{background:#FFEFE2}
+.brow.me .durname{color:#E4702A;font-weight:700}
+.brow.me .bn{color:#C4560F}
+.brow.catrow .durname{color:#4A5570;font-weight:700}
+.brow.catrow .bn{color:#4A5570;font-size:10.5px;letter-spacing:-.4px}
+.bc:hover .bn{color:#2F5DBF;text-decoration:underline}
+.brow .durname{padding-left:8px}
 .brow.catrow{border-top:1px dashed #DDE3EF;border-radius:0}
 .brow .durname{width:auto;display:flex;flex-direction:column;line-height:1.2;cursor:pointer;white-space:normal;min-width:0}
 .brow .durname .nm2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
@@ -193,7 +201,7 @@ details[open] .chev{transform:rotate(90deg)}
 .bub.cat{background:rgba(138,147,173,.22)}
 .bub.win{box-shadow:0 0 0 2px #1A1F36}
 .lg .bub{display:inline-block}
-.bn{position:relative;font-size:11px;font-weight:700;color:#1A1F36;font-variant-numeric:tabular-nums;letter-spacing:-.2px;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff}
+.bn{position:relative;font-size:12px;font-weight:700;color:#1A1F36;font-variant-numeric:tabular-nums;letter-spacing:-.2px;white-space:nowrap}
 .bn.sm{font-size:10px;color:#4A5570}
 .bn.zero{color:#C7CEDF;font-weight:500}
 .acdp{justify-self:end;font-size:11px;font-weight:700;padding:3px 7px;border-radius:20px;background:#EEF2FB;color:#1E3F8A;font-variant-numeric:tabular-nums}
@@ -494,7 +502,6 @@ tr.me .sharebar{background:#FF8A3D}
   <div class="card" id="cardDur">
     <div class="chead"><div class="ctitle"><h3 id="h-dur">Duration Mix</h3></div>
       <div class="tgl" data-durmed><button data-v="All" class="on">TV + Radio</button><button data-v="TV">TV</button><button data-v="Radio">Radio</button></div></div>
-    <p class="sub" id="p-dur" style="white-space:normal">Below 10s is 5s · 10 to 30s snaps to 15, 20 or 30s (25s is 20s) · above 30s is 30s+ · value additions count as 5s</p>
     <div class="fill" id="duration"></div>
   </div>
 </div>
@@ -532,6 +539,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=15"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>
