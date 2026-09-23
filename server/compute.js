@@ -45,26 +45,46 @@ function groupOptions(ds, pgName) {
   return { advertisers, channels };
 }
 
-function dashboard(ds, f) {
-  const { dicts, cols } = ds;
-  const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
+// Theme ids that are sponsorship or filler items, cached per dataset.
+const excludedCache = new WeakMap();
+function excludedThemes(ds) {
+  let set = excludedCache.get(ds);
+  if (!set) {
+    set = new Uint8Array(ds.dicts.theme.length);
+    ds.dicts.theme.forEach((t, i) => { if (D.isExcludedTheme(t)) set[i] = 1; });
+    excludedCache.set(ds, set);
+  }
+  return set;
+}
+
+// Shared filter resolution for the dashboard and the detail view.
+function resolve(ds, f) {
+  const { dicts } = ds;
   const pgId = dicts.pg.indexOf(f.pg);
   if (pgId < 0) throw new Error('Unknown product group');
-
   const from = toDay(f.from), to = toDay(f.to);
   if (!(to >= from)) throw new Error('Invalid date range');
-  const len = to - from + 1, pFrom = from - len, pTo = from - 1;
-  const mediumId = D.MEDIA.indexOf(f.medium);
-  const chId = f.channel ? dicts.channel.indexOf(f.channel) : -1;
-  const dpId = f.daypart ? D.DAYPARTS.indexOf(f.daypart) : -1;
-
+  const len = to - from + 1;
   // role: 1 = mine, 2 = competitor. Mine wins if a name is in both lists.
-  const role = new Uint8Array(nAdv);
+  const role = new Uint8Array(dicts.adv.length);
   const compIds = [];
   for (const n of f.comps || []) { const i = dicts.adv.indexOf(n); if (i >= 0) { role[i] = 2; compIds.push(i); } }
   const mineIds = [];
   for (const n of f.mine || []) { const i = dicts.adv.indexOf(n); if (i >= 0) { role[i] = 1; mineIds.push(i); } }
-  const comps = compIds.filter(i => role[i] === 2);
+  return {
+    pgId, from, to, pFrom: from - len, pTo: from - 1,
+    mediumId: D.MEDIA.indexOf(f.medium),
+    chId: f.channel ? dicts.channel.indexOf(f.channel) : -1,
+    dpId: f.daypart ? D.DAYPARTS.indexOf(f.daypart) : -1,
+    role, mineIds, comps: compIds.filter(i => role[i] === 2),
+  };
+}
+
+function dashboard(ds, f) {
+  const { dicts, cols } = ds;
+  const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
+  const { pgId, from, to, pFrom, pTo, mediumId, chId, dpId, role, mineIds, comps } = resolve(ds, f);
+  const excluded = excludedThemes(ds);
 
   const mon0 = new Date(from * 86400000), mon1 = new Date(to * 86400000);
   const m0 = mon0.getUTCFullYear() * 12 + mon0.getUTCMonth();
@@ -116,6 +136,7 @@ function dashboard(ds, f) {
       if (md < 2) chMine[mi * nCh + c] += v;
       if (md < 2 && du < 4) durMine[du]++;
     }
+    if (excluded[theme[i]]) continue;
     const key = (mi * nAdv + a) * nTheme + theme[i];
     const t = themeAgg.get(key);
     if (t) { t[0] += v; t[1]++; } else themeAgg.set(key, [v, 1]);
@@ -190,7 +211,7 @@ function dashboard(ds, f) {
       if (total <= 0) return null;
       return ids.map(c => (src[k * nCh + c] / total) * 100);
     });
-    return { channels: ids.map(c => dicts.channelName[c]), category: series(chCat), mine: series(chMine) };
+    return { channels: ids.map(c => dicts.channelName[c]), keys: ids.map(c => dicts.channel[c]), category: series(chCat), mine: series(chMine) };
   };
 
   // Duration mix, share of TV and Radio spots.
@@ -222,4 +243,88 @@ function dashboard(ds, f) {
   };
 }
 
-module.exports = { overview, groupOptions, dashboard };
+// Detail view behind a click: the dashboard filters narrowed by a scope
+// (month, medium, channel, advertiser or mine), broken down by advertiser, campaign and channel.
+function detail(ds, f, scope = {}) {
+  const { dicts, cols } = ds;
+  const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
+  const { pgId, from, to, pFrom, pTo, mediumId, chId, dpId, role } = resolve(ds, f);
+  const excluded = excludedThemes(ds);
+  let mon = -1;
+  if (scope.month) { const [y, m] = scope.month.split('-').map(Number); mon = y * 12 + m - 1; }
+  const sMed = scope.medium ? D.MEDIA.indexOf(scope.medium) : -1;
+  const sCh = scope.channel ? dicts.channel.indexOf(scope.channel) : -1;
+  const sAdv = scope.advertiser ? dicts.adv.indexOf(scope.advertiser) : -1;
+  const onlyMine = !!scope.mine;
+  // Previous period: the month before for a month scope, otherwise the period before the date range.
+  const usePrev = !!f.compare;
+
+  const advSpend = new Float64Array(nAdv), advSpots = new Float64Array(nAdv), advPrev = new Float64Array(nAdv);
+  const chSpend = new Float64Array(nCh), chSpots = new Float64Array(nCh), chMine = new Float64Array(nCh);
+  const themes = new Map();
+  let total = 0, spots = 0, mineTotal = 0, prevTotal = 0;
+  const { pg, adv, ch, theme, day, dp, cost } = cols;
+  const chMed = dicts.channelMedium;
+  const monCol = cols.mon;
+
+  for (let i = 0, n = pg.length; i < n; i++) {
+    if (pg[i] !== pgId) continue;
+    const d = day[i];
+    const c = ch[i], md = chMed[c];
+    if (mediumId >= 0 && md !== mediumId) continue;
+    if (chId >= 0 && c !== chId) continue;
+    if (dpId >= 0 && dp[i] !== dpId) continue;
+    if (sMed >= 0 && md !== sMed) continue;
+    if (sCh >= 0 && c !== sCh) continue;
+    const a = adv[i];
+    if (sAdv >= 0 && a !== sAdv) continue;
+    if (onlyMine && role[a] !== 1) continue;
+    const v = cost[i];
+    let cur, prev;
+    if (mon >= 0) {
+      cur = monCol[i] === mon && d >= from && d <= to;
+      prev = monCol[i] === mon - 1;
+    } else {
+      cur = d >= from && d <= to;
+      prev = d >= pFrom && d <= pTo;
+    }
+    if (prev && usePrev) { advPrev[a] += v; prevTotal += v; }
+    if (!cur) continue;
+    total += v; spots++;
+    advSpend[a] += v; advSpots[a]++;
+    chSpend[c] += v; chSpots[c]++;
+    if (role[a] === 1) { chMine[c] += v; mineTotal += v; }
+    if (!excluded[theme[i]]) {
+      const key = a * nTheme + theme[i];
+      const t = themes.get(key);
+      if (t) { t[0] += v; t[1]++; } else themes.set(key, [v, 1]);
+    }
+  }
+
+  const advertisers = [];
+  for (let a = 0; a < nAdv; a++) {
+    if (advSpend[a] <= 0 && advPrev[a] <= 0) continue;
+    advertisers.push({
+      name: dicts.adv[a], role: role[a] === 1 ? 'mine' : role[a] === 2 ? 'comp' : '',
+      spend: advSpend[a], spots: advSpots[a], prev: usePrev ? advPrev[a] : null,
+    });
+  }
+  advertisers.sort((x, y) => y.spend - x.spend);
+  const campaigns = [...themes].map(([key, v]) => {
+    const t = key % nTheme, a = (key - t) / nTheme;
+    return { name: dicts.theme[t], advertiser: dicts.adv[a], role: role[a] === 1 ? 'mine' : role[a] === 2 ? 'comp' : '', spend: v[0], spots: v[1] };
+  }).sort((x, y) => y.spend - x.spend).slice(0, 50);
+  const channels = [];
+  for (let c = 0; c < nCh; c++) {
+    if (chSpend[c] <= 0) continue;
+    channels.push({ name: dicts.channel[c], short: dicts.channelName[c], medium: D.MEDIA[chMed[c]], spend: chSpend[c], spots: chSpots[c], mine: chMine[c] });
+  }
+  channels.sort((x, y) => y.spend - x.spend);
+  return {
+    scope, total, spots, mineTotal, prevTotal: usePrev ? prevTotal : null,
+    prevLabel: mon >= 0 ? 'vs prev. month' : 'vs prev. period',
+    advertisers, campaigns, channels,
+  };
+}
+
+module.exports = { overview, groupOptions, dashboard, detail };

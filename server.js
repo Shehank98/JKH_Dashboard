@@ -113,4 +113,13 @@ app.post('/api/dashboard', needData, (req, res) => {
   }
 });
 
+app.post('/api/detail', needData, (req, res) => {
+  try {
+    const { filters, scope } = req.body || {};
+    res.json(compute.detail(dataset, filters || {}, scope || {}));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 app.listen(PORT, () => console.log(`Dashboard running on http://localhost:${PORT} (data dir ${DATA_DIR})`));

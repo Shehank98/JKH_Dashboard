@@ -48,22 +48,34 @@ assert.strictEqual(D.dayNumber(1, 'Jan', 26), D.dayNumber(1, 1, 2026));
     'Biscuits,Rival,P,Theme B,Lankadeepa,,10,12,2025,Wed,,,,,,,,Sinhala,,700000',
     'Biscuits,Other,P,Theme C,Lankadeepa,,8,2,2026,Thu,,,,,,,,Sinhala,,500000',
     'Biscuits,Bad,P,Theme C,Lankadeepa,,31,2,2026,Thu,,,,,,,,Sinhala,,1',
+    'Biscuits,Me,P,-BB,TV - Derana TV,News,9,1,2026,Fri,19:00,19:50:00,1,5,1,1,5,Sinhala,5,5000000',
+    'Biscuits,Me,P,Summer -BB,TV - Derana TV,News,9,1,2026,Fri,19:00,19:51:00,1,5,1,1,5,Sinhala,5,1',
+    'Biscuits,Me,P,Time Check,FM Derana,Show,9,1,2026,Fri,08:00,08:10:00,1,5,1,1,5,Sinhala,5,1',
   ].join('\n'));
   const ds = await ingestFile(file, 'smoke.csv');
   fs.rmSync(file);
-  assert.strictEqual(ds.meta.rows, 5);
+  assert.strictEqual(ds.meta.rows, 8);
   assert.strictEqual(ds.meta.skipped, 1);
   const out = compute.dashboard(ds, { from: '2026-01-01', to: '2026-02-28', compare: true, pg: 'Biscuits', mine: ['Me'], comps: ['Rival'], medium: 'All' });
-  assert.strictEqual(out.kpi.catSpend, 4000000);
-  assert.strictEqual(out.kpi.mineSpend, 1500000);
-  assert.strictEqual(Math.round(out.kpi.sos * 10) / 10, 37.5);
-  assert.strictEqual(out.kpi.rank, 2);
+  assert.strictEqual(out.kpi.catSpend, 9000002);
+  assert.strictEqual(out.kpi.mineSpend, 6500002);
+  assert.strictEqual(Math.round(out.kpi.sos * 10) / 10, 72.2);
+  assert.strictEqual(out.kpi.rank, 1);
   assert.strictEqual(out.kpi.catPrev, 700000);
   assert.strictEqual(out.months.length, 2);
   assert.strictEqual(out.drill[1].leader.name, 'Rival');
   assert.strictEqual(out.drill[0].leader.mine, true);
-  assert.strictEqual(out.drill[0].campaign.name, 'Theme A');
+  assert.strictEqual(out.drill[0].campaign.name, 'Theme A'); // -BB spent more but is excluded
   const tvOnly = compute.dashboard(ds, { from: '2026-01-01', to: '2026-02-28', pg: 'Biscuits', mine: ['Me'], comps: ['Rival'], medium: 'TV' });
-  assert.strictEqual(tvOnly.kpi.catSpend, 3000000);
+  assert.strictEqual(tvOnly.kpi.catSpend, 8000001);
+  // Sponsorship themes never become the lead campaign or appear in the campaign list.
+  assert.ok(D.isExcludedTheme('-BB') && D.isExcludedTheme('Summer -BB') && D.isExcludedTheme('time check') && !D.isExcludedTheme('Rich Taste'));
+  const det = compute.detail(ds, { from: '2026-01-01', to: '2026-02-28', compare: true, pg: 'Biscuits', mine: ['Me'], comps: ['Rival'], medium: 'All' }, { month: '2026-01' });
+  assert.strictEqual(det.total, 6000002);
+  assert.deepStrictEqual(det.campaigns.map(c => c.name), ['Theme A']);
+  assert.strictEqual(det.advertisers[0].role, 'mine');
+  assert.strictEqual(det.prevTotal, 700000); // December 2025
+  const detCh = compute.detail(ds, { from: '2026-01-01', to: '2026-02-28', pg: 'Biscuits', mine: ['Me'], comps: ['Rival'], medium: 'All' }, { channel: 'TV - Sirasa TV' });
+  assert.deepStrictEqual(detCh.advertisers.map(a => a.name), ['Rival']);
   console.log('All smoke tests passed');
 })().catch(e => { console.error(e); process.exit(1); });

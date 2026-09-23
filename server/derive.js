@@ -99,6 +99,17 @@ function parseTime(v) {
   return Number.isFinite(n) ? parseTime(n) : null;
 }
 
+// Sponsorship and filler items that are not real campaigns. Override with EXCLUDED_THEMES="a;b;c".
+const EXCLUDED_THEMES = (process.env.EXCLUDED_THEMES || '-BB;Com Break;DJ;-Extro;-Intro;-LLogo;Next Card;Tag;Time Check;-Tr')
+  .split(';').map(t => t.trim().toLowerCase()).filter(Boolean);
+
+// Excluded when the theme equals an item, or ends with a dash marker such as "Summer Promo -BB".
+function isExcludedTheme(theme) {
+  const t = String(theme || '').trim().toLowerCase();
+  if (!t) return false;
+  return EXCLUDED_THEMES.some(x => t === x || (x.startsWith('-') && t.endsWith(x)));
+}
+
 function parseNumber(v) {
   if (v == null || v === '') return NaN;
   if (typeof v === 'number') return v;
@@ -109,5 +120,5 @@ function parseNumber(v) {
 module.exports = {
   MEDIA, DAYPARTS, DAYPART_TIMES, DURATIONS, BREAK_QUALITY, MONTHS,
   mediumOf, channelNameOf, daypartOf, stdDurIndex, breakQualityOf,
-  dayNumber, parseTime, parseNumber,
+  dayNumber, parseTime, parseNumber, isExcludedTheme, EXCLUDED_THEMES,
 };

@@ -9,8 +9,9 @@ A full-screen competitive media spend dashboard (John Keells Group branding) for
 * Fills the whole browser window. Below 1280 x 720 it scales down to fit instead of scrolling.
 * Filter drawer with two tabs: **Filters** (period and category, advertisers, media) and **Data file** (upload, delete, required columns). Apply and Reset stay pinned at the bottom.
 * Daypart filter lists the time range for each bucket.
-* TV and Radio channel mix show every channel as % of spend, darkest segment = biggest channel.
-* Month Drill Down names the advertiser behind each lead campaign.
+* TV and Radio channel mix: **Top 5** stacked bars by default (the rest grouped as Other), with an **All channels** heatmap behind a toggle (Category or Mine).
+* Interactive: hover any bar, line, cell or segment for a tooltip; click it to open a details pop-up (Advertisers, Campaigns, Channels). Click rows to drill deeper, use Back to return, and push a finding into the dashboard (zoom to a month, filter to a channel, add a competitor). Click legend items in the trend to hide or show lines. KPI cards open the rankings.
+* Month Drill Down names the advertiser behind each lead campaign. Sponsorship and filler themes (`-BB`, `Com Break`, `DJ`, `-Extro`, `-Intro`, `-LLogo`, `Next Card`, `Tag`, `Time Check`, `-Tr`) are ignored when picking campaigns: exact match, or a name ending in a dash marker such as `Summer Promo -BB`. Override the list with `EXCLUDED_THEMES="a;b;c"`.
 * **Export** menu: JPG (whole dashboard as one image), PDF (one landscape page), or CSV (monthly numbers).
 
 ## How it works
@@ -70,7 +71,7 @@ npm run sample       # writes samples/sample_420000.csv and .xlsx for testing
 1. Push this repo to GitHub, then in Railway choose **New Project, Deploy from GitHub repo**.
 2. Add a **Volume** to the service and mount it at `/data`.
 3. Add the variable `DATA_DIR=/data`. Without a volume, the uploaded data is lost on each redeploy.
-4. Optional variables: `MAX_UPLOAD_MB` (default 100).
+4. Optional variables: `MAX_UPLOAD_MB` (default 100), `EXCLUDED_THEMES` (semicolon separated).
 5. Railway sets `PORT` automatically. Health check: `/api/status`.
 
 Memory: the start script allows Node up to 3 GB. A 50 MB `.xlsx` needs roughly 400 to 600 MB while processing and about 150 MB after that.
