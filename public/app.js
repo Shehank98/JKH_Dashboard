@@ -209,7 +209,6 @@
     $('fPg').innerHTML = overview.productGroups.map(g => `<option>${esc(g.name)}</option>`).join('');
     $('fDaypart').innerHTML = '<option value="">All dayparts</option>' +
       overview.dayparts.map(d => `<option value="${esc(d.name)}">${esc(dpLabel(d.name))}</option>`).join('');
-    renderDpTable();
     const { minDate, maxDate } = overview;
     $('fFrom').min = $('fTo').min = minDate; $('fFrom').max = $('fTo').max = maxDate;
 
@@ -226,10 +225,6 @@
 
   const dpInfo = name => (overview && overview.dayparts.find(d => d.name === name)) || null;
   const dpLabel = name => { const d = dpInfo(name); return d && /^\d/.test(d.time) ? `${d.name} (${d.time})` : name; };
-  function renderDpTable() {
-    $('dpTable').innerHTML = '<tbody>' + overview.dayparts.map(d =>
-      `<tr class="${d.name === state.daypart ? 'sel' : ''}"><td>${esc(d.name)}</td><td>${esc(d.time)}</td></tr>`).join('') + '</tbody>';
-  }
   function defaultDates() {
     const { minDate, maxDate } = overview, jan = maxDate.slice(0, 4) + '-01-01';
     return { from: jan > minDate ? jan : minDate, to: maxDate };
@@ -253,7 +248,6 @@
     $('fFrom').value = state.from; $('fTo').value = state.to;
     $('fPg').value = state.pg;
     $('fDaypart').value = state.daypart || '';
-    renderDpTable();
     [...$('fMedium').children].forEach(b => b.classList.toggle('on', b.dataset.v === state.medium));
     [...$('fAdType').children].forEach(b => b.classList.toggle('on', b.dataset.v === (state.adType || 'All')));
     renderAdvLists();
@@ -316,7 +310,7 @@
     [...$('fAdType').children].forEach(x => x.classList.toggle('on', x === b));
   });
   $('fChannel').addEventListener('change', e => { state.channel = e.target.value; });
-  $('fDaypart').addEventListener('change', e => { state.daypart = e.target.value; renderDpTable(); });
+  $('fDaypart').addEventListener('change', e => { state.daypart = e.target.value; });
   $('resetBtn').addEventListener('click', async () => {
     if (!overview) return;
     const keepPg = state.pg;
@@ -730,7 +724,7 @@
       const scope = r.mine ? { title: r.name + ' (mine)', mine: true, medium: med, tab: 'camp' } : r.avg ? { title: 'Category spend', medium: med, tab: 'adv' } : { title: r.name, advertiser: r.name, medium: med, tab: 'camp' };
       const cells = r.ads ? buckets.map((_, j) => cell(r, j, iAdv)).join('') : `<div class="bc none" style="grid-column:span ${buckets.length}">No TV or Radio ads</div>`;
       return `<div class="brow${r.avg ? ' catrow' : ''}">
-        <span class="durname" style="${nameStyle}" title="${esc(r.name)} · ${nf(r.ads)} ads"${detA(scope)}><span class="nm2">${esc(r.name)}</span><small>${nf(r.ads)} ads</small></span>
+        <span class="durname" style="${nameStyle}" title="${esc(r.name)} · ${nf(r.ads)} ads"${detA(scope)}><span class="nm2">${esc(r.name)}</span></span>
         ${cells}${acd}</div>`;
     }).join('');
     const cols = `grid-template-columns:minmax(88px,1.6fr) repeat(${buckets.length},minmax(34px,1fr)) 40px`;
