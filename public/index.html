@@ -219,9 +219,14 @@ details[open] .chev{transform:rotate(90deg)}
 .sost tr.me .sosbar .trk span{background:#FF8A3D}
 .sost tr.oth .sosbar .trk span{background:#C7CEDF}
 .sosbar b{font-size:12px;min-width:40px;text-align:right;font-variant-numeric:tabular-nums}
-.sost .spk{width:78px}
 .sost .go{color:#B4BCD0;font-weight:700;width:14px;text-align:right}
 .sost tr.row:hover .go{color:#2F5DBF}
+.sosm td{text-align:center;padding:5px 3px;font-variant-numeric:tabular-nums;font-size:11px}
+.sosm th{text-align:center;padding:4px 3px}
+.sosm td.an,.sosm th.an{text-align:left}
+.sosm td.c{cursor:pointer;border-radius:4px;font-weight:600}
+.sosm td.c:hover{outline:2px solid #1A1F36;outline-offset:-2px}
+.sosm td.per{font-weight:700;border-left:1.5px solid #E5E9F2}
 .nodata{display:flex;align-items:center;justify-content:center;flex:1;min-height:80px;color:#9AA3BC;font-size:11px;text-align:center}
 
 /* Empty and loading states */
@@ -367,9 +372,9 @@ tr.me .sharebar{background:#FF8A3D}
         <div class="segbar" id="fAdType">
           <button class="seg on" data-v="All">All</button>
           <button class="seg" data-v="Commercial">Commercials</button>
-          <button class="seg" data-v="Sponsorship">Sponsorships</button>
+          <button class="seg" data-v="Sponsorship">Value Additions</button>
         </div>
-        <div class="hint">Sponsorships: -BB, Com Break, DJ, -Extro, -Intro, -LLogo, Next Card, Tag, Time Check, -Tr (Advt_Theme). Everything else is a commercial. Sponsorships always count as 5s in Duration Mix and are never picked as the Month Drill Down lead campaign (except in Sponsorships view).</div>
+        <div class="hint">Value Additions: -BB, Com Break, DJ, -Extro, -Intro, -LLogo, Next Card, Tag, Time Check, -Tr (Advt_Theme). Everything else is a commercial. Value additions always count as 5s in Duration Mix and are never picked as the Month Drill Down lead campaign (except in Value Additions view).</div>
         <div class="flabel">Medium</div>
         <div class="segbar" id="fMedium">
           <button class="seg on" data-v="All">All</button>
@@ -476,7 +481,8 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="rowC">
   <div class="card" id="cardSos">
-    <div class="chead"><div class="ctitle"><h3 id="h-sos">Share of Spend Comparison</h3></div></div>
+    <div class="chead"><div class="ctitle"><h3 id="h-sos">Share of Spend Comparison</h3></div>
+      <div class="tgl" data-sosview><button data-v="period" class="on">Period</button><button data-v="month">By month</button></div></div>
     <p class="sub" id="p-sos">Selected period · my advertiser vs competitors · click a row for details</p>
     <div class="fill" id="sosTable"></div>
   </div>
@@ -490,7 +496,7 @@ tr.me .sharebar{background:#FF8A3D}
   <div class="card" id="cardDur">
     <div class="chead"><div class="ctitle"><h3 id="h-dur">Duration Mix</h3></div>
       <div class="tgl" data-durmed><button data-v="All" class="on">TV + Radio</button><button data-v="TV">TV</button><button data-v="Radio">Radio</button></div></div>
-    <p class="sub" id="p-dur" style="white-space:normal">Below 10s is 5s · 10 to 30s snaps to 15, 20 or 30s (25s is 20s) · above 30s is 30s+ · sponsorships count as 5s</p>
+    <p class="sub" id="p-dur" style="white-space:normal">Below 10s is 5s · 10 to 30s snaps to 15, 20 or 30s (25s is 20s) · above 30s is 30s+ · value additions count as 5s</p>
     <div class="fill" id="duration"></div>
   </div>
 </div>
@@ -528,6 +534,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

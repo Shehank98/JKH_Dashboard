@@ -23,7 +23,8 @@
   const mixView = { mx: 'bars' };                // channel mix: Top 5 bars or heatmap
   const heatSide = { mx: 'cat' };                // heatmap: category or mine
   let mixMedium = 'TV';                          // channel mix: TV, Radio or Press
-  let durMedium = 'All';                         // duration mix: All (TV + Radio), TV or Radio
+  let durMedium = 'All';
+  let sosView = 'period';                        // SOS table: whole period or by month                         // duration mix: All (TV + Radio), TV or Radio
   let pollTimer = null;
 
   // ---------- helpers ----------
@@ -370,7 +371,7 @@
     chips.push(`<span class="chip">+${f.comps.length} competitor${f.comps.length === 1 ? '' : 's'}</span>`);
     chips.push(`<span class="chip">${f.medium === 'All' ? 'All media' : esc(f.medium) + ' only'}</span>`);
     if (f.adType === 'Commercial') chips.push('<span class="chip">Commercials only</span>');
-    if (f.adType === 'Sponsorship') chips.push('<span class="chip s">Sponsorships only</span>');
+    if (f.adType === 'Sponsorship') chips.push('<span class="chip s">Value Additions only</span>');
     if (f.channel) chips.push(`<span class="chip">${esc(f.channel)}</span>`);
     if (f.daypart) chips.push(`<span class="chip">${esc(dpLabel(f.daypart))}</span>`);
     const busy = $('busyChip');
@@ -393,44 +394,57 @@
     renderDuration(d);
   }
 
-  // Share of spend comparison: mine, each competitor, everyone else, with a month-by-month SOS line.
+  // Share of spend comparison: mine, each competitor and everyone else.
+  // Period view: one line each for the selected dates. By month view: the SOS % of each month as shaded numbers.
   function renderSos(d) {
     const S = d.sos;
     const rows = S.rows.concat(S.others.spend > 0 ? [S.others] : []);
     if (!rows.length) { $('sosTable').innerHTML = '<div class="nodata">Pick your advertiser and competitors in Filters</div>'; return; }
+    const scopeOf = (r, extra) => (r.mine ? { title: r.name + ' (mine)', mine: true, ...extra } : r.others ? { title: 'All advertisers', ...extra } : { title: r.name, advertiser: r.name, ...extra });
+    const cls = r => (r.mine ? 'row me' : r.others ? 'row oth' : 'row');
+    if (sosView === 'month') {
+      const n = d.months.length, dec = n <= 7 ? 1 : 0;
+      const max = Math.max(1, ...rows.filter(r => !r.others).flatMap(r => r.monthly.filter(v => v != null)));
+      const shade = (r, v) => {
+        if (v == null) return 'background:#F6F8FC;color:#B4BCD0';
+        const t = Math.min(1, v / max) * 0.85 + 0.08;
+        const rgb = r.mine ? '255,138,61' : r.others ? '154,166,196' : '68,116,214';
+        return `background:rgba(${rgb},${t.toFixed(2)});color:${t > 0.55 ? '#fff' : '#1A1F36'}`;
+      };
+      const head = `<tr><th class="an">Advertiser</th>${d.months.map(m => `<th>${esc(monthLabel(m, d.months))}</th>`).join('')}<th class="per">Period</th></tr>`;
+      const body = rows.map(r => `<tr class="${cls(r)}">
+        <td class="an" title="${esc(r.name)}"${detA(scopeOf(r, { tab: r.others ? 'adv' : 'mon' }))}>${esc(r.name)}</td>
+        ${r.monthly.map((v, k) => {
+          const m = d.months[k];
+          return `<td class="c" style="${shade(r, v)}"${tipA(`${r.name} · ${m.label} ${m.year}\nSOS ${v == null ? 'n/a' : pctS(v)}\nClick for details`)}${detA(scopeOf(r, { title: `${r.others ? 'All advertisers' : r.name} · ${m.label} ${m.year}`, month: m.key, tab: r.others ? 'adv' : 'ch' }))}>${v == null ? 'n/a' : nf(v, dec)}</td>`;
+        }).join('')}
+        <td class="per">${pctS(r.sos)}</td></tr>`).join('');
+      $('sosTable').innerHTML = `<div class="sost sosm"><table><tbody>${head}${body}</tbody></table></div>`;
+      $('p-sos').textContent = 'SOS % of each month · darker = bigger share · click a cell for details';
+      return;
+    }
     const maxSos = Math.max(1, ...rows.map(r => r.sos));
-    const spark = r => {
-      const W = 74, H = 20, n = r.monthly.length;
-      // Each line uses its own range so its ups and downs show; exact values are in the tooltip.
-      const vals = r.monthly.filter(v => v != null);
-      const lo = Math.min(...vals), hi = Math.max(...vals), span = Math.max(hi - lo, 1);
-      const mid = (hi + lo) / 2;
-      const yOf = v => H / 2 - ((v - mid) / span) * (H - 6);
-      const pts = r.monthly.map((v, i) => [n === 1 ? W / 2 : 2 + (i * (W - 4)) / (n - 1), v == null ? null : yOf(v)]).filter(p => p[1] != null);
-      if (!pts.length) return '';
-      const col = r.mine ? C.orange : r.others ? '#B4BCD0' : '#4474D6';
-      const last = pts[pts.length - 1];
-      return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" points="${pts.map(p => p.map(x => x.toFixed(1)).join(',')).join(' ')}"></polyline><circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.2" fill="${col}"></circle></svg>`;
-    };
-    const monthsTip = r => r.monthly.map((v, i) => `${d.months[i].label}: ${v == null ? 'n/a' : pctS(v)}`).join('\n');
-    const body = rows.map(r => {
-      const scope = r.mine ? { title: r.name + ' (mine)', mine: true, tab: 'mon' } : r.others ? { title: 'All advertisers', tab: 'adv' } : { title: r.name, advertiser: r.name, tab: 'mon' };
-      const cls = r.mine ? 'row me' : r.others ? 'row oth' : 'row';
-      return `<tr class="${cls}"${detA(scope)}${tipA(`${r.name}\nSOS ${pctS(r.sos)} · ${money(r.spend)} · ${nf(r.spots)} spots\nSOS by month:\n${monthsTip(r)}\nClick for details`)}>
+    const body = rows.map(r => `<tr class="${cls(r)}"${detA(scopeOf(r, { tab: r.others ? 'adv' : 'mon' }))}${tipA(`${r.name}\nSOS ${pctS(r.sos)} · ${money(r.spend)} · ${nf(r.spots)} spots\nClick for details`)}>
         <td class="rk">${r.rank ? '#' + r.rank : ''}</td>
         <td class="an" title="${esc(r.name)}">${esc(r.name)}</td>
         <td><div class="sosbar"><div class="trk"><span style="width:${(r.sos / maxSos) * 100}%"></span></div><b>${pctS(r.sos)}</b></div></td>
         <td class="num">${money(r.spend, false)}</td>
-        <td class="num">${nf(r.spots)}<span style="color:#9AA3BC;font-size:10px"> · ${pctS(r.sov)}</span></td>
-        <td class="spk">${spark(r)}</td><td class="go">›</td></tr>`;
-    }).join('');
+        <td class="num">${nf(r.spots)}</td><td class="go">›</td></tr>`).join('');
     $('sosTable').innerHTML = `<div class="sost"><table><tbody>
-      <tr><th>#</th><th>Advertiser</th><th>SOS</th><th class="num">Spend (LKR)</th><th class="num">Spots · SOV</th><th>SOS by month</th><th></th></tr>
+      <tr><th>#</th><th>Advertiser</th><th>SOS</th><th class="num">Spend (LKR)</th><th class="num">Spots</th><th></th></tr>
       ${body}
       <tr class="tot"><td></td><td>Category · ${nf(S.total.advertisers)} advertisers</td><td><div class="sosbar"><div class="trk"><span style="width:0"></span></div><b>100%</b></div></td>
-        <td class="num">${money(S.total.spend, false)}</td><td class="num">${nf(S.total.spots)}</td><td></td><td></td></tr>
+        <td class="num">${money(S.total.spend, false)}</td><td class="num">${nf(S.total.spots)}</td><td></td></tr>
       </tbody></table></div>`;
+    $('p-sos').textContent = 'Selected period · my advertiser vs competitors · click a row for details';
   }
+  document.querySelector('.tgl[data-sosview]').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || !data) return;
+    sosView = b.dataset.v;
+    [...b.parentNode.children].forEach(x => x.classList.toggle('on', x === b));
+    renderSos(data);
+  });
 
   function renderDonut(m) {
     const circ = 2 * Math.PI * 50;
@@ -839,7 +853,7 @@
     if (data.filters.medium !== 'All' && !sc.medium) parts.push(data.filters.medium + ' only');
     if (data.filters.daypart) parts.push(dpLabel(data.filters.daypart));
     if (data.filters.adType === 'Commercial') parts.push('commercials only');
-    if (data.filters.adType === 'Sponsorship') parts.push('sponsorships only');
+    if (data.filters.adType === 'Sponsorship') parts.push('value additions only');
     return parts.join(' · ');
   };
 
@@ -1045,7 +1059,7 @@
     const d = data, q = v => `"${String(v).replace(/"/g, '""')}"`;
     const lines = [
       ['JKH Group Dashboard'], ['Period', `${fmtDate(d.filters.from)} to ${fmtDate(d.filters.to)}`], ['Product group', d.filters.pg],
-      ['Medium', d.filters.medium], ['Ad type', d.filters.adType || 'All'], ['Channel', d.filters.channel || 'All'], ['Daypart', d.filters.daypart || 'All'], ['Spend basis', 'Rate card (LKR)'], [],
+      ['Medium', d.filters.medium], ['Ad type', { Sponsorship: 'Value Additions', Commercial: 'Commercials' }[d.filters.adType] || 'All'], ['Channel', d.filters.channel || 'All'], ['Daypart', d.filters.daypart || 'All'], ['Spend basis', 'Rate card (LKR)'], [],
       ['KPI', 'Value'], ['Category spend', d.kpi.catSpend], ['My spend', d.kpi.mineSpend], ['Share of spend %', d.kpi.sos.toFixed(2)],
       ['Rank', d.kpi.rank ? `${d.kpi.rank} of ${d.kpi.rankOf}` : ''], ['Category spots', d.kpi.catSpots], ['My spots', d.kpi.mineSpots], [],
       ['Month', d.mineLabel + ' (mine)'].concat(d.trend.competitors.map(c => c.name), ['Category avg per advertiser', 'Category total', 'Top spender', 'Lead campaign', 'Campaign advertiser']),
