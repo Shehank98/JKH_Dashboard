@@ -44,7 +44,7 @@ Required: `Advertiser, Channel, Dd, Mn, Yr, Cost`. Header names are matched igno
 | ChannelName | Text after the `TV - ` / `FM - ` / `Radio - ` prefix. |
 | Date, MonthKey | Built from `Dd`, `Mn`, `Yr`. `Mn` can be a number or a name (Jan). Rows with an invalid date are skipped and counted. |
 | Daypart | Morning 05:00 to 12:00, Daytime 12:00 to 18:30, Prime 18:30 to 22:30, Late night 22:30 to 05:00, Not timed (no `Advt_time`, typical for Press). |
-| Std_Dur | Below 10s is 5s. 10 to 30s snaps to the nearest of 15, 20, 30 (ties go down, so 25s is 20s). Above 30s is 30s+. Raw `Dur` is kept too, and the bucket is worked out at query time. |
+| Std_Dur | 1 to 9s is 5s. 10 to 30s snaps to the nearest of 10, 15, 20, 30 (ties go down, so 12.5s is 10s and 25s is 20s). Above 30s is 30s+. Value additions always count as 5s. Raw `Dur` is kept too, and the bucket is worked out at query time. |
 | Break_Quality | `PosinBrk` = 1 or = `AdsinBrk` is Premium, otherwise Mid break. |
 | Campaign | `Advt_Theme`. |
 

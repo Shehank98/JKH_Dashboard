@@ -18,13 +18,14 @@ assert.strictEqual(D.channelNameOf('FM Derana'), 'FM Derana');
 
 // Std_Dur
 const std = d => D.DUR_BUCKETS[D.stdDurIndex(d)];
-assert.deepStrictEqual([3, 9, 10, 17, 18, 22, 25, 26, 28, 30, 31, 34, 45].map(std),
-  ['5s', '5s', '15s', '15s', '20s', '20s', '20s', '30s', '30s', '30s', '30s+', '30s+', '30s+']);
+assert.deepStrictEqual([1, 3, 9, 9.9, 10, 12, 12.5, 13, 17, 17.5, 18, 22, 25, 26, 28, 30, 31, 34, 45].map(std),
+  ['5s', '5s', '5s', '5s', '10s', '10s', '10s', '15s', '15s', '15s', '20s', '20s', '20s', '30s', '30s', '30s', '30s+', '30s+', '30s+']);
 
 // Sponsorship items always count as 5s; ACD uses real Dur, or 5s when blank.
 assert.strictEqual(D.durBucketOf(15, true), 0);
 assert.strictEqual(D.durBucketOf(NaN, true), 0);
-assert.strictEqual(D.durBucketOf(15, false), 1);
+assert.strictEqual(D.durBucketOf(15, false), 2);
+assert.strictEqual(D.durBucketOf(11, false), 1);
 assert.strictEqual(D.durBucketOf(NaN, false), 255);
 assert.strictEqual(D.durSecondsOf(NaN, true), 5);
 assert.strictEqual(D.durSecondsOf(12, true), 12);
@@ -87,7 +88,7 @@ assert.strictEqual(D.dayNumber(1, 'Jan', 26), D.dayNumber(1, 1, 2026));
   assert.strictEqual(det.advertisers[0].role, 'mine');
   // Duration mix: % of ads per bucket and ACD = sum of raw Dur / ads (TV and Radio).
   const durMe = out.duration.rows[0], durRival = out.duration.rows[1], durCat = out.duration.rows[2];
-  assert.deepStrictEqual(durMe.counts, [3, 1, 0, 1, 0]); // 5s x3, 15s, 30s
+  assert.deepStrictEqual(durMe.counts, [3, 0, 1, 0, 1, 0]); // 5s x3, 15s, 30s
   assert.strictEqual(durMe.acd, 12);                     // (30 + 15 + 5 + 5 + 5) / 5
   assert.strictEqual(durRival.acd, 20);
   assert.strictEqual(Math.round(durCat.acd * 100) / 100, 13.33); // 80 / 6

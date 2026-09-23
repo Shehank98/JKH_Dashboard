@@ -45,6 +45,10 @@ function groupOptions(ds, pgName) {
   return { advertisers, channels };
 }
 
+// Old saved datasets (no raw Dur) store the previous buckets 5/15/20/30/30+; map them onto 5/10/15/20/30/30+.
+const LEGACY_DUR = [0, 2, 3, 4, 5];
+const legacyDur = i => (i < LEGACY_DUR.length ? LEGACY_DUR[i] : 255);
+
 // Theme ids that are sponsorship or filler items, cached per dataset.
 const excludedCache = new WeakMap();
 function excludedThemes(ds) {
@@ -140,7 +144,7 @@ function dashboard(ds, f) {
     chCat[mi * nCh + c] += v; chTot[c] += v;
     const sponsor = excluded[theme[i]] === 1;
     const raw = durRaw ? D.durSecondsOf(durRaw[i], sponsor) : NaN;
-    const du = durRaw ? D.durBucketOf(durRaw[i], sponsor) : (sponsor ? 0 : dur[i]);
+    const du = durRaw ? D.durBucketOf(durRaw[i], sponsor) : (sponsor ? 0 : legacyDur(dur[i]));
     if (md < 2 && du < NB) {
       const M = durM[md];
       M.adv[a * NB + du]++; M.cat[du]++;
@@ -361,7 +365,7 @@ function detail(ds, f, scope = {}) {
     if (sDur >= 0) {
       if (md > 1) continue;
       const sponsor = excluded[theme[i]] === 1;
-      const bucket = durRaw ? D.durBucketOf(durRaw[i], sponsor) : (sponsor ? 0 : dur[i]);
+      const bucket = durRaw ? D.durBucketOf(durRaw[i], sponsor) : (sponsor ? 0 : legacyDur(dur[i]));
       if (bucket !== sDur) continue;
     }
     const v = cost[i];

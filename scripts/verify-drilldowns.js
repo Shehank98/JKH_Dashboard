@@ -20,8 +20,9 @@ function daypartOf(t) {
 }
 function bucketOf(d) {
   if (!(d > 0)) return null;
-  if (d < 10) return '5s';
+  if (d < 10) return '5s';       // 1 to 9s
   if (d > 30) return '30s+';
+  if (d <= 12.5) return '10s';   // 10 vs 15: a tie goes to the shorter standard
   if (d <= 17.5) return '15s';   // 15 vs 20: a tie goes to the shorter standard
   if (d <= 25) return '20s';     // 25 is a tie between 20 and 30, goes to 20
   return '30s';

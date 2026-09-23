@@ -705,7 +705,7 @@
         <span class="durname" title="${esc(r.name)} · ${nf(r.ads)} ads"${detA(scope)}><span class="nm2">${esc(r.name)}</span></span>
         ${cells}${acd}</div>`;
     }).join('');
-    const cols = `grid-template-columns:minmax(74px,1.2fr) repeat(${buckets.length},minmax(34px,1fr)) 36px`;
+    const cols = `grid-template-columns:minmax(70px,1.1fr) repeat(${buckets.length},minmax(32px,1fr)) 34px`;
     $('duration').innerHTML = `${legacy ? '<div class="durnote">Re-upload your file to apply the new length buckets and ACD</div>' : ''}
       <div class="bgrid" style="${cols}">
         <span class="bh"></span>${buckets.map(b => `<span class="bh">${b}</span>`).join('')}<span class="bh">ACD</span>
