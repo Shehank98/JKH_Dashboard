@@ -1,0 +1,23 @@
+{
+  "name": "competitive-ad-spend-dashboard",
+  "version": "1.0.0",
+  "description": "Competitive media spend dashboard for Sri Lankan advertisers. Upload an .xlsx or .csv spot log and compare your spend against competitors.",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node --max-old-space-size=3072 server.js",
+    "dev": "node server.js",
+    "sample": "node scripts/generate-sample.js",
+    "test": "node scripts/smoke-test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "compression": "^1.7.4",
+    "csv-parse": "^5.5.6",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.0",
+    "multer": "^2.0.0"
+  }
+}

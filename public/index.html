@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Competitive Ad Spend Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:#F4F6FA;overflow:hidden}
+body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#F4F6FA;color:#1A1F36;width:1440px;height:900px;overflow:hidden;padding:14px 18px;display:flex;flex-direction:column;gap:10px;transform-origin:0 0;position:relative}
+button,select,input{font-family:inherit}
+
+/* Drawer */
+#drawerToggle{display:none}
+.scrim{position:fixed;inset:0;background:rgba(20,26,46,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:8}
+#drawerToggle:checked ~ .scrim{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;left:0;width:288px;height:900px;background:#141A2E;color:#C9D1E4;padding:18px 16px;overflow-y:auto;transform:translateX(-296px);transition:transform .25s ease;z-index:9;box-shadow:6px 0 26px rgba(0,0,0,.25)}
+#drawerToggle:checked ~ .drawer{transform:translateX(0)}
+.drawer::-webkit-scrollbar{width:6px}.drawer::-webkit-scrollbar-thumb{background:#2E3756;border-radius:3px}
+.brand{font-size:13.5px;font-weight:700;color:#fff;letter-spacing:.3px;padding-right:22px}
+.brandsub{font-size:10.5px;color:#6E7A99;margin-bottom:14px}
+.fgroup{border-top:1px solid #242C45;padding:12px 0}
+.flabel{font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:#6E7A99;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.dateRow{display:flex;gap:7px}
+.inp{background:#1E2540;border:1px solid #2E3756;color:#E8EDF9;border-radius:7px;padding:7px 8px;font-size:11px;width:100%}
+.inp:disabled{opacity:.5}
+input[type=date].inp{color-scheme:dark}
+.search{margin-bottom:6px;padding:5px 8px;font-size:10.5px}
+.olist{max-height:148px;overflow-y:auto}
+.olist::-webkit-scrollbar{width:5px}.olist::-webkit-scrollbar-thumb{background:#2E3756;border-radius:3px}
+.opt{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:6px;font-size:11.5px;cursor:pointer}
+.opt:hover{background:#1E2540}
+.opt input{accent-color:#FF8A3D;width:13px;height:13px;cursor:pointer;flex-shrink:0}
+.opt .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.comp .opt input{accent-color:#5B8DEF}
+.pill{background:#FF8A3D;color:#1A1F36;font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px;margin-left:auto;flex-shrink:0}
+.pillc{background:#2E3756;color:#A9B6D4;font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px;margin-left:auto;flex-shrink:0}
+.segbar{display:flex;background:#1E2540;border-radius:8px;padding:3px;gap:2px}
+.seg{flex:1;text-align:center;font-size:10.5px;padding:6px 0;border-radius:6px;cursor:pointer;color:#8D9ABA;border:none;background:none;font-weight:600}
+.seg.on{background:#FF8A3D;color:#141A2E}
+.applyBtn{width:100%;margin-top:14px;background:#FF8A3D;color:#141A2E;border:none;padding:10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:block;text-align:center}
+.closeX{position:absolute;top:14px;right:14px;color:#6E7A99;font-size:16px;cursor:pointer;font-weight:700}
+.hint{font-size:10px;color:#9AA3BC;margin-top:8px;font-style:italic}
+.empty-note{font-size:10.5px;color:#6E7A99;padding:4px 7px}
+
+/* Upload */
+.dfile{background:#1E2540;border:1px solid #2E3756;border-radius:8px;padding:9px 10px;font-size:10.5px;line-height:1.5}
+.dfile b{color:#fff;font-size:11.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dfile .row{display:flex;justify-content:space-between;color:#8D9ABA}
+.drop{display:block;border:1.5px dashed #3A4568;border-radius:8px;padding:12px 10px;text-align:center;font-size:11px;color:#A9B6D4;cursor:pointer;transition:border-color .2s,background .2s}
+.drop:hover,.drop.over{border-color:#FF8A3D;background:#1E2540}
+.drop small{display:block;color:#6E7A99;font-size:9.5px;margin-top:3px}
+.btnrow{display:flex;gap:6px;margin-top:8px}
+.btn{flex:1;border:none;border-radius:7px;padding:8px;font-size:11px;font-weight:700;cursor:pointer}
+.btn.pri{background:#FF8A3D;color:#141A2E}
+.btn.ghost{background:none;border:1px solid #4A2A2A;color:#F08A8A}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.prog{height:6px;background:#1E2540;border-radius:4px;overflow:hidden;margin-top:9px}
+.prog div{height:100%;width:0;background:#FF8A3D;transition:width .2s}
+.prog.indet div{width:35%;animation:slide 1.1s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
+.ustatus{font-size:10.5px;color:#A9B6D4;margin-top:6px;min-height:14px}
+.ustatus.err{color:#F08A8A}
+
+/* Top bar */
+.topbar{display:flex;align-items:center;gap:12px;height:44px;flex-shrink:0;min-width:0}
+.fbtn{background:#141A2E;color:#fff;border:none;border-radius:9px;padding:10px 15px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.fbtn.light{background:#fff;color:#4A5570;border:1px solid #DDE3EF}
+.daterange{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid #E0E6F2;border-radius:9px;padding:7px 14px;flex-shrink:0}
+.dr-l{font-size:9px;letter-spacing:.9px;text-transform:uppercase;color:#9AA3BC;font-weight:700}
+.dr-v{font-size:13px;font-weight:700;letter-spacing:-.2px;white-space:nowrap}
+.chips{display:flex;gap:8px;min-width:0;overflow:hidden}
+.chip{background:#EEF2FB;color:#3F5480;font-size:10.5px;font-weight:700;padding:5px 10px;border-radius:20px;white-space:nowrap;max-width:230px;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
+.chip.o{background:#FFF1E6;color:#E4702A}
+.chip.busy{background:#141A2E;color:#FFC599}
+.tright{margin-left:auto;display:flex;gap:8px;flex-shrink:0}
+.toast{position:fixed;top:62px;right:18px;background:#141A2E;color:#fff;font-size:11.5px;font-weight:600;padding:9px 14px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+.toast.on{opacity:1}
+
+/* Cards */
+.card{background:#fff;border:1px solid #E5E9F2;border-radius:12px;padding:12px 14px;box-shadow:0 1px 2px rgba(20,26,46,.04);min-height:0;min-width:0;position:relative;overflow:hidden}
+h3{font-size:12.5px;font-weight:700;letter-spacing:-.1px}
+.sub{font-size:10px;color:#9AA3BC;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpirow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;height:74px;flex-shrink:0}
+.kpi{display:flex;flex-direction:column;justify-content:center;padding:10px 16px}
+.kl{font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;color:#8A93AD;font-weight:700}
+.kv{font-size:23px;font-weight:700;letter-spacing:-.6px;margin:2px 0}
+.kd{font-size:10.5px;color:#6B7590;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.up{color:#12A66A;font-weight:700}.down{color:#E14B4B;font-weight:700}.flat{color:#8A93AD;font-weight:700}
+.accent{border-left:4px solid #FF8A3D}
+.rowB{display:grid;grid-template-columns:262px 1fr 312px;gap:10px;height:312px;flex-shrink:0}
+.rowC{display:grid;grid-template-columns:1fr 1fr 352px;gap:10px;height:358px;flex-shrink:0}
+.legend{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:9px}
+.lg{display:flex;align-items:center;gap:5px;font-size:9.5px;color:#4A5570;white-space:nowrap}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0}
+table{width:100%;border-collapse:collapse}
+th{font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:#8A93AD;text-align:left;padding:5px 7px;border-bottom:1px solid #E5E9F2}
+td{font-size:11.5px;padding:7px;border-bottom:1px solid #F0F2F8;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.mineval{color:#E4702A;font-weight:700}
+.acc{overflow-y:auto;height:242px;margin-top:8px;padding-right:3px}
+.acc::-webkit-scrollbar{width:5px}.acc::-webkit-scrollbar-thumb{background:#DDE3EF;border-radius:3px}
+details{border:1px solid #E5E9F2;border-radius:8px;margin-bottom:5px}
+details[open]{border-color:#FFCFAC;background:#FFFCF9}
+summary{cursor:pointer;padding:8px 10px;font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:7px;list-style:none}
+summary::-webkit-details-marker{display:none}
+.chev{color:#B4BCD0;font-size:9px;transition:transform .15s;display:inline-block}
+details[open] .chev{transform:rotate(90deg)}
+.dbody{padding:0 10px 10px 26px;font-size:10.5px;color:#4A5570;line-height:1.6}
+.tag{display:inline-block;background:#EEF2FB;color:#3F5480;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px}
+.tagr{margin-left:auto;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tagme{background:#FFF1E6;color:#E4702A;font-size:8.5px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:auto}
+.bars{display:grid;gap:6px;align-items:end;margin-top:6px}
+.stack{display:flex;flex-direction:column;justify-content:flex-end;width:100%;height:100px;border-radius:4px 4px 0 0;overflow:hidden;background:#F4F6FA}
+.stack div{display:flex;align-items:center;justify-content:center;font-size:8.5px;color:#fff;font-weight:700;overflow:hidden}
+.stack div.lt{color:#3F5480}.stack div.lto{color:#9A4A16}
+.bl{text-align:center;font-size:9.5px;color:#8A93AD;margin-top:4px;font-weight:600;white-space:nowrap;overflow:hidden}
+.secl{font-size:9px;font-weight:700;letter-spacing:.9px;color:#8A93AD;margin-top:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.durrow{display:flex;border-radius:5px;overflow:hidden;background:#F4F6FA}
+.durrow div{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;overflow:hidden}
+.durrow div.lt{color:#3F5480}.durrow div.lto{color:#9A4A16}
+.durline{display:flex;align-items:center;gap:10px}
+.durname{font-size:11px;width:122px;color:#4A5570;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nodata{display:flex;align-items:center;justify-content:center;height:100%;min-height:80px;color:#9AA3BC;font-size:11px;text-align:center}
+
+/* Empty and loading states */
+.overlay{position:absolute;inset:68px 18px 14px 18px;display:none;align-items:center;justify-content:center;z-index:5;background:rgba(244,246,250,.82);border-radius:12px}
+.overlay.on{display:flex}
+.ovcard{background:#fff;border:1px solid #E5E9F2;border-radius:14px;padding:28px 34px;text-align:center;max-width:460px;box-shadow:0 8px 30px rgba(20,26,46,.08)}
+.ovcard h2{font-size:17px;margin-bottom:6px}
+.ovcard p{font-size:12px;color:#6B7590;line-height:1.6;margin-bottom:16px}
+.ovcard .fbtn{display:inline-flex}
+.loading .card{opacity:.6;transition:opacity .15s}
+</style>
+</head>
+<body>
+
+<input type="checkbox" id="drawerToggle">
+<label class="scrim" for="drawerToggle"></label>
+<div class="drawer" id="drawer">
+  <label class="closeX" for="drawerToggle">✕</label>
+  <div class="brand">COMPETITIVE SPEND MONITOR</div>
+  <div class="brandsub">Media Intelligence · Sri Lanka</div>
+
+  <div class="fgroup" style="border-top:none;padding-top:0">
+    <div class="flabel">Data File</div>
+    <div id="dfile"></div>
+    <label class="drop" id="drop" for="fileInput" style="margin-top:8px">
+      <span id="dropText">Drop .xlsx or .csv here, or click to choose</span>
+      <small>Up to 100 MB · CSV loads fastest</small>
+    </label>
+    <input type="file" id="fileInput" accept=".xlsx,.xlsm,.csv" style="display:none">
+    <div class="btnrow">
+      <button class="btn pri" id="uploadBtn" disabled>Upload</button>
+      <button class="btn ghost" id="deleteBtn" disabled>Delete data</button>
+    </div>
+    <div class="prog" id="prog" style="display:none"><div id="progBar"></div></div>
+    <div class="ustatus" id="ustatus"></div>
+  </div>
+
+  <div class="fgroup">
+    <div class="flabel">Date Range</div>
+    <div class="dateRow"><input class="inp" type="date" id="fFrom"><input class="inp" type="date" id="fTo"></div>
+    <label class="opt" style="margin-top:6px;padding-left:0"><input type="checkbox" id="fCompare" checked> Compare to previous period</label>
+  </div>
+
+  <div class="fgroup">
+    <div class="flabel">Product Group</div>
+    <select class="inp" id="fPg"></select>
+  </div>
+
+  <div class="fgroup">
+    <div class="flabel">My Advertiser</div>
+    <input class="inp search" id="mineSearch" placeholder="Search advertisers">
+    <div class="olist" id="mineList"></div>
+  </div>
+
+  <div class="fgroup comp">
+    <div class="flabel">Competitors</div>
+    <input class="inp search" id="compSearch" placeholder="Search competitors">
+    <div class="olist" id="compList"></div>
+    <div class="hint">Advertisers picked as mine are hidden here, and vice versa, to avoid double counting.</div>
+  </div>
+
+  <div class="fgroup">
+    <div class="flabel">Medium <span style="color:#FF8A3D">· derived from Channel</span></div>
+    <div class="segbar" id="fMedium">
+      <button class="seg on" data-v="All">All</button>
+      <button class="seg" data-v="TV">TV</button>
+      <button class="seg" data-v="Radio">Radio</button>
+      <button class="seg" data-v="Press">Press</button>
+    </div>
+    <div class="hint">"TV - Derana TV" maps to TV, "FM Derana" maps to Radio, all others map to Press.</div>
+  </div>
+
+  <div class="fgroup">
+    <div class="flabel">Channel</div>
+    <select class="inp" id="fChannel"></select>
+  </div>
+
+  <div class="fgroup">
+    <div class="flabel">Daypart</div>
+    <select class="inp" id="fDaypart"></select>
+  </div>
+
+  <label class="applyBtn" for="drawerToggle" id="applyBtn">Apply Filters</label>
+</div>
+
+<div class="topbar">
+  <label class="fbtn" for="drawerToggle">☰ Filters</label>
+  <div class="daterange">
+    <span class="dr-l">Period</span>
+    <span class="dr-v" id="periodText">No data</span>
+    <span class="chip" id="periodLen" style="background:#F4F6FA;color:#6B7590">0 months</span>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="tright">
+    <button class="fbtn light" id="exportBtn">Export</button>
+    <button class="fbtn light" id="shareBtn">Share</button>
+  </div>
+</div>
+
+<div class="kpirow">
+  <div class="card kpi">
+    <div class="kl">Total Category Spend</div>
+    <div class="kv" id="k1v">LKR 0</div>
+    <div class="kd" id="k1d">&nbsp;</div>
+  </div>
+  <div class="card kpi accent">
+    <div class="kl">My Advertiser Spend</div>
+    <div class="kv" id="k2v" style="color:#E4702A">LKR 0</div>
+    <div class="kd" id="k2d">&nbsp;</div>
+  </div>
+  <div class="card kpi">
+    <div class="kl">Share of Spend</div>
+    <div class="kv" id="k3v">0%</div>
+    <div class="kd" id="k3d">&nbsp;</div>
+  </div>
+</div>
+
+<div class="rowB">
+  <div class="card">
+    <h3 id="h-donut">Medium Split</h3>
+    <p class="sub" id="p-donut">Category vs my share by medium · rate card</p>
+    <div id="donut"></div>
+  </div>
+  <div class="card">
+    <h3 id="h-line">Monthly Spend Trend: Me vs Competitors</h3>
+    <p class="sub" id="p-line">LKR Mn · smoothed curves · my advertiser emphasised · dotted line is the category average</p>
+    <div id="trend"></div>
+  </div>
+  <div class="card">
+    <h3 id="h-acc">Month Drill Down</h3>
+    <p class="sub" id="p-acc">Top spender and lead campaign (Advt_Theme)</p>
+    <div class="acc" id="drill"></div>
+  </div>
+</div>
+
+<div class="rowC">
+  <div class="card">
+    <h3 id="h-tv">TV Channel Mix by Month</h3>
+    <p class="sub" id="p-tv">Share of TV spend per month · category above, my advertiser below</p>
+    <div id="tvMix"></div>
+  </div>
+  <div class="card">
+    <h3 id="h-rd">Radio Channel Mix by Month</h3>
+    <p class="sub" id="p-rd">Share of Radio spend per month · category above, my advertiser below</p>
+    <div id="radioMix"></div>
+  </div>
+  <div class="card">
+    <h3 id="h-dur">Duration Mix</h3>
+    <p class="sub" id="p-dur" style="white-space:normal">Dur below 10s becomes 5s, 10 to 30s snaps to nearest standard, above 30s becomes 30s</p>
+    <div id="duration"></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="ovcard">
+    <h2 id="ovTitle">No data uploaded yet</h2>
+    <p id="ovText">Open the filter drawer and upload your spot log as .xlsx or .csv. Large files (400k+ rows) take up to a minute to process.</p>
+    <label class="fbtn" for="drawerToggle">☰ Open Filters</label>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
