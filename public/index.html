@@ -172,6 +172,30 @@ details[open] .chev{transform:rotate(90deg)}
 .acdv{width:46px;text-align:right;font-size:12px;font-weight:700;color:#1A1F36;flex-shrink:0;font-variant-numeric:tabular-nums}
 .acdv.me{color:#E4702A}.acdv.na{color:#B4BCD0;font-weight:500;font-size:10.5px}
 .durnote{font-size:10px;color:#9A4A16;background:#FFF7F1;border-radius:6px;padding:4px 8px;margin-top:6px;flex-shrink:0}
+.bgrid{display:grid;align-items:end;gap:0 4px;margin-top:8px;flex-shrink:0;padding-bottom:4px;border-bottom:1px solid #EEF1F7}
+.bh{font-size:9px;font-weight:700;letter-spacing:.8px;color:#8A93AD;text-align:center;white-space:nowrap}
+.bh:last-child{color:#4A5570;text-align:right}
+.bbody{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly}
+.brow{display:grid;grid-template-columns:var(--cols);gap:0 4px;align-items:center;flex:1;max-height:62px;min-height:0;border-radius:8px}
+.brow:hover{background:#F7F9FD}
+.brow.catrow{border-top:1px dashed #DDE3EF;border-radius:0}
+.brow .durname{width:auto;display:flex;flex-direction:column;line-height:1.2;cursor:pointer;white-space:normal;min-width:0}
+.brow .durname .nm2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.brow .durname small{font-size:9px;color:#9AA3BC;font-weight:500}
+.bc{position:relative;height:100%;min-height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.bc.none{font-size:10px;color:#9AA3BC;justify-content:flex-start;cursor:default}
+.bub{position:absolute;border-radius:50%;transition:transform .15s}
+.bc:hover .bub{transform:scale(1.12)}
+.bub.me{background:rgba(255,138,61,.42)}
+.bub.cp{background:rgba(68,116,214,.3)}
+.bub.cat{background:rgba(138,147,173,.22)}
+.bub.win{box-shadow:0 0 0 2px #1A1F36}
+.lg .bub{display:inline-block}
+.bn{position:relative;font-size:11px;font-weight:700;color:#1A1F36;font-variant-numeric:tabular-nums;letter-spacing:-.2px;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff}
+.bn.sm{font-size:10px;color:#4A5570}
+.bn.zero{color:#C7CEDF;font-weight:500}
+.acdp{justify-self:end;font-size:11px;font-weight:700;padding:3px 7px;border-radius:20px;background:#EEF2FB;color:#1E3F8A;font-variant-numeric:tabular-nums}
+.acdp.me{background:#FFF1E6;color:#E4702A}.acdp.cat{background:#F0F2F7;color:#4A5570}.acdp.na{background:none;color:#B4BCD0;font-weight:500}
 .durname{font-size:11px;width:122px;color:#4A5570;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nodata{display:flex;align-items:center;justify-content:center;flex:1;min-height:80px;color:#9AA3BC;font-size:11px;text-align:center}
 
@@ -461,6 +485,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

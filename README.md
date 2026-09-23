@@ -53,7 +53,7 @@ Required: `Advertiser, Channel, Dd, Mn, Yr, Cost`. Header names are matched igno
 * **Rank** = my advertisers combined as one entity, ranked against every other advertiser with spend.
 * **Category avg.** (trend) = category spend in the month / advertisers active that month.
 * **Channel mix** = every channel in the medium, ordered by category spend in the selection.
-* **Duration mix** = % of ads (TV and Radio) in each length bucket: ads of that length / total ads. Press has no duration.
+* **Duration mix** = a bubble grid of the number of ads (TV and Radio) per advertiser in each length bucket. The number is the ad count and bubble area follows it; advertisers share one scale and the category row has its own. The advertiser with the most ads in each length is ringed. Hover shows the % of that advertiser's ads. Press has no duration.
 * **ACD** (average commercial duration) = sum of raw `Dur` / number of ads, for my advertiser, each competitor and the category, shown rounded to whole seconds.
 * **Month drill down** = the leader is the top spender in the whole category that month. The earliest run of quiet months (category spend below 80% of the monthly average, 2 or more months) is combined into one row.
 
