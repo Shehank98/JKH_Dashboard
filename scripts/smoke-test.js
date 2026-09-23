@@ -84,5 +84,18 @@ assert.strictEqual(D.dayNumber(1, 'Jan', 26), D.dayNumber(1, 1, 2026));
   assert.strictEqual(durMe.split[0], 60);
   const detCh = compute.detail(ds, { from: '2026-01-01', to: '2026-02-28', pg: 'Biscuits', mine: ['Me'], comps: ['Rival'], medium: 'All' }, { channel: 'TV - Sirasa TV' });
   assert.deepStrictEqual(detCh.advertisers.map(a => a.name), ['Rival']);
+  // Ad type filter: sponsorship items (-BB, Summer -BB, Time Check) vs commercials.
+  const F = { from: '2026-01-01', to: '2026-02-28', pg: 'Biscuits', mine: ['Me'], comps: ['Rival'], medium: 'All' };
+  const sp = compute.dashboard(ds, { ...F, adType: 'Sponsorship' });
+  const cm = compute.dashboard(ds, { ...F, adType: 'Commercial' });
+  assert.strictEqual(sp.kpi.catSpend, 5000002);
+  assert.strictEqual(sp.kpi.catSpots, 3);
+  assert.strictEqual(cm.kpi.catSpend, 4000000);
+  assert.strictEqual(sp.kpi.catSpend + cm.kpi.catSpend, out.kpi.catSpend);
+  assert.strictEqual(sp.drill[0].campaign.name, '-BB');          // sponsorship items can lead in Sponsorships mode
+  assert.strictEqual(cm.drill[0].campaign.name, 'Theme A');
+  const spDet = compute.detail(ds, { ...F, adType: 'Sponsorship' }, {});
+  assert.deepStrictEqual(spDet.campaigns.map(c => c.name).sort(), ['-BB', 'Summer -BB', 'Time Check']);
+  assert.strictEqual(compute.detail(ds, { ...F, adType: 'Commercial' }, {}).total, 4000000);
   console.log('All smoke tests passed');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -17,7 +17,7 @@
   let overview = null;      // product groups, date bounds
   let options = { advertisers: [], channels: [] };
   let data = null;          // last dashboard response
-  const state = { from: '', to: '', pg: '', mine: [], comps: [], medium: 'All', channel: '', daypart: '' };
+  const state = { from: '', to: '', pg: '', mine: [], comps: [], medium: 'All', channel: '', daypart: '', adType: 'All' };
   let pendingFile = null;
   const hiddenSeries = new Set();                // trend lines switched off from the legend
   const mixView = { tv: 'bars', rd: 'bars' };    // channel mix: Top 5 bars or heatmap
@@ -212,9 +212,9 @@
 
     const groups = overview.productGroups.map(g => g.name);
     if (saved && groups.includes(saved.pg)) {
-      Object.assign(state, saved);
+      Object.assign(state, { adType: 'All' }, saved);
     } else {
-      Object.assign(state, defaultDates(), { pg: groups[0], mine: [], comps: [], medium: 'All', channel: '', daypart: '' });
+      Object.assign(state, defaultDates(), { pg: groups[0], mine: [], comps: [], medium: 'All', channel: '', daypart: '', adType: 'All' });
     }
     await loadOptions(!(saved && saved.pg === state.pg && saved.mine && saved.mine.length));
     writeForm();
@@ -252,6 +252,7 @@
     $('fDaypart').value = state.daypart || '';
     renderDpTable();
     [...$('fMedium').children].forEach(b => b.classList.toggle('on', b.dataset.v === state.medium));
+    [...$('fAdType').children].forEach(b => b.classList.toggle('on', b.dataset.v === (state.adType || 'All')));
     renderAdvLists();
     renderChannelSelect();
   }
@@ -305,12 +306,18 @@
     [...$('fMedium').children].forEach(x => x.classList.toggle('on', x === b));
     renderChannelSelect();
   });
+  $('fAdType').addEventListener('click', e => {
+    const b = e.target.closest('.seg');
+    if (!b) return;
+    state.adType = b.dataset.v;
+    [...$('fAdType').children].forEach(x => x.classList.toggle('on', x === b));
+  });
   $('fChannel').addEventListener('change', e => { state.channel = e.target.value; });
   $('fDaypart').addEventListener('change', e => { state.daypart = e.target.value; renderDpTable(); });
   $('resetBtn').addEventListener('click', async () => {
     if (!overview) return;
     const keepPg = state.pg;
-    Object.assign(state, defaultDates(), { medium: 'All', channel: '', daypart: '' });
+    Object.assign(state, defaultDates(), { medium: 'All', channel: '', daypart: '', adType: 'All' });
     state.pg = keepPg;
     $('mineSearch').value = ''; $('compSearch').value = '';
     await loadOptions(true);
@@ -360,6 +367,8 @@
     if (f.mine.length) chips.push(`<span class="chip o" title="${esc(f.mine.join(', '))}">${esc(d.mineLabel)}</span>`);
     chips.push(`<span class="chip">+${f.comps.length} competitor${f.comps.length === 1 ? '' : 's'}</span>`);
     chips.push(`<span class="chip">${f.medium === 'All' ? 'All media' : esc(f.medium) + ' only'}</span>`);
+    if (f.adType === 'Commercial') chips.push('<span class="chip">Commercials only</span>');
+    if (f.adType === 'Sponsorship') chips.push('<span class="chip s">Sponsorships only</span>');
     if (f.channel) chips.push(`<span class="chip">${esc(f.channel)}</span>`);
     if (f.daypart) chips.push(`<span class="chip">${esc(dpLabel(f.daypart))}</span>`);
     const busy = $('busyChip');
@@ -771,13 +780,15 @@
     if (sc.mine) parts.push('mine only');
     if (data.filters.medium !== 'All' && !sc.medium) parts.push(data.filters.medium + ' only');
     if (data.filters.daypart) parts.push(dpLabel(data.filters.daypart));
+    if (data.filters.adType === 'Commercial') parts.push('commercials only');
+    if (data.filters.adType === 'Sponsorship') parts.push('sponsorships only');
     return parts.join(' · ');
   };
 
   // The filters behind what is on screen (the drawer may hold unapplied edits).
   function appliedFilters() {
-    const { from, to, pg, mine, comps, medium, channel, daypart } = data.filters;
-    return { from, to, pg, mine: mine.slice(), comps: comps.slice(), medium, channel, daypart };
+    const { from, to, pg, mine, comps, medium, channel, daypart, adType } = data.filters;
+    return { from, to, pg, mine: mine.slice(), comps: comps.slice(), medium, channel, daypart, adType: adType || 'All' };
   }
 
   async function openDetail(scope, fresh) {
@@ -864,7 +875,7 @@
         x.campaigns.map((c, i) => `<tr class="${c.role === 'mine' ? 'me' : ''}"${sub({ advertiser: c.advertiser, theme: c.name, title: `“${c.name}”`, tab: 'ch' })} style="cursor:pointer" title="Click to see where this campaign ran">
           <td class="rk">${i + 1}</td><td class="nm">“${esc(c.name)}”</td><td class="nm">${esc(c.advertiser)}${tag(c.role)}</td>
           <td class="num">${bar(c.spend, max)}${money(c.spend, false)}</td><td class="num">${x.total ? pctS((c.spend / x.total) * 100) : ''}</td><td class="num">${nf(c.spots)}</td></tr>`).join('') + '</tbody></table>';
-      if (!x.campaigns.length) html = '<div class="mload">No campaigns in this selection (sponsorship items such as -BB, Tag and Time Check are excluded)</div>';
+      if (!x.campaigns.length) html = `<div class="mload">No campaigns in this selection${data.filters.adType === 'Sponsorship' ? '' : ' (sponsorship items such as -BB, Tag and Time Check are not counted as campaigns; switch Ad type to Sponsorships to see them)'}</div>`;
     } else {
       const max = x.channels.length ? x.channels[0].spend : 0;
       html = `<table><tbody><tr><th>#</th><th>Channel</th><th>Medium</th><th class="num">Spend</th><th class="num">Share</th><th class="num">Spots</th><th class="num">Mine</th><th class="num">My share</th></tr>` +
@@ -936,7 +947,7 @@
     const d = data, q = v => `"${String(v).replace(/"/g, '""')}"`;
     const lines = [
       ['JKH Group Dashboard'], ['Period', `${fmtDate(d.filters.from)} to ${fmtDate(d.filters.to)}`], ['Product group', d.filters.pg],
-      ['Medium', d.filters.medium], ['Channel', d.filters.channel || 'All'], ['Daypart', d.filters.daypart || 'All'], ['Spend basis', 'Rate card (LKR)'], [],
+      ['Medium', d.filters.medium], ['Ad type', d.filters.adType || 'All'], ['Channel', d.filters.channel || 'All'], ['Daypart', d.filters.daypart || 'All'], ['Spend basis', 'Rate card (LKR)'], [],
       ['KPI', 'Value'], ['Category spend', d.kpi.catSpend], ['My spend', d.kpi.mineSpend], ['Share of spend %', d.kpi.sos.toFixed(2)],
       ['Rank', d.kpi.rank ? `${d.kpi.rank} of ${d.kpi.rankOf}` : ''], ['Category spots', d.kpi.catSpots], ['My spots', d.kpi.mineSpots], [],
       ['Month', d.mineLabel + ' (mine)'].concat(d.trend.competitors.map(c => c.name), ['Category avg per advertiser', 'Category total', 'Top spender', 'Lead campaign', 'Campaign advertiser']),

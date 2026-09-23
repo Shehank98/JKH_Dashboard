@@ -77,14 +77,18 @@ function resolve(ds, f) {
     chId: f.channel ? dicts.channel.indexOf(f.channel) : -1,
     dpId: f.daypart ? D.DAYPARTS.indexOf(f.daypart) : -1,
     role, mineIds, comps: compIds.filter(i => role[i] === 2),
+    // Ad type: 0 = all, 1 = commercials only, 2 = sponsorship items only.
+    adType: f.adType === 'Sponsorship' ? 2 : f.adType === 'Commercial' ? 1 : 0,
   };
 }
 
 function dashboard(ds, f) {
   const { dicts, cols } = ds;
   const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
-  const { pgId, from, to, pFrom, pTo, mediumId, chId, dpId, role, mineIds, comps } = resolve(ds, f);
+  const { pgId, from, to, pFrom, pTo, mediumId, chId, dpId, role, mineIds, comps, adType } = resolve(ds, f);
   const excluded = excludedThemes(ds);
+  // Sponsorship items are never a "campaign", except when only sponsorships are shown.
+  const skipCampaign = adType === 2 ? null : excluded;
 
   const mon0 = new Date(from * 86400000), mon1 = new Date(to * 86400000);
   const m0 = mon0.getUTCFullYear() * 12 + mon0.getUTCMonth();
@@ -116,6 +120,7 @@ function dashboard(ds, f) {
     if (mediumId >= 0 && md !== mediumId) continue;
     if (chId >= 0 && c !== chId) continue;
     if (dpId >= 0 && dp[i] !== dpId) continue;
+    if (adType && (excluded[theme[i]] ? 2 : 1) !== adType) continue;
     const a = adv[i], v = cost[i], isMine = role[a] === 1;
 
     if (d < from) {
@@ -148,7 +153,7 @@ function dashboard(ds, f) {
       if (md < 2) chMine[mi * nCh + c] += v;
       if (md < 2 && du < NB) durMine[du]++;
     }
-    if (excluded[theme[i]]) continue;
+    if (skipCampaign && skipCampaign[theme[i]]) continue;
     const key = (mi * nAdv + a) * nTheme + theme[i];
     const t = themeAgg.get(key);
     if (t) { t[0] += v; t[1]++; } else themeAgg.set(key, [v, 1]);
@@ -262,8 +267,9 @@ function dashboard(ds, f) {
 function detail(ds, f, scope = {}) {
   const { dicts, cols } = ds;
   const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
-  const { pgId, from, to, mediumId, chId, dpId, role } = resolve(ds, f);
+  const { pgId, from, to, mediumId, chId, dpId, role, adType } = resolve(ds, f);
   const excluded = excludedThemes(ds);
+  const skipCampaign = adType === 2 ? null : excluded;
   let mon = -1;
   if (scope.month) { const [y, m] = scope.month.split('-').map(Number); mon = y * 12 + m - 1; }
   const sMed = scope.medium ? D.MEDIA.indexOf(scope.medium) : -1;
@@ -297,6 +303,7 @@ function detail(ds, f, scope = {}) {
     if (mediumId >= 0 && md !== mediumId) continue;
     if (chId >= 0 && c !== chId) continue;
     if (dpId >= 0 && dp[i] !== dpId) continue;
+    if (adType && (excluded[theme[i]] ? 2 : 1) !== adType) continue;
     if (sMed >= 0 && md !== sMed) continue;
     if (sCh >= 0 && c !== sCh) continue;
     if (skipCh[c]) continue;
@@ -315,7 +322,7 @@ function detail(ds, f, scope = {}) {
     advSpend[a] += v; advSpots[a]++;
     chSpend[c] += v; chSpots[c]++;
     if (role[a] === 1) { chMine[c] += v; mineTotal += v; }
-    if (!excluded[theme[i]]) {
+    if (!(skipCampaign && skipCampaign[theme[i]])) {
       const key = a * nTheme + theme[i];
       const t = themes.get(key);
       if (t) { t[0] += v; t[1]++; } else themes.set(key, [v, 1]);

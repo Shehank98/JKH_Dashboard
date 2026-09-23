@@ -59,6 +59,8 @@ function reference(rows, f, sc) {
     if (f.medium !== 'All' && r.medium !== f.medium) continue;
     if (f.channel && r.channel !== f.channel) continue;
     if (f.daypart && r.daypart !== f.daypart) continue;
+    if (f.adType === 'Sponsorship' && !isSponsor(r.theme)) continue;
+    if (f.adType === 'Commercial' && isSponsor(r.theme)) continue;
     if (sc.month && r.month !== sc.month) continue;
     if (sc.medium && r.medium !== sc.medium) continue;
     if (sc.channel && r.channel !== sc.channel) continue;
@@ -74,7 +76,7 @@ function reference(rows, f, sc) {
     a.spend += r.cost; a.spots++; out.adv.set(r.adv, a);
     const c = out.ch.get(r.channel) || { spend: 0, spots: 0, mine: 0 };
     c.spend += r.cost; c.spots++; if (isMine) c.mine += r.cost; out.ch.set(r.channel, c);
-    if (!isSponsor(r.theme)) {
+    if (f.adType === 'Sponsorship' || !isSponsor(r.theme)) {
       const k = r.adv + '\u0001' + r.theme;
       const t = out.camp.get(k) || { spend: 0, spots: 0 };
       t.spend += r.cost; t.spots++; out.camp.set(k, t);
@@ -86,7 +88,7 @@ function reference(rows, f, sc) {
 let checks = 0, failures = 0;
 const fail = msg => { failures++; if (failures <= 25) console.log('  FAIL', msg); };
 const near = (a, b) => Math.abs(a - b) <= Math.max(0.01, Math.abs(b) * 1e-9);
-function compare(label, app, ref) {
+function compare(label, app, ref, sponsorMode) {
   checks++;
   if (!near(app.total, ref.total)) return fail(`${label}: total ${app.total} vs ${ref.total}`);
   if (app.spots !== ref.spots) return fail(`${label}: spots ${app.spots} vs ${ref.spots}`);
@@ -104,7 +106,7 @@ function compare(label, app, ref) {
   const refCamps = [...ref.camp].sort((x, y) => y[1].spend - x[1].spend);
   if (app.campaigns.length !== Math.min(50, refCamps.length)) return fail(`${label}: ${app.campaigns.length} campaign rows vs ${Math.min(50, refCamps.length)}`);
   for (const c of app.campaigns) {
-    if (isSponsor(c.name)) return fail(`${label}: sponsorship item "${c.name}" listed as a campaign`);
+    if (!sponsorMode && isSponsor(c.name)) return fail(`${label}: sponsorship item "${c.name}" listed as a campaign`);
     const r = ref.camp.get(c.advertiser + '\u0001' + c.name);
     if (!r || !near(c.spend, r.spend) || c.spots !== r.spots) return fail(`${label}: campaign row ${c.name}`);
   }
@@ -167,11 +169,15 @@ function pageScopes(d) {
     ['Two of mine', { ...base, mine: advs.slice(0, 2), comps: advs.slice(2, 6) }],
     ['Mid-month dates', { ...base, from: '2026-02-15', to: '2026-05-10' }],
     ['Press only', { ...base, medium: 'Press' }],
+    ['Commercials', { ...base, adType: 'Commercial' }],
+    ['Sponsorships', { ...base, adType: 'Sponsorship' }],
+    ['Sponsor + TV', { ...base, adType: 'Sponsorship', medium: 'TV', daypart: 'Prime' }],
     ['Other group', { ...base, pg: groups[1], mine: [g2[2]], comps: [g2[0], g2[1], g2[3]] }],
   ];
 
   for (const [name, f] of scenarios.filter(([n]) => !process.env.ONLY || n === process.env.ONLY)) {
     const before = checks, beforeFail = failures;
+    const SP = f.adType === 'Sponsorship';
     const d = compute.dashboard(ds, f);
     const subset = rows.filter(r => r.pg === f.pg && r.date >= f.from && r.date <= f.to);
     const cache = new Map();
@@ -180,7 +186,7 @@ function pageScopes(d) {
 
     for (const { label, scope, expect } of pageScopes(d)) {
       const a = app(scope);
-      compare(`${name} · ${label}`, a, ref(scope));
+      compare(`${name} · ${label}`, a, ref(scope), SP);
       // The number you clicked equals the pop-up.
       if (expect.total != null) { checks++; if (!near(a.total, expect.total)) fail(`${name} · ${label}: clicked ${expect.total}, pop-up ${a.total}`); }
       if (expect.spots != null) { checks++; if (a.spots !== expect.spots) fail(`${name} · ${label}: clicked ${expect.spots} ads, pop-up ${a.spots}`); }
@@ -197,17 +203,24 @@ function pageScopes(d) {
         for (const s2 of lvl2) {
           const clean = JSON.parse(JSON.stringify(s2));
           const a2 = app(clean);
-          compare(`${name} · ${label} > ${clean.theme || clean.advertiser || clean.channel}`, a2, ref(clean));
+          compare(`${name} · ${label} > ${clean.theme || clean.advertiser || clean.channel}`, a2, ref(clean), SP);
           const s3 = a2.channels[0] ? JSON.parse(JSON.stringify({ ...clean, channel: a2.channels[0].name })) : null;
-          if (s3) compare(`${name} · ${label} > ... > ${s3.channel}`, app(s3), ref(s3));
+          if (s3) compare(`${name} · ${label} > ... > ${s3.channel}`, app(s3), ref(s3), SP);
         }
       }
     }
     // Grouped quiet months (a date range inside the period).
     const sub = { from: d.months[0].key + '-01' < f.from ? f.from : d.months[0].key + '-01', to: d.months[Math.min(2, d.months.length - 1)].key + '-28' };
-    compare(`${name} · quiet months range`, app(sub), ref(sub));
+    compare(`${name} · quiet months range`, app(sub), ref(sub), SP);
     console.log(`${failures === beforeFail ? 'ok  ' : 'FAIL'} ${name.padEnd(16)} ${checks - before} checks`);
   }
+  // All = Commercials + Sponsorships, for the KPIs and every month.
+  const [dAll, dCom, dSp] = ['All', 'Commercial', 'Sponsorship'].map(t => compute.dashboard(ds, { ...base, adType: t }));
+  checks++; if (!near(dCom.kpi.catSpend + dSp.kpi.catSpend, dAll.kpi.catSpend)) fail('Commercials + Sponsorships != All (spend)');
+  checks++; if (dCom.kpi.catSpots + dSp.kpi.catSpots !== dAll.kpi.catSpots) fail('Commercials + Sponsorships != All (spots)');
+  dAll.drill.forEach((m, k) => { checks++; if (!near(dCom.drill[k].category + dSp.drill[k].category, m.category)) fail('month split ' + m.key); });
+  checks++; if (dSp.drill.some(m => m.campaign && !isSponsor(m.campaign.name))) fail('Sponsorships mode shows a non-sponsorship lead campaign');
+  checks++; if (dCom.drill.some(m => m.campaign && isSponsor(m.campaign.name)) || dAll.drill.some(m => m.campaign && isSponsor(m.campaign.name))) fail('sponsorship item leads in All/Commercials');
   console.log(`\n${checks} checks, ${failures} failures (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
   process.exit(failures ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

@@ -100,6 +100,7 @@ input[type=date].inp{color-scheme:dark}
 .chips{display:flex;gap:8px;min-width:0;overflow:hidden}
 .chip{background:#EEF2FB;color:#3F5480;font-size:10.5px;font-weight:700;padding:5px 10px;border-radius:20px;white-space:nowrap;max-width:230px;overflow:hidden;text-overflow:ellipsis;flex-shrink:0}
 .chip.o{background:#FFF1E6;color:#E4702A}
+.chip.s{background:#F3EDFF;color:#6B46C1}
 .chip.busy{background:#141A2E;color:#FFC599}
 .tright{margin-left:auto;display:flex;gap:8px;flex-shrink:0;position:relative}
 .menu{position:absolute;top:46px;right:0;background:#fff;border:1px solid #DDE3EF;border-radius:10px;box-shadow:0 10px 30px rgba(20,26,46,.14);padding:6px;width:250px;display:none;z-index:15}
@@ -330,6 +331,13 @@ tr.me .sharebar{background:#FF8A3D}
 
       <div class="sec">
         <div class="sech"><span class="n">3</span> Media</div>
+        <div class="flabel">Ad type</div>
+        <div class="segbar" id="fAdType">
+          <button class="seg on" data-v="All">All</button>
+          <button class="seg" data-v="Commercial">Commercials</button>
+          <button class="seg" data-v="Sponsorship">Sponsorships</button>
+        </div>
+        <div class="hint">Sponsorships: -BB, Com Break, DJ, -Extro, -Intro, -LLogo, Next Card, Tag, Time Check, -Tr (Advt_Theme). Everything else is a commercial.</div>
         <div class="flabel">Medium</div>
         <div class="segbar" id="fMedium">
           <button class="seg on" data-v="All">All</button>
@@ -485,6 +493,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>

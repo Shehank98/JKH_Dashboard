@@ -29,6 +29,8 @@ const close = (a, b, msg) => {
     ['Mid-month range', { ...base, from: '2026-02-15', to: '2026-05-10' }],
     ['Single month', { ...base, from: '2026-03-01', to: '2026-03-31' }],
     ['No competitors', { ...base, comps: [] }],
+    ['Commercials', { ...base, adType: 'Commercial' }],
+    ['Sponsorships', { ...base, adType: 'Sponsorship' }],
   ];
   let checks = 0;
   for (const [label, f] of scenarios) {
