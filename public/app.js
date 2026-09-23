@@ -524,7 +524,7 @@
         body = `Leader <b style="color:${L.mine ? C.deep : '#1A1F36'}">${esc(L.name)}</b> <strong>${money(L.spend)}</strong> · ${nf(m.category ? (L.spend / m.category) * 100 : 0, 1)}% SOS`;
         if (m.campaign) {
           const me = d.filters.mine.includes(m.campaign.advertiser);
-          body += `<span class="camp${me ? ' me' : ''}"${detA({ title: `${m.campaign.advertiser} · ${m.label} ${m.year}`, month: m.key, advertiser: m.campaign.advertiser, tab: 'camp' })}${tipA('Click to see all campaigns of ' + m.campaign.advertiser + ' this month')}><span class="cn">“${esc(m.campaign.name)}”</span><br>
+          body += `<span class="camp${me ? ' me' : ''}"${detA({ title: `“${m.campaign.name}” · ${m.label} ${m.year}`, month: m.key, advertiser: m.campaign.advertiser, theme: m.campaign.name, tab: 'ch' })}${tipA('Click to see where this campaign ran in ' + m.label)}><span class="cn">“${esc(m.campaign.name)}”</span><br>
             <span class="by">by <b>${esc(m.campaign.advertiser)}</b>${me ? ' (mine)' : ''} · ${mn(m.campaign.spend)} · ${nf(m.campaign.spots)} spots</span></span>`;
         }
         const tail = [];
@@ -648,7 +648,9 @@
       const cls = r.mine ? 'me' : r.avg ? 'cat' : 'cp';
       const win = !r.avg && lead[j] === iAdv && v > 0 ? ' win' : '';
       const share = r.ads ? pctS((v / r.ads) * 100) : '0%';
-      const scope = r.mine ? { title: r.name + ' (mine)', mine: true, tab: 'camp' } : r.avg ? { title: 'Category spend', tab: 'adv' } : { title: r.name, advertiser: r.name, tab: 'camp' };
+      const scope = r.mine ? { title: `${r.name} (mine) · ${buckets[j]} ads`, mine: true, dur: buckets[j], tab: 'ch' }
+        : r.avg ? { title: `Category · ${buckets[j]} ads`, dur: buckets[j], tab: 'adv' }
+        : { title: `${r.name} · ${buckets[j]} ads`, advertiser: r.name, dur: buckets[j], tab: 'ch' };
       const label = v >= 100000 ? nf(v / 1000, 0) + 'K' : nf(v);
       return `<div class="bc"${tipA(`${r.name} · ${buckets[j]}\n${nf(v)} ads (${share} of their ${nf(r.ads)} ads)${win ? '\nMost ' + buckets[j] + ' ads among advertisers' : ''}\nClick for details`)}${detA(scope)}>
         ${v > 0 ? `<span class="bub ${cls}${win}" style="width:${dia.toFixed(1)}px;height:${dia.toFixed(1)}px"></span>` : ''}
@@ -764,6 +766,8 @@
     if (sc.medium) parts.push(sc.exclude ? `Other ${sc.medium} channels` : sc.medium);
     if (sc.channel) parts.push(sc.channel);
     if (sc.advertiser) parts.push(sc.advertiser);
+    if (sc.theme) parts.push(`“${sc.theme}”`);
+    if (sc.dur) parts.push(`${sc.dur} TV and Radio ads`);
     if (sc.mine) parts.push('mine only');
     if (data.filters.medium !== 'All' && !sc.medium) parts.push(data.filters.medium + ' only');
     if (data.filters.daypart) parts.push(dpLabel(data.filters.daypart));
@@ -857,7 +861,7 @@
     } else if (detailTab === 'camp') {
       const max = x.campaigns.length ? x.campaigns[0].spend : 0;
       html = `<table><tbody><tr><th>#</th><th>Campaign (Advt_Theme)</th><th>Advertiser</th><th class="num">Spend</th><th class="num">Share</th><th class="num">Spots</th></tr>` +
-        x.campaigns.map((c, i) => `<tr class="${c.role === 'mine' ? 'me' : ''}"${sub({ advertiser: c.advertiser, title: c.advertiser, tab: 'ch' })} style="cursor:pointer">
+        x.campaigns.map((c, i) => `<tr class="${c.role === 'mine' ? 'me' : ''}"${sub({ advertiser: c.advertiser, theme: c.name, title: `“${c.name}”`, tab: 'ch' })} style="cursor:pointer" title="Click to see where this campaign ran">
           <td class="rk">${i + 1}</td><td class="nm">“${esc(c.name)}”</td><td class="nm">${esc(c.advertiser)}${tag(c.role)}</td>
           <td class="num">${bar(c.spend, max)}${money(c.spend, false)}</td><td class="num">${x.total ? pctS((c.spend / x.total) * 100) : ''}</td><td class="num">${nf(c.spots)}</td></tr>`).join('') + '</tbody></table>';
       if (!x.campaigns.length) html = '<div class="mload">No campaigns in this selection (sponsorship items such as -BB, Tag and Time Check are excluded)</div>';

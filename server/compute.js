@@ -269,6 +269,10 @@ function detail(ds, f, scope = {}) {
   const sMed = scope.medium ? D.MEDIA.indexOf(scope.medium) : -1;
   const sCh = scope.channel ? dicts.channel.indexOf(scope.channel) : -1;
   const sAdv = scope.advertiser ? dicts.adv.indexOf(scope.advertiser) : -1;
+  // A clicked campaign, and a clicked duration bubble (TV and Radio ads of one standard length).
+  const sTheme = scope.theme != null ? dicts.theme.indexOf(scope.theme) : -1;
+  const sDur = scope.dur ? D.DUR_BUCKETS.indexOf(scope.dur) : -1;
+  if ((scope.theme != null && sTheme < 0) || (scope.dur && sDur < 0)) throw new Error('Unknown campaign or length');
   const onlyMine = !!scope.mine;
   // "Other" segments leave out the channels shown on their own.
   const skipCh = new Uint8Array(nCh);
@@ -281,7 +285,8 @@ function detail(ds, f, scope = {}) {
   const chSpend = new Float64Array(nCh), chSpots = new Float64Array(nCh), chMine = new Float64Array(nCh);
   const themes = new Map();
   let total = 0, spots = 0, mineTotal = 0;
-  const { pg, adv, ch, theme, day, dp, cost } = cols;
+  const { pg, adv, ch, theme, day, dp, dur, cost } = cols;
+  const durRaw = cols.durRaw || null;
   const chMed = dicts.channelMedium;
   const monCol = cols.mon;
 
@@ -298,6 +303,12 @@ function detail(ds, f, scope = {}) {
     const a = adv[i];
     if (sAdv >= 0 && a !== sAdv) continue;
     if (onlyMine && role[a] !== 1) continue;
+    if (sTheme >= 0 && theme[i] !== sTheme) continue;
+    if (sDur >= 0) {
+      if (md > 1) continue;
+      const bucket = durRaw ? (durRaw[i] > 0 ? D.stdDurIndex(durRaw[i]) : 255) : dur[i];
+      if (bucket !== sDur) continue;
+    }
     const v = cost[i];
     if (d < rFrom || d > rTo || (mon >= 0 && monCol[i] !== mon)) continue;
     total += v; spots++;

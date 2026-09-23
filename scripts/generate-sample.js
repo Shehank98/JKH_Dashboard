@@ -75,7 +75,9 @@ function makeRow() {
   const dur = press ? '' : pick([5, 7, 10, 12, 15, 18, 20, 25, 30, 40, 45, 60], [16, 6, 6, 4, 16, 3, 10, 5, 14, 2, 2, 1]);
   const prime = h >= 19 && h < 23;
   const base = press ? 50000 + rnd() * 90000 : (tv ? 95000 : 42000) * (dur / 30 + 0.3) * (prime ? 1.8 : 1);
-  const theme = G.themes[(dt.getUTCMonth() + G.advertisers.indexOf(adv)) % G.themes.length];
+  let theme = G.themes[(dt.getUTCMonth() + G.advertisers.indexOf(adv)) % G.themes.length];
+  // A few sponsorship and filler items, which the dashboard must ignore when picking campaigns.
+  if (rnd() < 0.05) theme = pick(['-BB', 'Com Break', 'DJ', '-Extro', '-Intro', '-LLogo', 'Next Card', 'Tag', 'Time Check', '-Tr', theme + ' -BB']);
   return [g, adv, pick(G.products), theme, ch, press ? '' : pick(PROGRAMS), dt.getUTCDate(), dt.getUTCMonth() + 1, dt.getUTCFullYear(),
     DAYS[dt.getUTCDay()], press ? '' : `${pad(h)}:00`, time, press ? '' : pick(['Start', 'Mid', 'End']), press ? '' : ads,
     press ? '' : 1 + Math.floor(rnd() * 6), press ? '' : pos, press ? '' : ads, pick(['Sinhala', 'Tamil', 'English'], [7, 2, 1]), dur,

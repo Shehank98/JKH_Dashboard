@@ -9,7 +9,8 @@
     "dev": "node server.js",
     "sample": "node scripts/generate-sample.js",
     "test": "node scripts/smoke-test.js",
-    "check": "node scripts/check-drilldowns.js samples/sample_420000.csv"
+    "check": "node scripts/check-drilldowns.js samples/sample_420000.csv",
+    "verify": "node scripts/verify-drilldowns.js samples/sample_420000.csv"
   },
   "engines": {
     "node": ">=18"

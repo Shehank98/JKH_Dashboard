@@ -10,7 +10,7 @@ A full-screen competitive media spend dashboard (John Keells Group branding) for
 * Filter drawer with two tabs: **Filters** (period and category, advertisers, media) and **Data file** (upload, delete, required columns). Apply and Reset stay pinned at the bottom.
 * Daypart filter lists the time range for each bucket.
 * TV and Radio channel mix: **Top 5** stacked bars by default (the rest grouped as Other), with an **All channels** heatmap behind a toggle (Category or Mine).
-* Interactive: hover any bar, line, cell or segment for a tooltip; click it to open a details pop-up (Advertisers, Campaigns, Channels). Click rows to drill deeper, use Back to return, and push a finding into the dashboard (zoom to a month, filter to a channel, add a competitor). Click legend items in the trend to hide or show lines. KPI cards open the rankings.
+* Interactive: hover any bar, line, cell or segment for a tooltip; click it to open a details pop-up (Advertisers, Campaigns, Channels). Duration bubbles open only the ads of that length, campaigns open only that campaign. Click rows to drill deeper, use Back to return, and push a finding into the dashboard (zoom to a month, filter to a channel, add a competitor). Click legend items in the trend to hide or show lines. KPI cards open the rankings.
 * Month Drill Down names the advertiser behind each lead campaign. Sponsorship and filler themes (`-BB`, `Com Break`, `DJ`, `-Extro`, `-Intro`, `-LLogo`, `Next Card`, `Tag`, `Time Check`, `-Tr`) are ignored when picking campaigns: exact match, or a name ending in a dash marker such as `Summer Promo -BB`. Override the list with `EXCLUDED_THEMES="a;b;c"`.
 * **Export** menu: JPG (whole dashboard as one image), PDF (one landscape page), or CSV (monthly numbers).
 
@@ -64,6 +64,7 @@ npm install
 npm start            # http://localhost:3000
 npm test             # smoke tests for the derived fields and metrics
 npm run check        # cross-checks every drill-down total against its chart (needs npm run sample first)
+npm run verify       # independent recount of every pop-up, row by row, from the raw CSV
 npm run sample       # writes samples/sample_420000.csv and .xlsx for testing
 ```
 
