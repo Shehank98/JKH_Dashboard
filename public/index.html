@@ -12,7 +12,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{background:#F4F6FA;overflow:hidden}
-body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#F4F6FA;color:#1A1F36;width:100vw;height:100vh;overflow:hidden;padding:14px 18px;display:flex;flex-direction:column;gap:10px;transform-origin:0 0;position:relative}
+body{--s:1;font-family:'Inter','Segoe UI',system-ui,sans-serif;background:#F4F6FA;color:#1A1F36;width:calc(100vw / var(--s));height:calc(100vh / var(--s));transform:scale(var(--s));overflow:hidden;padding:14px 18px;display:flex;flex-direction:column;gap:10px;transform-origin:0 0;position:relative}
 button,select,input{font-family:inherit}
 
 /* ---------- Drawer ---------- */
@@ -361,6 +361,6 @@ details[open] .chev{transform:rotate(90deg)}
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

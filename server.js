@@ -27,7 +27,13 @@ try {
 const app = express();
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
-app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
+// Page, script and styles are revalidated on every load (cheap 304 via ETag), so a redeploy is picked up immediately.
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, file) => {
+    if (/\.(html|js|css)$/.test(file)) res.setHeader('Cache-Control', 'no-cache');
+    else res.setHeader('Cache-Control', 'public, max-age=3600');
+  },
+}));
 // Self-hosted font and export libraries (JPG/PDF), served from node_modules.
 const vendor = (route, dir) => app.use(route, express.static(path.join(__dirname, 'node_modules', dir), { maxAge: '7d' }));
 vendor('/vendor/inter', '@fontsource/inter');

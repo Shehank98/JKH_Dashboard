@@ -66,14 +66,14 @@
   // ---------- full screen: fill the window, scale down only below 1280 x 720 ----------
   function fit() {
     const W = window.innerWidth, H = window.innerHeight;
-    const s = Math.min(1, W / 1280, H / 720);
-    const b = document.body.style;
-    b.width = W / s + 'px'; b.height = H / s + 'px';
-    b.transform = s < 1 ? `scale(${s})` : '';
+    // Size comes from CSS (100vw / --s), so the page always fills the window even if this runs late.
+    document.body.style.setProperty('--s', Math.min(1, W / 1280, H / 720).toFixed(4));
     if (data) renderTrend(data);
   }
   let fitFrame = 0;
-  window.addEventListener('resize', () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fit); });
+  const refit = () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fit); };
+  window.addEventListener('resize', refit);
+  document.addEventListener('visibilitychange', refit);
   fit();
 
   // ---------- drawer tabs ----------
