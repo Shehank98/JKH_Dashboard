@@ -63,12 +63,27 @@
   // Light segments get dark text for contrast.
   const segClass = (color) => (['#BFD3F6', '#8FB2F5', '#A8C2F2'].includes(color) ? 'lt' : ['#FFDCC0', '#FFC599'].includes(color) ? 'lto' : '');
 
-  // ---------- scale to fit small screens ----------
+  // ---------- full screen: fill the window, scale down only below 1280 x 720 ----------
   function fit() {
-    const s = Math.min(1, window.innerWidth / 1440, window.innerHeight / 900);
-    document.body.style.transform = s < 1 ? `scale(${s})` : '';
+    const W = window.innerWidth, H = window.innerHeight;
+    const s = Math.min(1, W / 1280, H / 720);
+    const b = document.body.style;
+    b.width = W / s + 'px'; b.height = H / s + 'px';
+    b.transform = s < 1 ? `scale(${s})` : '';
+    if (data) renderTrend(data);
   }
-  window.addEventListener('resize', fit); fit();
+  let fitFrame = 0;
+  window.addEventListener('resize', () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fit); });
+  fit();
+
+  // ---------- drawer tabs ----------
+  function showPane(id) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.pane === id));
+    document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === id));
+    $('dfoot').style.display = id === 'paneFilters' ? '' : 'none';
+  }
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => showPane(t.dataset.pane)));
+  $('ovBtn').addEventListener('click', () => { if (!overview) showPane('paneData'); });
 
   // ---------- persistence of the viewer's last filters ----------
   function saveState() { try { localStorage.setItem('cas-filters', JSON.stringify(state)); } catch (e) { /* storage unavailable */ } }
@@ -88,6 +103,7 @@
       ${ds.skipped ? `<div class="row"><span>${nf(ds.skipped)} rows skipped (invalid date)</span></div>` : ''}</div>`
       : '<div class="dfile" style="color:#6E7A99">No data file loaded</div>';
     $('deleteBtn').disabled = !ds;
+    $('dataDot').style.display = ds ? 'none' : '';
   }
   function setUploadStatus(text, err) { const s = $('ustatus'); s.textContent = text; s.className = 'ustatus' + (err ? ' err' : ''); }
   function setProgress(pct) {
@@ -181,7 +197,8 @@
     const saved = fresh ? null : readSaved();
     $('fPg').innerHTML = overview.productGroups.map(g => `<option>${esc(g.name)}</option>`).join('');
     $('fDaypart').innerHTML = '<option value="">All dayparts</option>' +
-      overview.dayparts.map(d => `<option value="${esc(d)}">${esc(d === 'Prime' ? 'Prime (18:30 to 22:30)' : d)}</option>`).join('');
+      overview.dayparts.map(d => `<option value="${esc(d.name)}">${esc(dpLabel(d.name))}</option>`).join('');
+    renderDpTable();
     const { minDate, maxDate } = overview;
     $('fFrom').min = $('fTo').min = minDate; $('fFrom').max = $('fTo').max = maxDate;
 
@@ -189,12 +206,22 @@
     if (saved && groups.includes(saved.pg)) {
       Object.assign(state, saved);
     } else {
-      const jan = maxDate.slice(0, 4) + '-01-01';
-      Object.assign(state, { from: jan > minDate ? jan : minDate, to: maxDate, compare: true, pg: groups[0], mine: [], comps: [], medium: 'All', channel: '', daypart: '' });
+      Object.assign(state, defaultDates(), { compare: true, pg: groups[0], mine: [], comps: [], medium: 'All', channel: '', daypart: '' });
     }
     await loadOptions(!(saved && saved.pg === state.pg && saved.mine && saved.mine.length));
     writeForm();
     await refresh();
+  }
+
+  const dpInfo = name => (overview && overview.dayparts.find(d => d.name === name)) || null;
+  const dpLabel = name => { const d = dpInfo(name); return d && /^\d/.test(d.time) ? `${d.name} (${d.time})` : name; };
+  function renderDpTable() {
+    $('dpTable').innerHTML = '<tbody>' + overview.dayparts.map(d =>
+      `<tr class="${d.name === state.daypart ? 'sel' : ''}"><td>${esc(d.name)}</td><td>${esc(d.time)}</td></tr>`).join('') + '</tbody>';
+  }
+  function defaultDates() {
+    const { minDate, maxDate } = overview, jan = maxDate.slice(0, 4) + '-01-01';
+    return { from: jan > minDate ? jan : minDate, to: maxDate };
   }
 
   async function loadOptions(resetSelection) {
@@ -216,6 +243,7 @@
     $('fCompare').checked = !!state.compare;
     $('fPg').value = state.pg;
     $('fDaypart').value = state.daypart || '';
+    renderDpTable();
     [...$('fMedium').children].forEach(b => b.classList.toggle('on', b.dataset.v === state.medium));
     renderAdvLists();
     renderChannelSelect();
@@ -232,6 +260,8 @@
     const order = (list, sel) => list.slice().sort((x, y) => (sel.includes(y.name) - sel.includes(x.name)));
     const mine = order(options.advertisers.filter(a => !state.comps.includes(a.name) && (!qm || a.name.toLowerCase().includes(qm))), state.mine);
     const comps = order(options.advertisers.filter(a => !state.mine.includes(a.name) && (!qc || a.name.toLowerCase().includes(qc))), state.comps);
+    $('mineCnt').textContent = state.mine.length ? `${state.mine.length} selected` : '';
+    $('compCnt').textContent = state.comps.length ? `${state.comps.length} selected` : '';
     $('mineList').innerHTML = mine.map(a => row(a, 'mine')).join('') || '<div class="empty-note">No advertisers</div>';
     $('compList').innerHTML = comps.map(a => row(a, 'comp')).join('') || '<div class="empty-note">No advertisers</div>';
   }
@@ -269,7 +299,16 @@
     renderChannelSelect();
   });
   $('fChannel').addEventListener('change', e => { state.channel = e.target.value; });
-  $('fDaypart').addEventListener('change', e => { state.daypart = e.target.value; });
+  $('fDaypart').addEventListener('change', e => { state.daypart = e.target.value; renderDpTable(); });
+  $('resetBtn').addEventListener('click', async () => {
+    if (!overview) return;
+    const keepPg = state.pg;
+    Object.assign(state, defaultDates(), { compare: true, medium: 'All', channel: '', daypart: '' });
+    state.pg = keepPg;
+    $('mineSearch').value = ''; $('compSearch').value = '';
+    await loadOptions(true);
+    writeForm();
+  });
   $('fCompare').addEventListener('change', e => { state.compare = e.target.checked; });
   $('fFrom').addEventListener('change', e => { state.from = e.target.value; });
   $('fTo').addEventListener('change', e => { state.to = e.target.value; });
@@ -316,7 +355,7 @@
     chips.push(`<span class="chip">+${f.comps.length} competitor${f.comps.length === 1 ? '' : 's'}</span>`);
     chips.push(`<span class="chip">${f.medium === 'All' ? 'All media' : esc(f.medium) + ' only'}</span>`);
     if (f.channel) chips.push(`<span class="chip">${esc(f.channel)}</span>`);
-    if (f.daypart) chips.push(`<span class="chip">${esc(f.daypart)}</span>`);
+    if (f.daypart) chips.push(`<span class="chip">${esc(dpLabel(f.daypart))}</span>`);
     const busy = $('busyChip');
     $('chips').innerHTML = chips.join('');
     if (busy) $('chips').prepend(busy);
@@ -346,19 +385,13 @@
       return len > 0 ? s : '';
     }).join('');
     const total = money(m.categoryTotal, false);
-    const rows = m.names.map((n, i) => {
-      const idx = m.mine[i] - m.category[i];
-      const cls = idx > 0.05 ? 'up' : idx < -0.05 ? 'down' : 'flat';
-      const arrow = idx > 0.05 ? '▲' : idx < -0.05 ? '▼' : '';
-      return `<tr><td><span class="sw" style="background:${C.medium[i]};margin-right:6px"></span>${n}</td>
-        <td class="num">${nf(m.category[i], 1)}%</td><td class="num mineval">${nf(m.mine[i], 1)}%</td>
-        <td class="num ${cls}">${arrow} ${idx > 0 ? '+' : idx < 0 ? '−' : ''}${nf(Math.abs(idx), 1)}</td></tr>`;
-    }).join('');
-    $('donut').innerHTML = `<svg viewBox="0 0 200 148" width="100%" height="136">
+    const rows = m.names.map((n, i) => `<tr><td><span class="sw" style="background:${C.medium[i]};margin-right:6px"></span>${n}</td>
+        <td class="num">${nf(m.category[i], 1)}%</td><td class="num mineval">${nf(m.mine[i], 1)}%</td></tr>`).join('');
+    $('donut').innerHTML = `<svg class="donutsvg" viewBox="0 6 200 136" preserveAspectRatio="xMidYMid meet">
       <g transform="translate(100,72) rotate(-90)"><circle r="50" fill="none" stroke="#F0F2F8" stroke-width="19"></circle>${segs}</g>
       <text x="100" y="70" text-anchor="middle" font-size="16" font-weight="700" fill="#1A1F36">${esc(total)}</text>
       <text x="100" y="84" text-anchor="middle" font-size="7.5" fill="#8A93AD">CATEGORY TOTAL</text></svg>
-      <table><tbody><tr><th>Medium</th><th class="num">Cat.</th><th class="num">Mine</th><th class="num" title="Mine minus category, percentage points">Idx</th></tr>${rows}</tbody></table>`;
+      <table><tbody><tr><th>Medium</th><th class="num">Cat.</th><th class="num">Mine</th></tr>${rows}</tbody></table>`;
   }
 
   // Smooth path through every point: Catmull-Rom tangents, limited (Fritsch-Carlson) so the curve never overshoots.
@@ -400,7 +433,10 @@
 
   function renderTrend(d) {
     const months = d.months, n = months.length;
-    const X0 = 42, X1 = 978, Y0 = 204, Y1 = 40;
+    const legendHtml = trendLegend(d);
+    $('trend').innerHTML = `<div class="trendbox" id="trendBox"></div><div class="legend">${legendHtml}</div>`;
+    const box = $('trendBox'), W = Math.max(300, box.clientWidth), H = Math.max(120, box.clientHeight);
+    const X0 = 40, X1 = W - 18, Y0 = H - 24, Y1 = 30, XR = W - 8;
     const toMn = v => v / 1e6;
     const series = [d.trend.mine, d.trend.categoryAvg].concat(d.trend.competitors.map(c => c.values));
     const max = niceMax(Math.max(0, ...series.flat().map(toMn)));
@@ -409,10 +445,10 @@
     const pts = vals => vals.map((v, i) => [x(i), y(v)]);
     const grid = [0, 1, 2, 3, 4].map(k => {
       const yy = Y0 - (k * (Y0 - Y1)) / 4, val = (max * k) / 4;
-      return `<line x1="${X0}" y1="${yy}" x2="980" y2="${yy}" stroke="#EEF1F7"></line><text x="34" y="${yy + 4}" text-anchor="end">${nf(val, max < 4 ? 1 : 0)}</text>`;
+      return `<line x1="${X0}" y1="${yy}" x2="${XR}" y2="${yy}" stroke="#EEF1F7"></line><text x="${X0 - 8}" y="${yy + 3.5}" text-anchor="end">${nf(val, max < 4 ? 1 : 0)}</text>`;
     }).join('');
-    const every = Math.ceil(n / 12);
-    const xl = months.map((m, i) => (i % every === 0 || i === n - 1 ? `<text x="${x(i)}" y="226">${esc(monthLabel(m, months))}</text>` : '')).join('');
+    const every = Math.ceil(n / Math.max(4, Math.floor((X1 - X0) / 56)));
+    const xl = months.map((m, i) => (i % every === 0 || i === n - 1 ? `<text x="${x(i)}" y="${H - 6}">${esc(monthLabel(m, months))}</text>` : '')).join('');
     const comps = d.trend.competitors.map((c, i) => `<path fill="none" stroke="${C.compLines[i % C.compLines.length]}" stroke-width="${i === 0 ? 2.4 : 2}" stroke-linecap="round" stroke-linejoin="round" d="${smoothPath(pts(c.values))}"></path>`).reverse().join('');
     const avg = `<path fill="none" stroke="#B4BCD0" stroke-width="1.5" stroke-dasharray="2 4" stroke-linecap="round" d="${smoothPath(pts(d.trend.categoryAvg))}"></path>`;
     const mp = pts(d.trend.mine);
@@ -425,22 +461,23 @@
     const peakV = Math.max(...d.trend.mine);
     if (peakV > 0) {
       const pi = d.trend.mine.indexOf(peakV), [px, py] = mp[pi];
-      const label = `${mn(peakV)} peak`, w = label.length * 7.4 + 18;
-      const rx = Math.max(X0, Math.min(980 - w, px - w / 2));
-      const ry = py - 34 < 4 ? py + 12 : py - 32;
-      callout = `<rect x="${rx}" y="${ry}" width="${w}" height="22" rx="6" fill="#FFF1E6"></rect><text x="${rx + w / 2}" y="${ry + 15.5}" font-size="12.5" font-weight="700" fill="${C.deep}" text-anchor="middle">${label}</text>`;
+      const label = `${mn(peakV)} peak`, w = label.length * 6.1 + 16;
+      const rx = Math.max(X0, Math.min(XR - w, px - w / 2));
+      const ry = py - 30 < 2 ? py + 10 : py - 28;
+      callout = `<rect x="${rx}" y="${ry}" width="${w}" height="19" rx="5" fill="#FFF1E6"></rect><text x="${rx + w / 2}" y="${ry + 13}" font-size="10.5" font-weight="700" fill="${C.deep}" text-anchor="middle">${label}</text>`;
     }
-    const legend = [`<div class="lg"><span class="sw" style="background:${C.orange};height:4px;width:18px"></span><strong>${esc(d.mineLabel)} (mine)</strong></div>`]
-      .concat(d.trend.competitors.map((c, i) => `<div class="lg"><span class="sw" style="background:${C.compLines[i % C.compLines.length]};height:3px;width:18px"></span>${esc(c.name)}</div>`))
-      .concat(['<div class="lg"><span class="sw" style="background:repeating-linear-gradient(90deg,#B4BCD0 0 3px,transparent 3px 6px);height:2px;width:18px"></span>Category avg.</div>']).join('');
-    $('trend').innerHTML = `<svg viewBox="0 0 1000 236" width="100%" height="216" style="margin-top:4px">
+    box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
       <defs><linearGradient id="mineFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${C.orange}" stop-opacity=".22"></stop><stop offset="100%" stop-color="${C.orange}" stop-opacity="0"></stop></linearGradient></defs>
-      <g font-size="12" fill="#9AA3BC" stroke-width="1">${grid}</g>
+      <g font-size="10" fill="#9AA3BC" stroke-width="1">${grid}</g>
       ${area}${comps}${avg}
       <path fill="none" stroke="${C.orange}" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" d="${minePath}"></path>
       ${dots}${callout}
-      <g font-size="12.5" fill="#8A93AD" text-anchor="middle">${xl}</g></svg>
-      <div class="legend">${legend}</div>`;
+      <g font-size="10.5" fill="#8A93AD" text-anchor="middle">${xl}</g></svg>`;
+  }
+  function trendLegend(d) {
+    return [`<div class="lg"><span class="sw" style="background:${C.orange};height:4px;width:18px"></span><strong>${esc(d.mineLabel)} (mine)</strong></div>`]
+      .concat(d.trend.competitors.map((c, i) => `<div class="lg"><span class="sw" style="background:${C.compLines[i % C.compLines.length]};height:3px;width:18px"></span>${esc(c.name)}</div>`))
+      .concat(['<div class="lg"><span class="sw" style="background:repeating-linear-gradient(90deg,#B4BCD0 0 3px,transparent 3px 6px);height:2px;width:18px"></span>Category avg.</div>']).join('');
   }
 
   function renderDrill(d) {
@@ -459,12 +496,16 @@
       const L = m.leader;
       let body = 'No spend recorded this month.';
       if (L) {
-        const parts = [`<strong>${money(L.spend)}</strong> · ${nf(m.category ? (L.spend / m.category) * 100 : 0, 1)}% SOS`];
-        if (m.campaign) parts.push(`<span class="tag">“${esc(m.campaign.name)}”</span> ${mn(m.campaign.spend)} across ${nf(m.campaign.spots)} spots`);
-        body = parts.join(' · ') + '.';
-        if (!L.mine) body += ` Leader ${esc(L.name)}.`;
-        if (m.runnerUp) body += ` Runner up ${esc(m.runnerUp.name)} ${mn(m.runnerUp.spend)}.`;
-        if (!L.mine && !(m.runnerUp && m.runnerUp.mine)) body += m.mineSpend > 0 ? ` Mine ${mn(m.mineSpend)}.` : ' No spend from mine.';
+        body = `Leader <b style="color:${L.mine ? C.deep : '#1A1F36'}">${esc(L.name)}</b> <strong>${money(L.spend)}</strong> · ${nf(m.category ? (L.spend / m.category) * 100 : 0, 1)}% SOS`;
+        if (m.campaign) {
+          const me = d.filters.mine.includes(m.campaign.advertiser);
+          body += `<span class="camp${me ? ' me' : ''}"><span class="cn">“${esc(m.campaign.name)}”</span><br>
+            <span class="by">by <b>${esc(m.campaign.advertiser)}</b>${me ? ' (mine)' : ''} · ${mn(m.campaign.spend)} · ${nf(m.campaign.spots)} spots</span></span>`;
+        }
+        const tail = [];
+        if (m.runnerUp) tail.push(`Runner up ${esc(m.runnerUp.name)} ${mn(m.runnerUp.spend)}.`);
+        if (!L.mine && !(m.runnerUp && m.runnerUp.mine)) tail.push(m.mineSpend > 0 ? `Mine ${mn(m.mineSpend)}.` : 'No spend from mine.');
+        body += tail.join(' ');
       }
       return `<details${i === 0 ? ' open' : ''}><summary><span class="chev">▶</span> ${m.label} ${m.year} ${tagFor(L)}</summary>
         <div class="dbody"><p id="p-m-${m.key}">${body}</p></div></details>`;
@@ -484,16 +525,30 @@
     $('drill').innerHTML = html.join('');
   }
 
+  // n colours from dark to light, so the biggest channel is always the darkest segment.
+  function scale(n, dark, light) {
+    const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+    const a = hex(dark), b = hex(light);
+    return Array.from({ length: n }, (_, i) => {
+      const t = n === 1 ? 0 : i / (n - 1);
+      return '#' + a.map((v, j) => Math.round(v + (b[j] - v) * t).toString(16).padStart(2, '0')).join('');
+    });
+  }
+  const textOn = hex => {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    return 0.299 * r + 0.587 * g + 0.114 * b > 165 ? '#1A1F36' : '#fff';
+  };
+
   function mixHtml(mix, d, medium, key) {
-    if (!mix.channels.length) return `<div class="nodata" style="height:280px">No ${medium} spend in this selection</div>`;
+    if (!mix.channels.length) return `<div class="nodata">No ${medium} spend in this selection</div>`;
     const n = d.months.length;
     const k = mix.channels.length;
-    const blues = C.blues.slice(0, k - 1).concat([C.blues[3]]), oranges = C.oTints.slice(0, k - 1).concat([C.oTints[3]]);
-    const showText = n <= 14;
-    const bars = (series, colors) => `<div class="bars" style="grid-template-columns:repeat(${n},1fr)">` + series.map((parts, i) => {
+    const blues = scale(k, '#1E3F8A', '#DCE7FB'), oranges = scale(k, '#C4560F', '#FFE4CC');
+    const showText = n <= 16;
+    const bars = (series, colors) => `<div class="bars" style="grid-template-columns:repeat(${n},minmax(0,1fr))">` + series.map((parts, i) => {
       const segs = parts ? parts.map((p, j) => ({ p, c: colors[j] })).reverse()
-        .map(s => `<div class="${segClass(s.c)}" style="height:${s.p}%;background:${s.c}">${showText && s.p >= 9 ? Math.round(s.p) : ''}</div>`).join('') : '';
-      return `<div><div class="stack" title="${parts ? mix.channels.map((c, j) => `${c} ${nf(parts[j], 1)}%`).join(', ') : 'No spend'}">${segs}</div><div class="bl">${esc(monthLabel(d.months[i], d.months))}</div></div>`;
+        .map(s => `<div style="height:${s.p}%;background:${s.c};color:${textOn(s.c)}">${showText && s.p >= 7 ? Math.round(s.p) + '%' : ''}</div>`).join('') : '';
+      return `<div class="bcol"><div class="stack" title="${parts ? esc(mix.channels.map((c, j) => `${c} ${nf(parts[j], 1)}%`).join(', ')) : 'No spend'}">${segs}</div><div class="bl">${esc(monthLabel(d.months[i], d.months))}</div></div>`;
     }).join('') + '</div>';
     const legend = mix.channels.map((c, j) => `<div class="lg"><span class="sw" style="background:${blues[j]}"></span>${esc(c)}</div>`).join('');
     return `<p class="secl" id="p-${key}a">CATEGORY</p>${bars(mix.category, blues)}
@@ -504,44 +559,96 @@
   function renderDuration(d) {
     const rows = d.duration.rows;
     const n = rows.length;
-    const rowH = Math.min(46, 232 / n), barH = Math.max(14, Math.min(30, rowH - 12));
+    const barH = n <= 6 ? 30 : Math.max(14, 30 - (n - 6) * 2.5);
     const html = rows.map((r, i) => {
       const colors = r.mine ? C.durMine : C.durComp;
       const nameStyle = r.mine ? `color:${C.deep};font-weight:700` : r.avg ? 'color:#8A93AD' : '';
       const bar = r.split
-        ? r.split.map((p, j) => `<div class="${segClass(colors[j])}" style="width:${p}%;background:${colors[j]}">${p >= 7 ? Math.round(p) : ''}</div>`).join('')
+        ? r.split.map((p, j) => `<div class="${segClass(colors[j])}" style="width:${p}%;background:${colors[j]}">${p >= 7 ? Math.round(p) + '%' : ''}</div>`).join('')
         : '<div style="width:100%;color:#9AA3BC;font-weight:500">No TV or Radio spots</div>';
-      return `<div class="durline" style="margin-bottom:${i === n - 1 ? 0 : rowH - barH}px"><span class="durname" style="${nameStyle}" title="${esc(r.mine ? r.name + ' (mine)' : r.name)}">${esc(r.name)}</span>
+      return `<div class="durline"><span class="durname" style="${nameStyle}" title="${esc(r.mine ? r.name + ' (mine)' : r.name)}">${esc(r.name)}</span>
         <div class="durrow" style="flex:1;height:${barH}px;${r.avg ? 'opacity:.55' : ''}">${bar}</div></div>`;
     }).join('');
-    $('duration').innerHTML = `<p class="secl" id="p-durb" style="margin-top:14px">5s / 15s / 20s / 30s SPLIT · SHARE OF TV AND RADIO SPOTS</p>
-      <div style="margin-top:12px">${html}</div>
-      <div class="legend" style="margin-top:14px">${d.duration.buckets.map((b, j) => `<div class="lg"><span class="sw" style="background:${C.durComp[j]}"></span>${b}</div>`).join('')}</div>`;
+    $('duration').innerHTML = `<p class="secl" id="p-durb" style="margin-top:10px">5s / 15s / 20s / 30s SPLIT · SHARE OF TV AND RADIO SPOTS</p>
+      <div class="durrows">${html}</div>
+      <div class="legend" style="margin-top:10px">${d.duration.buckets.map((b, j) => `<div class="lg"><span class="sw" style="background:${C.durComp[j]}"></span>${b}</div>`).join('')}</div>`;
   }
 
   // ---------- export and share ----------
-  $('exportBtn').addEventListener('click', () => {
+  const menu = $('exportMenu');
+  $('exportBtn').addEventListener('click', e => { e.stopPropagation(); menu.classList.toggle('on'); });
+  document.addEventListener('click', e => { if (!menu.contains(e.target)) menu.classList.remove('on'); });
+  menu.addEventListener('click', e => {
+    const b = e.target.closest('button[data-x]');
+    if (!b) return;
+    menu.classList.remove('on');
     if (!data) return toast('Nothing to export yet');
+    ({ jpg: exportImage, pdf: exportPdf, csv: exportCsv })[b.dataset.x]();
+  });
+  const fileBase = () => `JKH_ad-spend_${data.filters.pg.replace(/[^\w]+/g, '-')}_${data.filters.from}_to_${data.filters.to}`;
+  const loadScript = src => new Promise((ok, fail) => {
+    if (document.querySelector(`script[src="${src}"]`)) return ok();
+    const el = document.createElement('script');
+    el.src = src; el.onload = ok; el.onerror = () => fail(new Error('Could not load ' + src));
+    document.head.appendChild(el);
+  });
+  // Renders the whole dashboard (every card) to one JPEG, leaving out the drawer, menus and buttons.
+  async function captureDashboard() {
+    await loadScript('vendor/html-to-image/html-to-image.js');
+    $('drawerToggle').checked = false;
+    await new Promise(r => setTimeout(r, 320));
+    const b = document.body, w = b.offsetWidth, h = b.offsetHeight;
+    b.classList.add('exporting');
+    const skip = new Set(['drawer', 'drawerToggle', 'toast', 'overlay', 'filterBtn', 'tright']);
+    const url = await window.htmlToImage.toJpeg(b, {
+      quality: 0.95, pixelRatio: 2, backgroundColor: '#F4F6FA', width: w, height: h,
+      style: { transform: 'none' },
+      filter: node => !(node.id && skip.has(node.id)) && !(node.classList && node.classList.contains('scrim')),
+    }).finally(() => b.classList.remove('exporting'));
+    return { url, w, h };
+  }
+  async function exportImage() {
+    toast('Preparing JPG');
+    try {
+      const { url } = await captureDashboard();
+      const a = document.createElement('a');
+      a.href = url; a.download = fileBase() + '.jpg'; a.click();
+      toast('JPG downloaded');
+    } catch (e) { toast('Export failed: ' + e.message); }
+  }
+  async function exportPdf() {
+    toast('Preparing PDF');
+    try {
+      const [{ url, w, h }] = await Promise.all([captureDashboard(), loadScript('vendor/jspdf/jspdf.umd.min.js')]);
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation: w >= h ? 'landscape' : 'portrait', unit: 'pt', format: [w, h] });
+      pdf.setProperties({ title: 'Competitive Ad Spend Dashboard', author: 'John Keells Group' });
+      pdf.addImage(url, 'JPEG', 0, 0, w, h);
+      pdf.save(fileBase() + '.pdf');
+      toast('PDF downloaded');
+    } catch (e) { toast('Export failed: ' + e.message); }
+  }
+  function exportCsv() {
     const d = data, q = v => `"${String(v).replace(/"/g, '""')}"`;
     const lines = [
       ['Competitive Ad Spend Dashboard'], ['Period', `${fmtDate(d.filters.from)} to ${fmtDate(d.filters.to)}`], ['Product group', d.filters.pg],
       ['Medium', d.filters.medium], ['Channel', d.filters.channel || 'All'], ['Daypart', d.filters.daypart || 'All'], ['Spend basis', 'Rate card (LKR)'], [],
       ['KPI', 'Value'], ['Category spend', d.kpi.catSpend], ['My spend', d.kpi.mineSpend], ['Share of spend %', d.kpi.sos.toFixed(2)],
       ['Rank', d.kpi.rank ? `${d.kpi.rank} of ${d.kpi.rankOf}` : ''], ['Category spots', d.kpi.catSpots], ['My spots', d.kpi.mineSpots], [],
-      ['Month', d.mineLabel + ' (mine)'].concat(d.trend.competitors.map(c => c.name), ['Category avg per advertiser', 'Category total', 'Top spender', 'Lead campaign']),
+      ['Month', d.mineLabel + ' (mine)'].concat(d.trend.competitors.map(c => c.name), ['Category avg per advertiser', 'Category total', 'Top spender', 'Lead campaign', 'Campaign advertiser']),
     ];
     d.months.forEach((m, i) => {
       const dr = d.drill[i];
       lines.push([m.key, Math.round(d.trend.mine[i])].concat(d.trend.competitors.map(c => Math.round(c.values[i])),
-        [Math.round(d.trend.categoryAvg[i]), Math.round(dr.category), dr.leader ? dr.leader.name : '', dr.campaign ? dr.campaign.name : '']));
+        [Math.round(d.trend.categoryAvg[i]), Math.round(dr.category), dr.leader ? dr.leader.name : '', dr.campaign ? dr.campaign.name : '', dr.campaign ? dr.campaign.advertiser : '']));
     });
     const csv = lines.map(r => r.map(v => (typeof v === 'number' ? v : q(v))).join(',')).join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }));
-    a.download = `ad-spend_${d.filters.pg.replace(/[^\w]+/g, '-')}_${d.filters.from}_to_${d.filters.to}.csv`;
+    a.download = fileBase() + '.csv';
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  });
+  }
   $('shareBtn').addEventListener('click', async () => {
     const url = location.origin + location.pathname + '#' + encodeURIComponent(JSON.stringify(state));
     try { await navigator.clipboard.writeText(url); toast('Link with current filters copied'); } catch (e) { prompt('Copy this link', url); }
@@ -553,7 +660,7 @@
       const s = await api('/api/status');
       renderDataFile(s.dataset);
       if (s.dataset) await loadOverview(false);
-      else showEmpty();
+      else { showEmpty(); showPane('paneData'); }
       if (s.job.state === 'processing') pollStatus();
       else if (s.job.state === 'error') setUploadStatus(`Last upload failed: ${s.job.error}`, true);
     } catch (e) {

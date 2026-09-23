@@ -16,7 +16,7 @@ function overview(ds) {
   return {
     meta: ds.meta,
     minDate: toIso(ds.meta.minDay), maxDate: toIso(ds.meta.maxDay),
-    productGroups: groups, dayparts: D.DAYPARTS,
+    productGroups: groups, dayparts: D.DAYPARTS.map((name, i) => ({ name, time: D.DAYPART_TIMES[i] })),
   };
 }
 
@@ -165,36 +165,32 @@ function dashboard(ds, f) {
     const L = drill[k].leader;
     if (!L) continue;
     if (L.id === -1 ? role[a] !== 1 : L.id !== a) continue;
-    const agg = leadThemes[k].get(t);
-    if (agg) { agg[0] += val[0]; agg[1] += val[1]; } else leadThemes[k].set(t, [val[0], val[1]]);
+    const ck = a * nTheme + t;
+    const agg = leadThemes[k].get(ck);
+    if (agg) { agg[0] += val[0]; agg[1] += val[1]; } else leadThemes[k].set(ck, [val[0], val[1]]);
   }
   drill.forEach((m, k) => {
     let best = null;
-    for (const [t, v] of leadThemes[k]) if (!best || v[0] > best[1]) best = [t, v[0], v[1]];
-    m.campaign = best ? { name: dicts.theme[best[0]], spend: best[1], spots: best[2] } : null;
+    for (const [ck, v] of leadThemes[k]) if (!best || v[0] > best[1]) best = [ck, v[0], v[1]];
+    m.campaign = best ? {
+      name: dicts.theme[best[0] % nTheme], advertiser: dicts.adv[Math.floor(best[0] / nTheme)], spend: best[1], spots: best[2],
+    } : null;
     if (m.leader) delete m.leader.id;
     if (m.runnerUp) delete m.runnerUp.id;
   });
 
-  // Channel mix: top 3 channels by category spend in the medium, the rest as Other.
+  // Channel mix: every channel in the medium, ordered by category spend in the period.
   const channelMix = medium => {
     const ids = [];
     for (let c = 0; c < nCh; c++) if (chMed[c] === medium && chTot[c] > 0) ids.push(c);
     ids.sort((x, y) => chTot[y] - chTot[x]);
-    const top = ids.slice(0, 3);
     const series = src => months.map((_, k) => {
       let total = 0;
       for (const c of ids) total += src[k * nCh + c];
       if (total <= 0) return null;
-      const parts = top.map(c => (src[k * nCh + c] / total) * 100);
-      parts.push(Math.max(0, 100 - parts.reduce((s, x) => s + x, 0)));
-      return parts;
+      return ids.map(c => (src[k * nCh + c] / total) * 100);
     });
-    const otherLabel = medium === 0 ? 'Other TV' : 'Other FM';
-    return {
-      channels: top.length ? top.map(c => dicts.channelName[c]).concat([otherLabel]) : [],
-      category: series(chCat), mine: series(chMine),
-    };
+    return { channels: ids.map(c => dicts.channelName[c]), category: series(chCat), mine: series(chMine) };
   };
 
   // Duration mix, share of TV and Radio spots.

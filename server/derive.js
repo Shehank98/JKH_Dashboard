@@ -3,6 +3,7 @@
 
 const MEDIA = ['TV', 'Radio', 'Press'];
 const DAYPARTS = ['Morning', 'Daytime', 'Prime', 'Late night', 'Not timed'];
+const DAYPART_TIMES = ['05:00 to 12:00', '12:00 to 18:30', '18:30 to 22:30', '22:30 to 05:00', 'no Advt_time, e.g. Press'];
 const DURATIONS = [5, 15, 20, 30];
 const BREAK_QUALITY = ['Premium', 'Mid break', 'Unknown'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -106,7 +107,7 @@ function parseNumber(v) {
 }
 
 module.exports = {
-  MEDIA, DAYPARTS, DURATIONS, BREAK_QUALITY, MONTHS,
+  MEDIA, DAYPARTS, DAYPART_TIMES, DURATIONS, BREAK_QUALITY, MONTHS,
   mediumOf, channelNameOf, daypartOf, stdDurIndex, breakQualityOf,
   dayNumber, parseTime, parseNumber,
 };

@@ -1,8 +1,17 @@
 # Competitive Ad Spend Dashboard
 
-A single-screen (1440 x 900) competitive media spend dashboard for Sri Lankan advertisers. Upload a spot log (`.xlsx` or `.csv`, 400k+ rows), choose a product group, pick your advertiser and your competitors, and compare spend, share of spend, medium split, channel mix and duration mix.
+A full-screen competitive media spend dashboard (John Keells Group branding) for Sri Lankan advertisers. Upload a spot log (`.xlsx` or `.csv`, 400k+ rows), choose a product group, pick your advertiser and your competitors, and compare spend, share of spend, medium split, channel mix and duration mix.
 
 ![Dashboard](docs/screenshot.png)
+
+## Features
+
+* Fills the whole browser window. Below 1280 x 720 it scales down to fit instead of scrolling.
+* Filter drawer with two tabs: **Filters** (period and category, advertisers, media) and **Data file** (upload, delete, required columns). Apply and Reset stay pinned at the bottom.
+* Daypart filter lists the time range for each bucket.
+* TV and Radio channel mix show every channel as % of spend, darkest segment = biggest channel.
+* Month Drill Down names the advertiser behind each lead campaign.
+* **Export** menu: JPG (whole dashboard as one image), PDF (one landscape page), or CSV (monthly numbers).
 
 ## How it works
 
@@ -42,9 +51,8 @@ Required: `Advertiser, Channel, Dd, Mn, Yr, Cost`. Header names are matched igno
 * **SOS %** = my spend / category spend.
 * **Rank** = my advertisers combined as one entity, ranked against every other advertiser with spend.
 * **Previous period** = the same number of days immediately before the start date.
-* **Idx** = my medium share minus the category medium share, in percentage points.
 * **Category avg.** (trend) = category spend in the month / advertisers active that month.
-* **Channel mix** = top 3 channels by category spend in the selection, plus Other.
+* **Channel mix** = every channel in the medium, ordered by category spend in the selection.
 * **Duration mix** = share of TV and Radio spots by standardised duration (Press has no duration).
 * **Month drill down** = the leader is the top spender in the whole category that month. The earliest run of quiet months (category spend below 80% of the monthly average, 2 or more months) is combined into one row.
 
