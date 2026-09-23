@@ -54,7 +54,7 @@ async function readRows(file) {
 function reference(rows, f, sc) {
   const mine = new Set(f.mine), comps = new Set(f.comps), excl = new Set(sc.exclude || []);
   const from = sc.from && sc.from > f.from ? sc.from : f.from, to = sc.to && sc.to < f.to ? sc.to : f.to;
-  const out = { total: 0, spots: 0, mineTotal: 0, adv: new Map(), ch: new Map(), camp: new Map() };
+  const out = { total: 0, spots: 0, mineTotal: 0, adv: new Map(), ch: new Map(), camp: new Map(), mon: new Map(), catMon: new Map() };
   for (const r of rows) {
     if (r.pg !== f.pg || r.date < from || r.date > to) continue;
     if (f.medium !== 'All' && r.medium !== f.medium) continue;
@@ -63,6 +63,7 @@ function reference(rows, f, sc) {
     if (f.adType === 'Sponsorship' && !isSponsor(r.theme)) continue;
     if (f.adType === 'Commercial' && isSponsor(r.theme)) continue;
     if (sc.month && r.month !== sc.month) continue;
+    out.catMon.set(r.month, (out.catMon.get(r.month) || 0) + r.cost); // same days as the selection
     if (sc.medium && r.medium !== sc.medium) continue;
     if (sc.channel && r.channel !== sc.channel) continue;
     if (excl.has(r.channel)) continue;
@@ -71,6 +72,7 @@ function reference(rows, f, sc) {
     if (sc.theme != null && r.theme !== sc.theme) continue;
     if (sc.dur && (r.medium === 'Press' || r.bucket !== sc.dur)) continue;
     out.total += r.cost; out.spots++;
+    const mm = out.mon.get(r.month) || { spend: 0, spots: 0 }; mm.spend += r.cost; mm.spots++; out.mon.set(r.month, mm);
     const isMine = mine.has(r.adv);
     if (isMine) out.mineTotal += r.cost;
     const a = out.adv.get(r.adv) || { spend: 0, spots: 0, role: isMine ? 'mine' : comps.has(r.adv) ? 'comp' : '' };
@@ -110,6 +112,11 @@ function compare(label, app, ref, sponsorMode) {
     const r = ref.camp.get(c.advertiser + '\u0001' + c.name);
     if (!r || !near(c.spend, r.spend) || c.spots !== r.spots) return fail(`${label}: campaign row ${c.name}`);
   }
+  // Months tab: spend, spots and the category spend per month (share of category).
+  for (const m of app.months) {
+    const r = ref.mon.get(m.key) || { spend: 0, spots: 0 };
+    if (!near(m.spend, r.spend) || m.spots !== r.spots || !near(m.category, ref.catMon.get(m.key) || 0)) return fail(`${label}: months row ${m.key}`);
+  }
   // Sorted by spend, biggest first, in every table.
   const sorted = list => list.every((x, i) => i === 0 || list[i - 1].spend >= x.spend);
   if (!sorted(app.advertisers) || !sorted(app.channels) || !sorted(app.campaigns)) return fail(`${label}: table not sorted by spend`);
@@ -128,7 +135,9 @@ function pageScopes(d) {
     const camp = d.drill[k].campaign;
     if (camp) add(`Drill campaign ${m.key}`, { month: m.key, advertiser: camp.advertiser, theme: camp.name }, { total: camp.spend, spots: camp.spots });
   });
-  for (const [mix, medium] of [[d.tvMix, 'TV'], [d.radioMix, 'Radio']]) {
+  d.sos.rows.forEach(r => add(`SOS row ${r.name}`, r.mine ? { mine: true } : { advertiser: r.name }, { total: r.spend, spots: r.spots }));
+  if (d.sos.others.spend > 0) add('SOS others', {}, {});
+  for (const [mix, medium] of [[d.tvMix, 'TV'], [d.radioMix, 'Radio'], [d.pressMix, 'Press']]) {
     const top = Math.min(5, mix.keys.length);
     d.months.forEach((m, k) => {
       mix.keys.forEach((key, j) => {
@@ -141,11 +150,14 @@ function pageScopes(d) {
     });
     mix.keys.forEach(key => add(`Heat row ${key}`, { channel: key }, {}));
   }
-  d.duration.rows.forEach(r => {
-    const who = r.mine ? { mine: true } : r.avg ? {} : { advertiser: r.name };
-    add(`Duration row ${r.name}`, who, {});
-    d.duration.buckets.forEach((b, j) => { if (r.counts[j] > 0) add(`Bubble ${r.name} ${b}`, { ...who, dur: b }, { spots: r.counts[j] }); });
-  });
+  for (const [med, rows] of [[undefined, d.duration.rows], ['TV', d.duration.byMedium.TV], ['Radio', d.duration.byMedium.Radio]]) {
+    rows.forEach(r => {
+      const who = r.mine ? { mine: true } : r.avg ? {} : { advertiser: r.name };
+      if (med) who.medium = med;
+      add(`Duration ${med || 'TV+Radio'} row ${r.name}`, who, {});
+      d.duration.buckets.forEach((b, j) => { if (r.counts[j] > 0) add(`Bubble ${med || 'TV+Radio'} ${r.name} ${b}`, { ...who, dur: b }, { spots: r.counts[j] }); });
+    });
+  }
   return S;
 }
 
@@ -213,6 +225,12 @@ function pageScopes(d) {
     const sub = { from: d.months[0].key + '-01' < f.from ? f.from : d.months[0].key + '-01', to: d.months[Math.min(2, d.months.length - 1)].key + '-28' };
     compare(`${name} · quiet months range`, app(sub), ref(sub), SP);
     console.log(`${failures === beforeFail ? 'ok  ' : 'FAIL'} ${name.padEnd(16)} ${checks - before} checks`);
+  }
+  // SOS table adds up to 100% and to the category spots.
+  for (const [name, f] of scenarios) {
+    const d = compute.dashboard(ds, f), rows = d.sos.rows.concat([d.sos.others]);
+    checks++; if (d.kpi.catSpend && !near(rows.reduce((s, r) => s + r.sos, 0), 100)) fail(`${name}: SOS table does not add to 100%`);
+    checks++; if (rows.reduce((s, r) => s + r.spots, 0) !== d.kpi.catSpots) fail(`${name}: SOS table spots`);
   }
   // All = Commercials + Sponsorships, for the KPIs and every month.
   const [dAll, dCom, dSp] = ['All', 'Commercial', 'Sponsorship'].map(t => compute.dashboard(ds, { ...base, adType: t }));

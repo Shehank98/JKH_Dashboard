@@ -1,8 +1,8 @@
 # JKH Group Dashboard
 
-A full-screen competitive media spend dashboard (John Keells Group branding) for Sri Lankan advertisers. Upload a spot log (`.xlsx` or `.csv`, 400k+ rows), choose a product group, pick your advertiser and your competitors, and compare spend, share of spend, medium split, channel mix and duration mix.
+A full-screen competitive media spend dashboard by Ogilvy ARC for John Keells Group for Sri Lankan advertisers. Upload a spot log (`.xlsx` or `.csv`, 400k+ rows), choose a product group, pick your advertiser and your competitors, and compare spend, share of spend, medium split, channel mix and duration mix.
 
-![Dashboard](docs/screenshot.png)
+![Dashboard](docs/screenshot.jpg)
 
 ## Features
 
@@ -10,10 +10,12 @@ A full-screen competitive media spend dashboard (John Keells Group branding) for
 * Filter drawer with two tabs: **Filters** (period and category, advertisers, media) and **Data file** (upload, delete, required columns). Apply and Reset stay pinned at the bottom.
 * Daypart filter lists the time range for each bucket.
 * **Ad type** filter: All (default), Commercials or Sponsorships. Sponsorships are the Advt_Theme items `-BB`, `Com Break`, `DJ`, `-Extro`, `-Intro`, `-LLogo`, `Next Card`, `Tag`, `Time Check`, `-Tr` (exact name, or ending in a dash marker such as `Summer Promo -BB`); everything else is a commercial. The choice applies to every card and pop-up, and Commercials + Sponsorships always add up to All. Sponsorship items always count in the 5s bubble of Duration Mix (ACD uses their real Dur, or 5 seconds when Dur is blank). They are skipped only when Month Drill Down picks its lead campaign (in All and Commercials; in Sponsorships the top item is shown); pop-up campaign lists include them like any other theme.
-* TV and Radio channel mix: **Top 5** stacked bars by default (the rest grouped as Other), with an **All channels** heatmap behind a toggle (Category or Mine).
+* **Share of Spend Comparison**: my advertiser, each competitor and all other advertisers for the selected period, with SOS, spend, spots, share of spots, rank and a month-by-month SOS line. Click a row for details (opens on a Months tab with share of category per month).
+* **Channel Mix** with TV, Radio and Press toggles: **Top 5** stacked bars by default (the rest grouped as Other), with an **All channels** heatmap behind a toggle (Category or Mine).
+* **Duration Mix** with TV + Radio, TV and Radio toggles (Press has no ad duration).
 * Interactive: hover any bar, line, cell or segment for a tooltip; click it to open a details pop-up (Advertisers, Campaigns, Channels). Duration bubbles open only the ads of that length, campaigns open only that campaign. Click rows to drill deeper, use Back to return, and push a finding into the dashboard (zoom to a month, filter to a channel, add a competitor). Click legend items in the trend to hide or show lines. KPI cards open the rankings.
 * Month Drill Down names the advertiser behind each lead campaign. Sponsorship and filler themes (`-BB`, `Com Break`, `DJ`, `-Extro`, `-Intro`, `-LLogo`, `Next Card`, `Tag`, `Time Check`, `-Tr`) are ignored when picking campaigns: exact match, or a name ending in a dash marker such as `Summer Promo -BB`. Override the list with `EXCLUDED_THEMES="a;b;c"`.
-* **Export** menu: JPG (whole dashboard as one image), PDF (one landscape page), or CSV (monthly numbers).
+* **Export** menu: JPG images as a ZIP (the full dashboard plus each chart as its own branded JPG), PDF (one landscape page), or CSV (monthly numbers). Charts avoid SVG url() paint references so exports never render black.
 
 ## How it works
 

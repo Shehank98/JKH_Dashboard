@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JKH Group Dashboard</title>
-<link rel="icon" href="jkh-logo.png">
+<link rel="icon" href="favicon.png">
 <link rel="stylesheet" href="vendor/inter/400.css">
 <link rel="stylesheet" href="vendor/inter/500.css">
 <link rel="stylesheet" href="vendor/inter/600.css">
@@ -89,8 +89,9 @@ input[type=date].inp{color-scheme:dark}
 /* ---------- Top bar ---------- */
 .topbar{display:flex;align-items:center;gap:12px;height:44px;flex-shrink:0;min-width:0}
 .logo{display:flex;align-items:center;gap:10px;flex-shrink:0;padding-right:12px;border-right:1px solid #DDE3EF;height:44px}
-.logo img{height:42px;width:auto;display:block}
-.logo .t1{font-size:13px;font-weight:700;letter-spacing:-.2px;line-height:1.2;white-space:nowrap}
+.lstack{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.logo img{height:19px;width:auto;display:block}
+.logo .t1{font-size:11.5px;font-weight:700;letter-spacing:-.1px;line-height:1.1;white-space:nowrap;color:#1A1F36}
 .logo .t2{font-size:9.5px;color:#8A93AD;font-weight:600;letter-spacing:.3px;white-space:nowrap}
 .fbtn{background:#141A2E;color:#fff;border:none;border-radius:9px;padding:10px 15px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .fbtn.light{background:#fff;color:#4A5570;border:1px solid #DDE3EF}
@@ -126,7 +127,7 @@ h3{font-size:12.5px;font-weight:700;letter-spacing:-.1px}
 .up{color:#12A66A;font-weight:700}.down{color:#E14B4B;font-weight:700}.flat{color:#8A93AD;font-weight:700}
 .accent{border-left:4px solid #FF8A3D}
 .rowB{display:grid;grid-template-columns:minmax(262px,18%) 1fr minmax(312px,23%);gap:10px;flex:312 1 0;min-height:0}
-.rowC{display:grid;grid-template-columns:1fr 1fr minmax(352px,25%);gap:10px;flex:358 1 0;min-height:0}
+.rowC{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(352px,25%);gap:10px;flex:358 1 0;min-height:0}
 .legend{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:8px;flex-shrink:0}
 .lg{display:flex;align-items:center;gap:5px;font-size:9.5px;color:#4A5570;white-space:nowrap}
 .sw{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0}
@@ -198,13 +199,37 @@ details[open] .chev{transform:rotate(90deg)}
 .acdp{justify-self:end;font-size:11px;font-weight:700;padding:3px 7px;border-radius:20px;background:#EEF2FB;color:#1E3F8A;font-variant-numeric:tabular-nums}
 .acdp.me{background:#FFF1E6;color:#E4702A}.acdp.cat{background:#F0F2F7;color:#4A5570}.acdp.na{background:none;color:#B4BCD0;font-weight:500}
 .durname{font-size:11px;width:122px;color:#4A5570;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sost{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;margin-top:6px}
+.exporting .sost,.xframe .sost{overflow:hidden}
+.sost table td{padding:6px 6px;font-size:11.5px}
+.sost th{height:26px}
+.sost th{padding:4px 6px;position:sticky;top:0;background:#fff}
+.sost tr.row{cursor:pointer}
+.sost tr.row:hover td{background:#F6F8FC}
+.sost tr.me td{background:#FFF7F1;font-weight:600}
+.sost tr.me:hover td{background:#FFEFE2}
+.sost tr.me td:first-child{box-shadow:inset 3px 0 0 #FF8A3D}
+.sost tr.oth td{color:#6B7590}
+.sost tr.tot td{border-top:1.5px solid #E5E9F2;font-weight:700;background:#FAFBFD;cursor:default}
+.sost .rk{color:#9AA3BC;width:22px;font-weight:700}
+.sost .an{max-width:150px;overflow:hidden;text-overflow:ellipsis}
+.sosbar{display:flex;align-items:center;gap:6px;min-width:110px}
+.sosbar .trk{flex:1;height:8px;border-radius:4px;background:#F0F3F9;overflow:hidden;min-width:50px}
+.sosbar .trk span{display:block;height:100%;border-radius:4px;background:#5B8DEF}
+.sost tr.me .sosbar .trk span{background:#FF8A3D}
+.sost tr.oth .sosbar .trk span{background:#C7CEDF}
+.sosbar b{font-size:12px;min-width:40px;text-align:right;font-variant-numeric:tabular-nums}
+.sost .spk{width:78px}
+.sost .go{color:#B4BCD0;font-weight:700;width:14px;text-align:right}
+.sost tr.row:hover .go{color:#2F5DBF}
 .nodata{display:flex;align-items:center;justify-content:center;flex:1;min-height:80px;color:#9AA3BC;font-size:11px;text-align:center}
 
 /* Empty and loading states */
 .overlay{position:absolute;inset:68px 18px 14px 18px;display:none;align-items:center;justify-content:center;z-index:5;background:rgba(244,246,250,.82);border-radius:12px}
 .overlay.on{display:flex}
 .ovcard{background:#fff;border:1px solid #E5E9F2;border-radius:14px;padding:28px 34px;text-align:center;max-width:460px;box-shadow:0 8px 30px rgba(20,26,46,.08)}
-.ovcard img{height:70px;margin-bottom:12px}
+.ovcard .ovlogo{height:34px;margin-bottom:6px}
+.ovsub{font-size:12px;font-weight:700;color:#4A5570;letter-spacing:.3px;margin-bottom:14px}
 .ovcard h2{font-size:17px;margin-bottom:6px}
 .ovcard p{font-size:12px;color:#6B7590;line-height:1.6;margin-bottom:16px}
 .ovcard .fbtn{display:inline-flex}
@@ -228,7 +253,7 @@ tr[data-detail]:hover td{background:#F6F8FC}
 .mlink{display:inline-block;margin-top:4px;font-size:10px;font-weight:700;color:#2F5DBF;cursor:pointer}
 .mlink:hover{text-decoration:underline}
 .camp[data-detail]:hover{filter:brightness(.98);box-shadow:0 0 0 1px #C9D6F2}
-.chead{display:flex;align-items:flex-start;gap:8px;flex-shrink:0}
+.chead{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .ctitle{min-width:0;flex:1}
 .tgl{display:flex;background:#F0F3F9;border-radius:7px;padding:2px;flex-shrink:0}
 .tgl button{border:none;background:none;font-size:10px;font-weight:700;color:#8A93AD;padding:4px 9px;border-radius:5px;cursor:pointer;white-space:nowrap}
@@ -286,6 +311,13 @@ tr.me .sharebar{background:#FF8A3D}
 .abtn.pri{background:#141A2E;color:#fff;border-color:#141A2E}
 .abtn:hover{filter:brightness(.97)}
 .mload{padding:40px;text-align:center;color:#9AA3BC;font-size:12px}
+/* Export frame for single-chart images */
+.xframe{background:#F4F6FA;padding:16px 20px 20px;font-family:'Inter','Segoe UI',system-ui,sans-serif}
+.xhead{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.xhead img{height:24px}
+.xhead div{display:flex;flex-direction:column;border-left:1px solid #DDE3EF;padding-left:14px}
+.xhead b{font-size:13px;color:#1A1F36}
+.xhead span{font-size:10.5px;color:#6B7590;margin-top:1px}
 .exporting .card{opacity:1}
 .exporting .acc{overflow:hidden}
 </style>
@@ -388,8 +420,7 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="topbar">
   <div class="logo">
-    <img src="jkh-logo.png" alt="John Keells Group">
-    <div class="t1">JKH Group Dashboard</div>
+    <div class="lstack"><img src="ogilvy-arc.png" alt="Ogilvy ARC"><div class="t1">JKH Group Dashboard</div></div>
   </div>
   <label class="fbtn" for="drawerToggle" id="filterBtn">☰ Filters</label>
   <div class="daterange">
@@ -402,7 +433,7 @@ tr.me .sharebar{background:#FF8A3D}
     <button class="fbtn light" id="exportBtn">Export ▾</button>
     <button class="fbtn light" id="shareBtn">Share</button>
     <div class="menu" id="exportMenu">
-      <button data-x="jpg"><b>JPG image</b><span>The whole dashboard as one picture</span></button>
+      <button data-x="jpg"><b>JPG images (ZIP)</b><span>Full dashboard plus each chart as its own JPG</span></button>
       <button data-x="pdf"><b>PDF</b><span>The whole dashboard on one landscape page</span></button>
       <hr>
       <button data-x="csv"><b>CSV data</b><span>Monthly numbers behind the charts</span></button>
@@ -410,7 +441,7 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<div class="kpirow">
+<div class="kpirow" id="kpis">
   <div class="card kpi" id="k1" data-tip="Click to see every advertiser in the category">
     <div class="kl">Total Category Spend <span class="more">Details ›</span></div>
     <div class="kv" id="k1v">LKR 0</div>
@@ -426,17 +457,17 @@ tr.me .sharebar{background:#FF8A3D}
 </div>
 
 <div class="rowB">
-  <div class="card">
+  <div class="card" id="cardMedium">
     <h3 id="h-donut">Medium Split</h3>
     <p class="sub" id="p-donut">Category vs my share by medium · rate card</p>
     <div class="fill" id="donut"></div>
   </div>
-  <div class="card">
+  <div class="card" id="cardTrend">
     <h3 id="h-line">Monthly Spend Trend: Me vs Competitors</h3>
     <p class="sub" id="p-line">LKR Mn · smoothed curves · my advertiser emphasised · dotted line is the category average</p>
     <div class="fill" id="trend"></div>
   </div>
-  <div class="card">
+  <div class="card" id="cardDrill">
     <h3 id="h-acc">Month Drill Down</h3>
     <p class="sub" id="p-acc">Top spender and lead campaign (Advt_Theme) with its advertiser</p>
     <div class="acc" id="drill"></div>
@@ -444,20 +475,21 @@ tr.me .sharebar{background:#FF8A3D}
 </div>
 
 <div class="rowC">
-  <div class="card">
-    <div class="chead"><div class="ctitle"><h3 id="h-tv">TV Channel Mix by Month</h3>
-      <p class="sub" id="p-tv">% of TV spend per month</p></div>
-      <div class="tgl" data-mix="tv"><button data-v="bars" class="on">Top 5</button><button data-v="heat">All channels</button></div></div>
-    <div class="fill" id="tvMix"></div>
+  <div class="card" id="cardSos">
+    <div class="chead"><div class="ctitle"><h3 id="h-sos">Share of Spend Comparison</h3></div></div>
+    <p class="sub" id="p-sos">Selected period · my advertiser vs competitors · click a row for details</p>
+    <div class="fill" id="sosTable"></div>
   </div>
-  <div class="card">
-    <div class="chead"><div class="ctitle"><h3 id="h-rd">Radio Channel Mix by Month</h3>
-      <p class="sub" id="p-rd">% of Radio spend per month</p></div>
-      <div class="tgl" data-mix="rd"><button data-v="bars" class="on">Top 5</button><button data-v="heat">All channels</button></div></div>
-    <div class="fill" id="radioMix"></div>
+  <div class="card" id="cardMix">
+    <div class="chead"><div class="ctitle"><h3 id="h-mix">Channel Mix</h3></div>
+      <div class="tgl" data-mixmed><button data-v="TV" class="on">TV</button><button data-v="Radio">Radio</button><button data-v="Press">Press</button></div>
+      <div class="tgl" data-mix="mx"><button data-v="bars" class="on">Top 5</button><button data-v="heat">All</button></div></div>
+    <p class="sub" id="p-mix">% of spend per month</p>
+    <div class="fill" id="chMix"></div>
   </div>
-  <div class="card">
-    <h3 id="h-dur">Duration Mix</h3>
+  <div class="card" id="cardDur">
+    <div class="chead"><div class="ctitle"><h3 id="h-dur">Duration Mix</h3></div>
+      <div class="tgl" data-durmed><button data-v="All" class="on">TV + Radio</button><button data-v="TV">TV</button><button data-v="Radio">Radio</button></div></div>
     <p class="sub" id="p-dur" style="white-space:normal">Below 10s is 5s · 10 to 30s snaps to 15, 20 or 30s (25s is 20s) · above 30s is 30s+ · sponsorships count as 5s</p>
     <div class="fill" id="duration"></div>
   </div>
@@ -465,7 +497,8 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="overlay" id="overlay">
   <div class="ovcard">
-    <img src="jkh-logo.png" alt="John Keells Group">
+    <img src="ogilvy-arc.png" alt="Ogilvy ARC" class="ovlogo">
+    <div class="ovsub">JKH Group Dashboard</div>
     <h2 id="ovTitle">No data uploaded yet</h2>
     <p id="ovText">Open the filter drawer and upload your spot log as .xlsx or .csv. Large files (400k+ rows) take up to a minute to process.</p>
     <label class="fbtn" for="drawerToggle" id="ovBtn">☰ Open Filters</label>
@@ -474,6 +507,7 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="toast" id="toast"></div>
 <div class="tip" id="tip"></div>
+<div id="exportStage" style="position:fixed;left:-20000px;top:0;z-index:-1"></div>
 
 <div class="modal" id="modal">
   <div class="mbox" role="dialog" aria-modal="true" aria-labelledby="mTitle">
@@ -487,12 +521,13 @@ tr.me .sharebar{background:#FF8A3D}
       <button data-t="adv" class="on">Advertisers</button>
       <button data-t="camp">Campaigns</button>
       <button data-t="ch">Channels</button>
+      <button data-t="mon">Months</button>
     </div>
     <div class="mbody" id="mBody"></div>
     <div class="mfoot" id="mFoot"></div>
   </div>
 </div>
 
-<script src="app.js?v=10"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>

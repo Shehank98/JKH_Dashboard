@@ -73,7 +73,7 @@ const close = (a, b, msg) => {
     });
 
     // Channel mix: each segment, heatmap cell and the Top 5 "Other" group
-    for (const [mix, medium] of [[d.tvMix, 'TV'], [d.radioMix, 'Radio']]) {
+    for (const [mix, medium] of [[d.tvMix, 'TV'], [d.radioMix, 'Radio'], [d.pressMix, 'Press']]) {
       d.months.forEach((m, k) => {
         const parts = mix.category[k];
         if (!parts) return;

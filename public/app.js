@@ -20,8 +20,10 @@
   const state = { from: '', to: '', pg: '', mine: [], comps: [], medium: 'All', channel: '', daypart: '', adType: 'All' };
   let pendingFile = null;
   const hiddenSeries = new Set();                // trend lines switched off from the legend
-  const mixView = { tv: 'bars', rd: 'bars' };    // channel mix: Top 5 bars or heatmap
-  const heatSide = { tv: 'cat', rd: 'cat' };     // heatmap: category or mine
+  const mixView = { mx: 'bars' };                // channel mix: Top 5 bars or heatmap
+  const heatSide = { mx: 'cat' };                // heatmap: category or mine
+  let mixMedium = 'TV';                          // channel mix: TV, Radio or Press
+  let durMedium = 'All';                         // duration mix: All (TV + Radio), TV or Radio
   let pollTimer = null;
 
   // ---------- helpers ----------
@@ -353,7 +355,7 @@
     $('chips').innerHTML = '';
     ['k1v', 'k2v'].forEach(id => { $(id).textContent = 'LKR 0'; }); $('k3v').textContent = '0%';
     ['k1', 'k2', 'k3'].forEach(id => $(id).removeAttribute('data-detail'));
-    ['donut', 'trend', 'drill', 'tvMix', 'radioMix', 'duration'].forEach(id => { $(id).innerHTML = ''; });
+    ['donut', 'trend', 'drill', 'sosTable', 'chMix', 'duration'].forEach(id => { $(id).innerHTML = ''; });
     $('fPg').innerHTML = ''; $('mineList').innerHTML = ''; $('compList').innerHTML = ''; $('fChannel').innerHTML = ''; $('fDaypart').innerHTML = '';
   }
 
@@ -386,9 +388,48 @@
     renderDonut(d.medium);
     renderTrend(d);
     renderDrill(d);
-    $('tvMix').innerHTML = mixHtml(d.tvMix, d, 'TV', 'tv');
-    $('radioMix').innerHTML = mixHtml(d.radioMix, d, 'Radio', 'rd');
+    renderSos(d);
+    renderMix();
     renderDuration(d);
+  }
+
+  // Share of spend comparison: mine, each competitor, everyone else, with a month-by-month SOS line.
+  function renderSos(d) {
+    const S = d.sos;
+    const rows = S.rows.concat(S.others.spend > 0 ? [S.others] : []);
+    if (!rows.length) { $('sosTable').innerHTML = '<div class="nodata">Pick your advertiser and competitors in Filters</div>'; return; }
+    const maxSos = Math.max(1, ...rows.map(r => r.sos));
+    const spark = r => {
+      const W = 74, H = 20, n = r.monthly.length;
+      // Each line uses its own range so its ups and downs show; exact values are in the tooltip.
+      const vals = r.monthly.filter(v => v != null);
+      const lo = Math.min(...vals), hi = Math.max(...vals), span = Math.max(hi - lo, 1);
+      const mid = (hi + lo) / 2;
+      const yOf = v => H / 2 - ((v - mid) / span) * (H - 6);
+      const pts = r.monthly.map((v, i) => [n === 1 ? W / 2 : 2 + (i * (W - 4)) / (n - 1), v == null ? null : yOf(v)]).filter(p => p[1] != null);
+      if (!pts.length) return '';
+      const col = r.mine ? C.orange : r.others ? '#B4BCD0' : '#4474D6';
+      const last = pts[pts.length - 1];
+      return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><polyline fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" points="${pts.map(p => p.map(x => x.toFixed(1)).join(',')).join(' ')}"></polyline><circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.2" fill="${col}"></circle></svg>`;
+    };
+    const monthsTip = r => r.monthly.map((v, i) => `${d.months[i].label}: ${v == null ? 'n/a' : pctS(v)}`).join('\n');
+    const body = rows.map(r => {
+      const scope = r.mine ? { title: r.name + ' (mine)', mine: true, tab: 'mon' } : r.others ? { title: 'All advertisers', tab: 'adv' } : { title: r.name, advertiser: r.name, tab: 'mon' };
+      const cls = r.mine ? 'row me' : r.others ? 'row oth' : 'row';
+      return `<tr class="${cls}"${detA(scope)}${tipA(`${r.name}\nSOS ${pctS(r.sos)} · ${money(r.spend)} · ${nf(r.spots)} spots\nSOS by month:\n${monthsTip(r)}\nClick for details`)}>
+        <td class="rk">${r.rank ? '#' + r.rank : ''}</td>
+        <td class="an" title="${esc(r.name)}">${esc(r.name)}</td>
+        <td><div class="sosbar"><div class="trk"><span style="width:${(r.sos / maxSos) * 100}%"></span></div><b>${pctS(r.sos)}</b></div></td>
+        <td class="num">${money(r.spend, false)}</td>
+        <td class="num">${nf(r.spots)}<span style="color:#9AA3BC;font-size:10px"> · ${pctS(r.sov)}</span></td>
+        <td class="spk">${spark(r)}</td><td class="go">›</td></tr>`;
+    }).join('');
+    $('sosTable').innerHTML = `<div class="sost"><table><tbody>
+      <tr><th>#</th><th>Advertiser</th><th>SOS</th><th class="num">Spend (LKR)</th><th class="num">Spots · SOV</th><th>SOS by month</th><th></th></tr>
+      ${body}
+      <tr class="tot"><td></td><td>Category · ${nf(S.total.advertisers)} advertisers</td><td><div class="sosbar"><div class="trk"><span style="width:0"></span></div><b>100%</b></div></td>
+        <td class="num">${money(S.total.spend, false)}</td><td class="num">${nf(S.total.spots)}</td><td></td><td></td></tr>
+      </tbody></table></div>`;
   }
 
   function renderDonut(m) {
@@ -472,7 +513,7 @@
     const mp = pts(d.trend.mine);
     const minePath = smoothPath(mp);
     const mineOn = shown('__mine');
-    const area = mineOn && n > 1 ? `<path fill="url(#mineFill)" d="${minePath} L${mp[n - 1][0]},${Y0} L${mp[0][0]},${Y0} Z"></path>` : '';
+    const area = mineOn && n > 1 ? `<path fill="${C.orange}" fill-opacity="0.12" d="${minePath} L${mp[n - 1][0]},${Y0} L${mp[0][0]},${Y0} Z"></path>` : '';
     const dots = !mineOn ? '' : mp.map((p, i) => i === n - 1
       ? `<circle cx="${p[0]}" cy="${p[1]}" r="5.5" fill="${C.orange}" stroke="#fff" stroke-width="2.5"></circle>`
       : `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="${C.orange}"></circle>`).join('');
@@ -493,10 +534,9 @@
       d.trend.competitors.forEach(c => { if (shown(c.name)) lines.push(`${c.name}: ${mn(c.values[i])}`); });
       if (shown('__avg')) lines.push(`Category avg.: ${mn(d.trend.categoryAvg[i])}`);
       lines.push('Click for month details');
-      return `<rect class="hit" x="${x(i) - colW / 2}" y="${Y1 - 10}" width="${colW}" height="${Y0 - Y1 + 10}"${tipA(lines.join('\n'))}${detA({ title: `${m.label} ${m.year}`, month: m.key, tab: 'adv' })}></rect>`;
+      return `<rect class="hit" fill="#2F5DBF" fill-opacity="0" x="${x(i) - colW / 2}" y="${Y1 - 10}" width="${colW}" height="${Y0 - Y1 + 10}"${tipA(lines.join('\n'))}${detA({ title: `${m.label} ${m.year}`, month: m.key, tab: 'adv' })}></rect>`;
     }).join('');
     box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-      <defs><linearGradient id="mineFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${C.orange}" stop-opacity=".22"></stop><stop offset="100%" stop-color="${C.orange}" stop-opacity="0"></stop></linearGradient></defs>
       <g font-size="10" fill="#9AA3BC" stroke-width="1">${grid}</g>
       ${area}${comps}${avg}
       ${mineOn ? `<path fill="none" stroke="${C.orange}" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" d="${minePath}"></path>` : ''}
@@ -584,7 +624,7 @@
   function top5Html(mix, d, medium, key) {
     const n = d.months.length, TOP = 5;
     const k = mix.channels.length, top = Math.min(TOP, k), hasOther = k > TOP;
-    const otherName = medium === 'TV' ? 'Other TV' : 'Other FM';
+    const otherName = { TV: 'Other TV', Radio: 'Other FM', Press: 'Other Press' }[medium];
     const names = mix.channels.slice(0, top).concat(hasOther ? [`${otherName} (${k - TOP})`] : []);
     const fold = parts => parts && parts.slice(0, top).concat(hasOther ? [parts.slice(TOP).reduce((a, b) => a + b, 0)] : []);
     const blues = scale(top, '#1E3F8A', '#BFD3F6').concat(hasOther ? ['#DDE2EC'] : []);
@@ -637,7 +677,9 @@
   // The number is the ad count; bubble area follows the count so a column compares at a glance.
   // Advertisers share one scale; the category row has its own scale so it does not dwarf them.
   function renderDuration(d) {
-    const { rows, buckets, legacy } = d.duration;
+    const { buckets, legacy } = d.duration;
+    const rows = durMedium === 'All' ? d.duration.rows : d.duration.byMedium[durMedium];
+    const med = durMedium === 'All' ? undefined : durMedium;
     const advRows = rows.filter(r => !r.avg);
     const maxAdv = Math.max(1, ...advRows.flatMap(r => r.counts));
     const catRow = rows.find(r => r.avg);
@@ -657,9 +699,10 @@
       const cls = r.mine ? 'me' : r.avg ? 'cat' : 'cp';
       const win = !r.avg && lead[j] === iAdv && v > 0 ? ' win' : '';
       const share = r.ads ? pctS((v / r.ads) * 100) : '0%';
-      const scope = r.mine ? { title: `${r.name} (mine) · ${buckets[j]} ads`, mine: true, dur: buckets[j], tab: 'ch' }
-        : r.avg ? { title: `Category · ${buckets[j]} ads`, dur: buckets[j], tab: 'adv' }
-        : { title: `${r.name} · ${buckets[j]} ads`, advertiser: r.name, dur: buckets[j], tab: 'ch' };
+      const what = `${buckets[j]} ${med ? med + ' ' : ''}ads`;
+      const scope = r.mine ? { title: `${r.name} (mine) · ${what}`, mine: true, dur: buckets[j], medium: med, tab: 'ch' }
+        : r.avg ? { title: `Category · ${what}`, dur: buckets[j], medium: med, tab: 'adv' }
+        : { title: `${r.name} · ${what}`, advertiser: r.name, dur: buckets[j], medium: med, tab: 'ch' };
       const label = v >= 100000 ? nf(v / 1000, 0) + 'K' : nf(v);
       return `<div class="bc"${tipA(`${r.name} · ${buckets[j]}\n${nf(v)} ads (${share} of their ${nf(r.ads)} ads)${win ? '\nMost ' + buckets[j] + ' ads among advertisers' : ''}\nClick for details`)}${detA(scope)}>
         ${v > 0 ? `<span class="bub ${cls}${win}" style="width:${dia.toFixed(1)}px;height:${dia.toFixed(1)}px"></span>` : ''}
@@ -670,7 +713,7 @@
       if (!r.avg) iAdv++;
       const nameStyle = r.mine ? `color:${C.deep};font-weight:700` : r.avg ? 'color:#4A5570;font-weight:700' : '';
       const acd = r.acd == null ? '<span class="acdp na">n/a</span>' : `<span class="acdp${r.mine ? ' me' : r.avg ? ' cat' : ''}">${Math.round(r.acd)}s</span>`;
-      const scope = r.mine ? { title: r.name + ' (mine)', mine: true, tab: 'camp' } : r.avg ? { title: 'Category spend', tab: 'adv' } : { title: r.name, advertiser: r.name, tab: 'camp' };
+      const scope = r.mine ? { title: r.name + ' (mine)', mine: true, medium: med, tab: 'camp' } : r.avg ? { title: 'Category spend', medium: med, tab: 'adv' } : { title: r.name, advertiser: r.name, medium: med, tab: 'camp' };
       const cells = r.ads ? buckets.map((_, j) => cell(r, j, iAdv)).join('') : `<div class="bc none" style="grid-column:span ${buckets.length}">No TV or Radio ads</div>`;
       return `<div class="brow${r.avg ? ' catrow' : ''}">
         <span class="durname" style="${nameStyle}" title="${esc(r.name)} · ${nf(r.ads)} ads"${detA(scope)}><span class="nm2">${esc(r.name)}</span><small>${nf(r.ads)} ads</small></span>
@@ -679,7 +722,7 @@
     const cols = `grid-template-columns:minmax(88px,1.6fr) repeat(${buckets.length},minmax(34px,1fr)) 40px`;
     $('duration').innerHTML = `${legacy ? '<div class="durnote">Re-upload your file to apply the new length buckets and ACD</div>' : ''}
       <div class="bgrid" style="${cols}">
-        <span class="bh" style="text-align:left">NUMBER OF ADS</span>${buckets.map(b => `<span class="bh">${b}</span>`).join('')}<span class="bh">ACD</span>
+        <span class="bh" style="text-align:left">${med ? med.toUpperCase() + ' ADS' : 'NUMBER OF ADS'}</span>${buckets.map(b => `<span class="bh">${b}</span>`).join('')}<span class="bh">ACD</span>
       </div>
       <div class="bbody" style="--cols:${cols.replace('grid-template-columns:', '')}">${body}</div>
       <div class="legend" style="margin-top:6px">
@@ -716,9 +759,24 @@
     }
   });
   function renderMix() {
-    $('tvMix').innerHTML = mixHtml(data.tvMix, data, 'TV', 'tv');
-    $('radioMix').innerHTML = mixHtml(data.radioMix, data, 'Radio', 'rd');
+    const mix = { TV: data.tvMix, Radio: data.radioMix, Press: data.pressMix }[mixMedium];
+    $('chMix').innerHTML = mixHtml(mix, data, mixMedium, 'mx');
+    $('p-mix').textContent = `% of ${mixMedium} spend per month`;
   }
+  document.querySelector('.tgl[data-mixmed]').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || !data) return;
+    mixMedium = b.dataset.v;
+    [...b.parentNode.children].forEach(x => x.classList.toggle('on', x === b));
+    renderMix();
+  });
+  document.querySelector('.tgl[data-durmed]').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || !data) return;
+    durMedium = b.dataset.v;
+    [...b.parentNode.children].forEach(x => x.classList.toggle('on', x === b));
+    renderDuration(data);
+  });
 
   const tip = $('tip');
   let tipEl = null;
@@ -876,6 +934,14 @@
           <td class="rk">${i + 1}</td><td class="nm">“${esc(c.name)}”</td><td class="nm">${esc(c.advertiser)}${tag(c.role)}</td>
           <td class="num">${bar(c.spend, max)}${money(c.spend, false)}</td><td class="num">${x.total ? pctS((c.spend / x.total) * 100) : ''}</td><td class="num">${nf(c.spots)}</td></tr>`).join('') + '</tbody></table>';
       if (!x.campaigns.length) html = '<div class="mload">No campaigns in this selection</div>';
+    } else if (detailTab === 'mon') {
+      const rows = x.months;
+      const max = Math.max(0, ...rows.map(m => m.spend));
+      html = `<table><tbody><tr><th>Month</th><th class="num">Spend</th><th class="num">Spots</th><th class="num">Share of category</th><th class="num">Category spend</th></tr>` +
+        rows.map(m => `<tr${sub({ month: m.key, title: `${(detailStack[detailStack.length - 1].title || '').split(' · ')[0]} · ${m.label} ${m.year}`, tab: 'adv' })} style="cursor:pointer" title="Click to open ${m.label} ${m.year}">
+          <td class="nm">${m.label} ${m.year}</td><td class="num">${bar(m.spend, max)}${money(m.spend, false)}</td><td class="num">${nf(m.spots)}</td>
+          <td class="num" style="font-weight:700">${m.category ? pctS((m.spend / m.category) * 100) : 'n/a'}</td><td class="num" style="color:#8A93AD">${money(m.category, false)}</td></tr>`).join('') + '</tbody></table>';
+      if (!rows.length) html = '<div class="mload">No months in this selection</div>';
     } else {
       const max = x.channels.length ? x.channels[0].spend : 0;
       html = `<table><tbody><tr><th>#</th><th>Channel</th><th>Medium</th><th class="num">Spend</th><th class="num">Share</th><th class="num">Spots</th><th class="num">Mine</th><th class="num">My share</th></tr>` +
@@ -914,7 +980,7 @@
     await new Promise(r => setTimeout(r, 320));
     const b = document.body, w = b.offsetWidth, h = b.offsetHeight;
     b.classList.add('exporting');
-    const skip = new Set(['drawer', 'drawerToggle', 'toast', 'overlay', 'filterBtn', 'tright', 'modal', 'tip']);
+    const skip = new Set(['drawer', 'drawerToggle', 'toast', 'overlay', 'filterBtn', 'tright', 'modal', 'tip', 'exportStage']);
     const url = await window.htmlToImage.toJpeg(b, {
       quality: 0.95, pixelRatio: 2, backgroundColor: '#F4F6FA', width: w, height: h,
       style: { transform: 'none' },
@@ -922,13 +988,45 @@
     }).finally(() => b.classList.remove('exporting'));
     return { url, w, h };
   }
-  async function exportImage() {
-    toast('Preparing JPG');
+  // One chart as its own image: a copy of the card under a branded header (logo, name, period, filters).
+  async function captureCard(el) {
+    const stage = $('exportStage');
+    const w = Math.round(el.getBoundingClientRect().width / (parseFloat(document.body.style.getPropertyValue('--s')) || 1));
+    const h = el.offsetHeight;
+    const chips = [...document.querySelectorAll('#chips .chip')].filter(c => c.id !== 'busyChip').map(c => c.textContent).join(' · ');
+    stage.innerHTML = `<div class="xframe" style="width:${w + 40}px">
+      <div class="xhead"><img src="ogilvy-arc.png" alt="Ogilvy ARC"><div><b>JKH Group Dashboard</b><span>${esc($('periodText').textContent.replace(/\s+/g, ' '))} · ${esc(chips)}</span></div></div>
+      <div class="xbody"></div></div>`;
+    const copy = el.cloneNode(true);
+    copy.style.width = w + 'px'; copy.style.height = h + 'px'; copy.style.flex = 'none';
+    copy.querySelectorAll('.acc, .sost, .heat').forEach(a => { a.style.overflow = 'hidden'; });
+    stage.querySelector('.xbody').appendChild(copy);
+    await stage.querySelector('.xhead img').decode().catch(() => {});
+    const frame = stage.firstElementChild;
     try {
-      const { url } = await captureDashboard();
+      return await window.htmlToImage.toJpeg(frame, { quality: 0.95, pixelRatio: 2, backgroundColor: '#F4F6FA' });
+    } finally { stage.innerHTML = ''; }
+  }
+  const EXPORT_PARTS = [
+    ['01_KPIs', 'kpis'], ['02_Medium_Split', 'cardMedium'], ['03_Monthly_Spend_Trend', 'cardTrend'], ['04_Month_Drill_Down', 'cardDrill'],
+    ['05_Share_of_Spend', 'cardSos'], ['06_Channel_Mix', 'cardMix'], ['07_Duration_Mix', 'cardDur'],
+  ];
+  async function exportImage() {
+    toast('Preparing JPG images');
+    try {
+      const [{ url }] = await Promise.all([captureDashboard(), loadScript('vendor/jszip/jszip.min.js')]);
+      const zip = new window.JSZip();
+      const b64 = u => u.split(',')[1];
+      zip.file('00_Full_Dashboard.jpg', b64(url), { base64: true });
+      document.body.classList.add('exporting');
+      try {
+        for (const [name, id] of EXPORT_PARTS) zip.file(`${name}.jpg`, b64(await captureCard($(id))), { base64: true });
+      } finally { document.body.classList.remove('exporting'); }
+      const blob = await zip.generateAsync({ type: 'blob' });
       const a = document.createElement('a');
-      a.href = url; a.download = fileBase() + '.jpg'; a.click();
-      toast('JPG downloaded');
+      a.href = URL.createObjectURL(blob); a.download = fileBase() + '_JPG.zip'; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      toast('ZIP downloaded: full dashboard + 7 charts');
     } catch (e) { toast('Export failed: ' + e.message); }
   }
   async function exportPdf() {
