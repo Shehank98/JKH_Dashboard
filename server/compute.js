@@ -87,7 +87,7 @@ function dashboard(ds, f) {
   const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
   const { pgId, from, to, pFrom, pTo, mediumId, chId, dpId, role, mineIds, comps, adType } = resolve(ds, f);
   const excluded = excludedThemes(ds);
-  // Sponsorship items are never a "campaign", except when only sponsorships are shown.
+  // Month Drill Down never picks a sponsorship item as the lead campaign, except when only sponsorships are shown.
   const skipCampaign = adType === 2 ? null : excluded;
 
   const mon0 = new Date(from * 86400000), mon1 = new Date(to * 86400000);
@@ -137,8 +137,9 @@ function dashboard(ds, f) {
     monCat[mi] += v;
     medCat[md] += v;
     if (md < 2) { chCat[mi * nCh + c] += v; chTot[c] += v; }
-    const raw = durRaw ? durRaw[i] : NaN;
-    const du = durRaw ? (raw > 0 ? D.stdDurIndex(raw) : 255) : dur[i];
+    const sponsor = excluded[theme[i]] === 1;
+    const raw = durRaw ? D.durSecondsOf(durRaw[i], sponsor) : NaN;
+    const du = durRaw ? D.durBucketOf(durRaw[i], sponsor) : (sponsor ? 0 : dur[i]);
     if (md < 2 && du < NB) {
       durAdv[a * NB + du]++; durCat[du]++;
       if (raw > 0) {
@@ -269,7 +270,6 @@ function detail(ds, f, scope = {}) {
   const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
   const { pgId, from, to, mediumId, chId, dpId, role, adType } = resolve(ds, f);
   const excluded = excludedThemes(ds);
-  const skipCampaign = adType === 2 ? null : excluded;
   let mon = -1;
   if (scope.month) { const [y, m] = scope.month.split('-').map(Number); mon = y * 12 + m - 1; }
   const sMed = scope.medium ? D.MEDIA.indexOf(scope.medium) : -1;
@@ -313,7 +313,8 @@ function detail(ds, f, scope = {}) {
     if (sTheme >= 0 && theme[i] !== sTheme) continue;
     if (sDur >= 0) {
       if (md > 1) continue;
-      const bucket = durRaw ? (durRaw[i] > 0 ? D.stdDurIndex(durRaw[i]) : 255) : dur[i];
+      const sponsor = excluded[theme[i]] === 1;
+      const bucket = durRaw ? D.durBucketOf(durRaw[i], sponsor) : (sponsor ? 0 : dur[i]);
       if (bucket !== sDur) continue;
     }
     const v = cost[i];
@@ -322,11 +323,9 @@ function detail(ds, f, scope = {}) {
     advSpend[a] += v; advSpots[a]++;
     chSpend[c] += v; chSpots[c]++;
     if (role[a] === 1) { chMine[c] += v; mineTotal += v; }
-    if (!(skipCampaign && skipCampaign[theme[i]])) {
-      const key = a * nTheme + theme[i];
-      const t = themes.get(key);
-      if (t) { t[0] += v; t[1]++; } else themes.set(key, [v, 1]);
-    }
+    const key = a * nTheme + theme[i];
+    const t = themes.get(key);
+    if (t) { t[0] += v; t[1]++; } else themes.set(key, [v, 1]);
   }
 
   const advertisers = [];

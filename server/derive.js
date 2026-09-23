@@ -112,6 +112,17 @@ function isExcludedTheme(theme) {
   return EXCLUDED_THEMES.some(x => t === x || (x.startsWith('-') && t.endsWith(x)));
 }
 
+// Duration bucket and seconds for one ad. Sponsorship items always count as 5s;
+// for ACD they use their real Dur, or 5 seconds when Dur is blank.
+function durBucketOf(raw, sponsor) {
+  if (sponsor) return 0;
+  return raw > 0 ? stdDurIndex(raw) : 255;
+}
+function durSecondsOf(raw, sponsor) {
+  if (raw > 0) return raw;
+  return sponsor ? DURATIONS[0] : NaN;
+}
+
 function parseNumber(v) {
   if (v == null || v === '') return NaN;
   if (typeof v === 'number') return v;
@@ -122,5 +133,5 @@ function parseNumber(v) {
 module.exports = {
   MEDIA, DAYPARTS, DAYPART_TIMES, DURATIONS, DUR_BUCKETS, BREAK_QUALITY, MONTHS,
   mediumOf, channelNameOf, daypartOf, stdDurIndex, breakQualityOf,
-  dayNumber, parseTime, parseNumber, isExcludedTheme, EXCLUDED_THEMES,
+  dayNumber, parseTime, parseNumber, isExcludedTheme, EXCLUDED_THEMES, durBucketOf, durSecondsOf,
 };

@@ -875,7 +875,7 @@
         x.campaigns.map((c, i) => `<tr class="${c.role === 'mine' ? 'me' : ''}"${sub({ advertiser: c.advertiser, theme: c.name, title: `“${c.name}”`, tab: 'ch' })} style="cursor:pointer" title="Click to see where this campaign ran">
           <td class="rk">${i + 1}</td><td class="nm">“${esc(c.name)}”</td><td class="nm">${esc(c.advertiser)}${tag(c.role)}</td>
           <td class="num">${bar(c.spend, max)}${money(c.spend, false)}</td><td class="num">${x.total ? pctS((c.spend / x.total) * 100) : ''}</td><td class="num">${nf(c.spots)}</td></tr>`).join('') + '</tbody></table>';
-      if (!x.campaigns.length) html = `<div class="mload">No campaigns in this selection${data.filters.adType === 'Sponsorship' ? '' : ' (sponsorship items such as -BB, Tag and Time Check are not counted as campaigns; switch Ad type to Sponsorships to see them)'}</div>`;
+      if (!x.campaigns.length) html = '<div class="mload">No campaigns in this selection</div>';
     } else {
       const max = x.channels.length ? x.channels[0].spend : 0;
       html = `<table><tbody><tr><th>#</th><th>Channel</th><th>Medium</th><th class="num">Spend</th><th class="num">Share</th><th class="num">Spots</th><th class="num">Mine</th><th class="num">My share</th></tr>` +

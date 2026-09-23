@@ -21,6 +21,15 @@ const std = d => D.DUR_BUCKETS[D.stdDurIndex(d)];
 assert.deepStrictEqual([3, 9, 10, 17, 18, 22, 25, 26, 28, 30, 31, 34, 45].map(std),
   ['5s', '5s', '15s', '15s', '20s', '20s', '20s', '30s', '30s', '30s', '30s+', '30s+', '30s+']);
 
+// Sponsorship items always count as 5s; ACD uses real Dur, or 5s when blank.
+assert.strictEqual(D.durBucketOf(15, true), 0);
+assert.strictEqual(D.durBucketOf(NaN, true), 0);
+assert.strictEqual(D.durBucketOf(15, false), 1);
+assert.strictEqual(D.durBucketOf(NaN, false), 255);
+assert.strictEqual(D.durSecondsOf(NaN, true), 5);
+assert.strictEqual(D.durSecondsOf(12, true), 12);
+assert.ok(Number.isNaN(D.durSecondsOf(NaN, false)));
+
 // Daypart
 const dp = t => D.DAYPARTS[D.daypartOf(D.parseTime(t))];
 assert.strictEqual(dp('18:29:59'), 'Daytime');
@@ -73,7 +82,8 @@ assert.strictEqual(D.dayNumber(1, 'Jan', 26), D.dayNumber(1, 1, 2026));
   assert.ok(D.isExcludedTheme('-BB') && D.isExcludedTheme('Summer -BB') && D.isExcludedTheme('time check') && !D.isExcludedTheme('Rich Taste'));
   const det = compute.detail(ds, { from: '2026-01-01', to: '2026-02-28', compare: true, pg: 'Biscuits', mine: ['Me'], comps: ['Rival'], medium: 'All' }, { month: '2026-01' });
   assert.strictEqual(det.total, 6000002);
-  assert.deepStrictEqual(det.campaigns.map(c => c.name), ['Theme A']);
+  // Pop-up campaign lists include sponsorship items; only the Month Drill Down lead skips them.
+  assert.deepStrictEqual(det.campaigns.map(c => c.name).sort(), ['-BB', 'Summer -BB', 'Theme A', 'Time Check']);
   assert.strictEqual(det.advertisers[0].role, 'mine');
   // Duration mix: % of ads per bucket and ACD = sum of raw Dur / ads (TV and Radio).
   const durMe = out.duration.rows[0], durRival = out.duration.rows[1], durCat = out.duration.rows[2];

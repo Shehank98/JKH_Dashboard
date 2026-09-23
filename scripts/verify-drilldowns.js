@@ -43,7 +43,8 @@ async function readRows(file) {
     rows.push({
       pg: String(o.Product_Group).trim(), adv: String(o.Advertiser).trim(), theme: String(o.Advt_Theme || '').trim() || '(blank)',
       channel: ch, medium: mediumOf(ch), date: iso(y, m, d), month: iso(y, m, 1).slice(0, 7),
-      daypart: daypartOf(o.Advt_time), bucket: bucketOf(Number(o.Dur)), cost: Number(String(o.Cost).replace(/,/g, '')) || 0,
+      // Sponsorship items always count as 5s.
+      daypart: daypartOf(o.Advt_time), bucket: isSponsor(o.Advt_Theme) ? '5s' : bucketOf(Number(o.Dur)), cost: Number(String(o.Cost).replace(/,/g, '')) || 0,
     });
   }
   return rows;
@@ -76,7 +77,7 @@ function reference(rows, f, sc) {
     a.spend += r.cost; a.spots++; out.adv.set(r.adv, a);
     const c = out.ch.get(r.channel) || { spend: 0, spots: 0, mine: 0 };
     c.spend += r.cost; c.spots++; if (isMine) c.mine += r.cost; out.ch.set(r.channel, c);
-    if (f.adType === 'Sponsorship' || !isSponsor(r.theme)) {
+    {
       const k = r.adv + '\u0001' + r.theme;
       const t = out.camp.get(k) || { spend: 0, spots: 0 };
       t.spend += r.cost; t.spots++; out.camp.set(k, t);
@@ -106,7 +107,6 @@ function compare(label, app, ref, sponsorMode) {
   const refCamps = [...ref.camp].sort((x, y) => y[1].spend - x[1].spend);
   if (app.campaigns.length !== Math.min(50, refCamps.length)) return fail(`${label}: ${app.campaigns.length} campaign rows vs ${Math.min(50, refCamps.length)}`);
   for (const c of app.campaigns) {
-    if (!sponsorMode && isSponsor(c.name)) return fail(`${label}: sponsorship item "${c.name}" listed as a campaign`);
     const r = ref.camp.get(c.advertiser + '\u0001' + c.name);
     if (!r || !near(c.spend, r.spend) || c.spots !== r.spots) return fail(`${label}: campaign row ${c.name}`);
   }

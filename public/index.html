@@ -337,7 +337,7 @@ tr.me .sharebar{background:#FF8A3D}
           <button class="seg" data-v="Commercial">Commercials</button>
           <button class="seg" data-v="Sponsorship">Sponsorships</button>
         </div>
-        <div class="hint">Sponsorships: -BB, Com Break, DJ, -Extro, -Intro, -LLogo, Next Card, Tag, Time Check, -Tr (Advt_Theme). Everything else is a commercial.</div>
+        <div class="hint">Sponsorships: -BB, Com Break, DJ, -Extro, -Intro, -LLogo, Next Card, Tag, Time Check, -Tr (Advt_Theme). Everything else is a commercial. Sponsorships always count as 5s in Duration Mix and are never picked as the Month Drill Down lead campaign (except in Sponsorships view).</div>
         <div class="flabel">Medium</div>
         <div class="segbar" id="fMedium">
           <button class="seg on" data-v="All">All</button>
@@ -458,7 +458,7 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
   <div class="card">
     <h3 id="h-dur">Duration Mix</h3>
-    <p class="sub" id="p-dur" style="white-space:normal">Below 10s is 5s · 10 to 30s snaps to 15, 20 or 30s (25s is 20s) · above 30s is 30s+</p>
+    <p class="sub" id="p-dur" style="white-space:normal">Below 10s is 5s · 10 to 30s snaps to 15, 20 or 30s (25s is 20s) · above 30s is 30s+ · sponsorships count as 5s</p>
     <div class="fill" id="duration"></div>
   </div>
 </div>
@@ -493,6 +493,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>
