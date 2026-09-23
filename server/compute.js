@@ -95,12 +95,17 @@ function dashboard(ds, f) {
   const monCat = new Float64Array(nM), monMine = new Float64Array(nM);
   const medCat = [0, 0, 0], medMine = [0, 0, 0];
   const chCat = new Float64Array(nM * nCh), chMine = new Float64Array(nM * nCh), chTot = new Float64Array(nCh);
-  const durAdv = new Float64Array(nAdv * 4), durMine = [0, 0, 0, 0], durCat = [0, 0, 0, 0];
+  const NB = D.DUR_BUCKETS.length;
+  const durAdv = new Float64Array(nAdv * NB), durMine = new Array(NB).fill(0), durCat = new Array(NB).fill(0);
+  // ACD = sum of raw Dur / ads with a duration (TV and Radio).
+  const acdSum = new Float64Array(nAdv), acdN = new Float64Array(nAdv);
+  let acdMineSum = 0, acdMineN = 0, acdCatSum = 0, acdCatN = 0;
   const themeAgg = new Map(); // key (month, advertiser, theme) -> [spend, spots]
   let catSpend = 0, catSpots = 0, mineSpend = 0, mineSpots = 0, catPrev = 0, minePrev = 0;
   let prevRows = 0;
 
   const { pg, adv, ch, theme, day, mon, dp, dur, cost } = cols;
+  const durRaw = cols.durRaw || null; // missing on datasets saved before raw Dur was stored
   const chMed = dicts.channelMedium;
 
   for (let i = 0, n = pg.length; i < n; i++) {
@@ -127,14 +132,21 @@ function dashboard(ds, f) {
     monCat[mi] += v;
     medCat[md] += v;
     if (md < 2) { chCat[mi * nCh + c] += v; chTot[c] += v; }
-    const du = dur[i];
-    if (md < 2 && du < 4) { durAdv[a * 4 + du]++; durCat[du]++; }
+    const raw = durRaw ? durRaw[i] : NaN;
+    const du = durRaw ? (raw > 0 ? D.stdDurIndex(raw) : 255) : dur[i];
+    if (md < 2 && du < NB) {
+      durAdv[a * NB + du]++; durCat[du]++;
+      if (raw > 0) {
+        acdSum[a] += raw; acdN[a]++; acdCatSum += raw; acdCatN++;
+        if (isMine) { acdMineSum += raw; acdMineN++; }
+      }
+    }
     if (isMine) {
       mineSpend += v; mineSpots++;
       monMine[mi] += v;
       medMine[md] += v;
       if (md < 2) chMine[mi * nCh + c] += v;
-      if (md < 2 && du < 4) durMine[du]++;
+      if (md < 2 && du < NB) durMine[du]++;
     }
     if (excluded[theme[i]]) continue;
     const key = (mi * nAdv + a) * nTheme + theme[i];
@@ -216,9 +228,11 @@ function dashboard(ds, f) {
 
   // Duration mix, share of TV and Radio spots.
   const pct = arr => { const s = arr.reduce((x, y) => x + y, 0); return s ? arr.map(x => (x / s) * 100) : null; };
-  const durationRows = [{ name: mineLabel, mine: true, split: pct(durMine) }]
-    .concat(compSorted.map(a => ({ name: dicts.adv[a], mine: false, split: pct(Array.from(durAdv.subarray(a * 4, a * 4 + 4))) })))
-    .concat([{ name: 'Category avg.', avg: true, split: pct(durCat) }]);
+  const acd = (sum, n) => (durRaw && n ? sum / n : null);
+  const durRow = (row, counts, acdVal) => ({ ...row, split: pct(counts), counts, ads: counts.reduce((x, y) => x + y, 0), acd: acdVal });
+  const durationRows = [durRow({ name: mineLabel, mine: true }, durMine, acd(acdMineSum, acdMineN))]
+    .concat(compSorted.map(a => durRow({ name: dicts.adv[a], mine: false }, Array.from(durAdv.subarray(a * NB, a * NB + NB)), acd(acdSum[a], acdN[a]))))
+    .concat([durRow({ name: 'Category', avg: true }, durCat, acd(acdCatSum, acdCatN))]);
 
   const hasPrev = f.compare && prevRows > 0;
   return {
@@ -239,7 +253,7 @@ function dashboard(ds, f) {
     },
     months, trend, drill,
     tvMix: channelMix(0), radioMix: channelMix(1),
-    duration: { buckets: D.DURATIONS.map(s => s + 's'), rows: durationRows },
+    duration: { buckets: D.DUR_BUCKETS, rows: durationRows, legacy: !durRaw },
   };
 }
 
@@ -248,7 +262,7 @@ function dashboard(ds, f) {
 function detail(ds, f, scope = {}) {
   const { dicts, cols } = ds;
   const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
-  const { pgId, from, to, pFrom, pTo, mediumId, chId, dpId, role } = resolve(ds, f);
+  const { pgId, from, to, mediumId, chId, dpId, role } = resolve(ds, f);
   const excluded = excludedThemes(ds);
   let mon = -1;
   if (scope.month) { const [y, m] = scope.month.split('-').map(Number); mon = y * 12 + m - 1; }
@@ -256,13 +270,11 @@ function detail(ds, f, scope = {}) {
   const sCh = scope.channel ? dicts.channel.indexOf(scope.channel) : -1;
   const sAdv = scope.advertiser ? dicts.adv.indexOf(scope.advertiser) : -1;
   const onlyMine = !!scope.mine;
-  // Previous period: the month before for a month scope, otherwise the period before the date range.
-  const usePrev = !!f.compare;
 
-  const advSpend = new Float64Array(nAdv), advSpots = new Float64Array(nAdv), advPrev = new Float64Array(nAdv);
+  const advSpend = new Float64Array(nAdv), advSpots = new Float64Array(nAdv);
   const chSpend = new Float64Array(nCh), chSpots = new Float64Array(nCh), chMine = new Float64Array(nCh);
   const themes = new Map();
-  let total = 0, spots = 0, mineTotal = 0, prevTotal = 0;
+  let total = 0, spots = 0, mineTotal = 0;
   const { pg, adv, ch, theme, day, dp, cost } = cols;
   const chMed = dicts.channelMedium;
   const monCol = cols.mon;
@@ -280,16 +292,7 @@ function detail(ds, f, scope = {}) {
     if (sAdv >= 0 && a !== sAdv) continue;
     if (onlyMine && role[a] !== 1) continue;
     const v = cost[i];
-    let cur, prev;
-    if (mon >= 0) {
-      cur = monCol[i] === mon && d >= from && d <= to;
-      prev = monCol[i] === mon - 1;
-    } else {
-      cur = d >= from && d <= to;
-      prev = d >= pFrom && d <= pTo;
-    }
-    if (prev && usePrev) { advPrev[a] += v; prevTotal += v; }
-    if (!cur) continue;
+    if (d < from || d > to || (mon >= 0 && monCol[i] !== mon)) continue;
     total += v; spots++;
     advSpend[a] += v; advSpots[a]++;
     chSpend[c] += v; chSpots[c]++;
@@ -303,10 +306,10 @@ function detail(ds, f, scope = {}) {
 
   const advertisers = [];
   for (let a = 0; a < nAdv; a++) {
-    if (advSpend[a] <= 0 && advPrev[a] <= 0) continue;
+    if (advSpend[a] <= 0) continue;
     advertisers.push({
       name: dicts.adv[a], role: role[a] === 1 ? 'mine' : role[a] === 2 ? 'comp' : '',
-      spend: advSpend[a], spots: advSpots[a], prev: usePrev ? advPrev[a] : null,
+      spend: advSpend[a], spots: advSpots[a],
     });
   }
   advertisers.sort((x, y) => y.spend - x.spend);
@@ -321,8 +324,7 @@ function detail(ds, f, scope = {}) {
   }
   channels.sort((x, y) => y.spend - x.spend);
   return {
-    scope, total, spots, mineTotal, prevTotal: usePrev ? prevTotal : null,
-    prevLabel: mon >= 0 ? 'vs prev. month' : 'vs prev. period',
+    scope, total, spots, mineTotal,
     advertisers, campaigns, channels,
   };
 }

@@ -166,6 +166,12 @@ details[open] .chev{transform:rotate(90deg)}
 .durrow div{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;overflow:hidden}
 .durrow div.lt{color:#3F5480}.durrow div.lto{color:#9A4A16}
 .durline{display:flex;align-items:center;gap:10px}
+.durhead{display:flex;align-items:flex-end;margin-top:8px;flex-shrink:0}
+.durhead .secl{margin-top:0}
+.acdh{margin-left:auto;width:46px;text-align:right;color:#4A5570 !important}
+.acdv{width:46px;text-align:right;font-size:12px;font-weight:700;color:#1A1F36;flex-shrink:0;font-variant-numeric:tabular-nums}
+.acdv.me{color:#E4702A}.acdv.na{color:#B4BCD0;font-weight:500;font-size:10.5px}
+.durnote{font-size:10px;color:#9A4A16;background:#FFF7F1;border-radius:6px;padding:4px 8px;margin-top:6px;flex-shrink:0}
 .durname{font-size:11px;width:122px;color:#4A5570;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nodata{display:flex;align-items:center;justify-content:center;flex:1;min-height:80px;color:#9AA3BC;font-size:11px;text-align:center}
 
@@ -281,7 +287,6 @@ tr.me .sharebar{background:#FF8A3D}
         <div class="sech"><span class="n">1</span> Period and category</div>
         <div class="flabel">Date range</div>
         <div class="dateRow"><input class="inp" type="date" id="fFrom" aria-label="From date"><input class="inp" type="date" id="fTo" aria-label="To date"></div>
-        <label class="opt" style="margin-top:4px;padding-left:0"><input type="checkbox" id="fCompare" checked> Compare to previous period</label>
         <div class="flabel">Product group</div>
         <select class="inp" id="fPg"></select>
       </div>
@@ -421,7 +426,7 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
   <div class="card">
     <h3 id="h-dur">Duration Mix</h3>
-    <p class="sub" id="p-dur" style="white-space:normal">Dur below 10s becomes 5s, 10 to 30s snaps to nearest standard, above 30s becomes 30s</p>
+    <p class="sub" id="p-dur" style="white-space:normal">Below 10s is 5s · 10 to 30s snaps to 15, 20 or 30s (25s is 20s) · above 30s is 30s+</p>
     <div class="fill" id="duration"></div>
   </div>
 </div>
@@ -456,6 +461,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

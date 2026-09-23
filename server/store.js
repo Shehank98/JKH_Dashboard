@@ -6,8 +6,10 @@ const path = require('path');
 
 const COL_TYPES = {
   pg: Int32Array, adv: Int32Array, ch: Int32Array, theme: Int32Array, day: Int32Array, mon: Int32Array,
-  dp: Uint8Array, dur: Uint8Array, bq: Uint8Array, cost: Float64Array,
+  dp: Uint8Array, dur: Uint8Array, bq: Uint8Array, cost: Float64Array, durRaw: Float32Array,
 };
+// Columns added later; older saved datasets load without them.
+const OPTIONAL = new Set(['durRaw']);
 
 function datasetDir(dataDir) { return path.join(dataDir, 'dataset'); }
 
@@ -31,7 +33,9 @@ function load(dataDir) {
   const { meta, dicts } = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
   const cols = {};
   for (const [name, Type] of Object.entries(COL_TYPES)) {
-    const buf = fs.readFileSync(path.join(dir, name + '.bin'));
+    const file = path.join(dir, name + '.bin');
+    if (OPTIONAL.has(name) && !fs.existsSync(file)) continue;
+    const buf = fs.readFileSync(file);
     const copy = new Uint8Array(buf.byteLength);
     copy.set(buf);
     cols[name] = new Type(copy.buffer);

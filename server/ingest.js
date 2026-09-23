@@ -30,7 +30,7 @@ class Dict {
 class Builder {
   constructor() {
     this.pg = new Dict(); this.adv = new Dict(); this.channel = new Dict(); this.theme = new Dict();
-    this.cols = { pg: [], adv: [], ch: [], theme: [], day: [], mon: [], dp: [], dur: [], bq: [], cost: [] };
+    this.cols = { pg: [], adv: [], ch: [], theme: [], day: [], mon: [], dp: [], dur: [], durRaw: [], bq: [], cost: [] };
     this.header = null; // array index -> key
     this.rows = 0; this.skipped = 0; this.scanned = 0;
   }
@@ -77,7 +77,9 @@ class Builder {
     c.day.push(day);
     c.mon.push(dt.getUTCFullYear() * 12 + dt.getUTCMonth());
     c.dp.push(D.daypartOf(D.parseTime(r.advtTime)));
-    c.dur.push(D.stdDurIndex(D.parseNumber(r.dur)));
+    const dur = D.parseNumber(r.dur);
+    c.dur.push(D.stdDurIndex(dur));
+    c.durRaw.push(Number.isFinite(dur) && dur > 0 ? dur : NaN);
     c.bq.push(D.breakQualityOf(r.posInBrk, r.adsInBrk));
     c.cost.push(Number.isFinite(cost) ? cost : 0);
     this.rows++;
@@ -90,7 +92,7 @@ class Builder {
     const cols = {
       pg: Int32Array.from(c.pg), adv: Int32Array.from(c.adv), ch: Int32Array.from(c.ch),
       theme: Int32Array.from(c.theme), day: Int32Array.from(c.day), mon: Int32Array.from(c.mon),
-      dp: Uint8Array.from(c.dp), dur: Uint8Array.from(c.dur), bq: Uint8Array.from(c.bq),
+      dp: Uint8Array.from(c.dp), dur: Uint8Array.from(c.dur), durRaw: Float32Array.from(c.durRaw), bq: Uint8Array.from(c.bq),
       cost: Float64Array.from(c.cost),
     };
     this.cols = null;

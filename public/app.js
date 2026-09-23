@@ -9,14 +9,15 @@
     blues: ['#2F5DBF', '#5B8DEF', '#8FB2F5', '#BFD3F6'],
     medium: ['#2F5DBF', '#5B8DEF', '#A8C2F2'],
     compLines: ['#5B8DEF', '#9AA6C4', '#C7CEDF', '#2F5DBF', '#8FB2F5', '#B4BCD0', '#1E3F8A', '#A8C2F2', '#BFD3F6'],
-    durMine: ['#FF8A3D', '#FFA766', '#FFC599', '#E4702A'], durComp: ['#2F5DBF', '#5B8DEF', '#8FB2F5', '#1E3F8A'],
+    // Light to dark as the ads get longer: 5s, 15s, 20s, 30s, 30s+
+    durMine: ['#FFD2AE', '#FFAA6E', '#FF8A3D', '#D9661F', '#9E4510'], durComp: ['#BFD3F6', '#7FA5EE', '#4474D6', '#1E3F8A', '#0D2257'],
   };
 
   // ---------- state ----------
   let overview = null;      // product groups, date bounds
   let options = { advertisers: [], channels: [] };
   let data = null;          // last dashboard response
-  const state = { from: '', to: '', compare: true, pg: '', mine: [], comps: [], medium: 'All', channel: '', daypart: '' };
+  const state = { from: '', to: '', pg: '', mine: [], comps: [], medium: 'All', channel: '', daypart: '' };
   let pendingFile = null;
   const hiddenSeries = new Set();                // trend lines switched off from the legend
   const mixView = { tv: 'bars', rd: 'bars' };    // channel mix: Top 5 bars or heatmap
@@ -213,7 +214,7 @@
     if (saved && groups.includes(saved.pg)) {
       Object.assign(state, saved);
     } else {
-      Object.assign(state, defaultDates(), { compare: true, pg: groups[0], mine: [], comps: [], medium: 'All', channel: '', daypart: '' });
+      Object.assign(state, defaultDates(), { pg: groups[0], mine: [], comps: [], medium: 'All', channel: '', daypart: '' });
     }
     await loadOptions(!(saved && saved.pg === state.pg && saved.mine && saved.mine.length));
     writeForm();
@@ -247,7 +248,6 @@
 
   function writeForm() {
     $('fFrom').value = state.from; $('fTo').value = state.to;
-    $('fCompare').checked = !!state.compare;
     $('fPg').value = state.pg;
     $('fDaypart').value = state.daypart || '';
     renderDpTable();
@@ -310,13 +310,12 @@
   $('resetBtn').addEventListener('click', async () => {
     if (!overview) return;
     const keepPg = state.pg;
-    Object.assign(state, defaultDates(), { compare: true, medium: 'All', channel: '', daypart: '' });
+    Object.assign(state, defaultDates(), { medium: 'All', channel: '', daypart: '' });
     state.pg = keepPg;
     $('mineSearch').value = ''; $('compSearch').value = '';
     await loadOptions(true);
     writeForm();
   });
-  $('fCompare').addEventListener('change', e => { state.compare = e.target.checked; });
   $('fFrom').addEventListener('change', e => { state.from = e.target.value; });
   $('fTo').addEventListener('change', e => { state.to = e.target.value; });
   $('applyBtn').addEventListener('click', () => { refresh(); });
@@ -621,26 +620,30 @@
       <div class="heat" style="grid-template-columns:minmax(70px,110px) repeat(${n},minmax(0,1fr));grid-template-rows:16px">${head}${rows}</div>`;
   }
 
+  // Duration mix: % of ads (TV and Radio) in each standard length, plus ACD = sum of raw Dur / ads.
   function renderDuration(d) {
-    const rows = d.duration.rows;
+    const { rows, buckets, legacy } = d.duration;
     const n = rows.length;
-    const barH = n <= 6 ? 30 : Math.max(14, 30 - (n - 6) * 2.5);
-    const html = rows.map((r, i) => {
+    const barH = n <= 6 ? 28 : Math.max(14, 28 - (n - 6) * 2.5);
+    const html = rows.map(r => {
       const colors = r.mine ? C.durMine : C.durComp;
-      const nameStyle = r.mine ? `color:${C.deep};font-weight:700` : r.avg ? 'color:#8A93AD' : '';
+      const nameStyle = r.mine ? `color:${C.deep};font-weight:700` : r.avg ? 'color:#4A5570;font-weight:700' : '';
       const scope = r.mine ? { title: r.name + ' (mine)', mine: true, tab: 'camp' } : r.avg ? { title: 'Category spend', tab: 'adv' } : { title: r.name, advertiser: r.name, tab: 'camp' };
       const bar = r.split
-        ? r.split.map((p, j) => `<div class="${segClass(colors[j])}" style="width:${p}%;background:${colors[j]}"${tipA(`${r.name}
-${d.duration.buckets[j]} spots: ${pctS(p)}
-Click for details`)}${detA(scope)}>${p >= 7 ? Math.round(p) + '%' : ''}</div>`).join('')
-        : '<div style="width:100%;color:#9AA3BC;font-weight:500">No TV or Radio spots</div>';
-      return `<div class="durline"${detA(scope)}><span class="durname" style="${nameStyle}" title="${esc(r.mine ? r.name + ' (mine)' : r.name)}">${esc(r.name)}</span>
-        <div class="durrow" style="flex:1;height:${barH}px;${r.avg ? 'opacity:.55' : ''}">${bar}</div></div>`;
+        ? r.split.map((p, j) => (p > 0 ? `<div style="width:${p}%;background:${colors[j]};color:${textOn(colors[j])}"${tipA(`${r.name}\n${buckets[j]}: ${pctS(p)} of ads · ${nf(r.counts[j])} of ${nf(r.ads)} ads\nClick for details`)}${detA(scope)}>${p >= 7 ? Math.round(p) + '%' : ''}</div>` : '')).join('')
+        : '<div style="width:100%;color:#9AA3BC;font-weight:500">No TV or Radio ads</div>';
+      const acd = r.acd == null ? '<span class="acdv na">n/a</span>' : `<span class="acdv${r.mine ? ' me' : ''}">${nf(r.acd, 1)}s</span>`;
+      return `<div class="durline"${detA(scope)}${tipA(`${r.name}\n${nf(r.ads)} ads · ACD ${r.acd == null ? 'n/a' : nf(r.acd, 1) + 's'}\nClick for details`)}>
+        <span class="durname" style="${nameStyle}" title="${esc(r.mine ? r.name + ' (mine)' : r.name)}">${esc(r.name)}</span>
+        <div class="durrow" style="flex:1;height:${barH}px;${r.avg ? 'opacity:.6' : ''}">${bar}</div>${acd}</div>`;
     }).join('');
-    $('duration').innerHTML = `<p class="secl" id="p-durb" style="margin-top:10px">5s / 15s / 20s / 30s SPLIT · SHARE OF TV AND RADIO SPOTS</p>
+    $('duration').innerHTML = `<div class="durhead"><span class="secl">% OF ADS BY LENGTH · TV AND RADIO</span><span class="secl acdh">ACD</span></div>
+      ${legacy ? '<div class="durnote">Re-upload your file to apply the new length buckets and ACD</div>' : ''}
       <div class="durrows">${html}</div>
-      <div class="legend" style="margin-top:10px">${d.duration.buckets.map((b, j) => `<div class="lg"><span class="sw" style="background:${C.durComp[j]}"></span>${b}</div>`).join('')}</div>`;
+      <div class="legend" style="margin-top:8px">${buckets.map((b, j) => `<div class="lg"><span class="sw" style="background:${C.durComp[j]}"></span>${b}</div>`).join('')}
+        <div class="lg" style="margin-left:auto;color:#8A93AD">ACD = total seconds / ads</div></div>`;
   }
+
 
   // ---------- interactivity: toggles, legend, tooltip, click-through ----------
   document.querySelectorAll('.tgl[data-mix]').forEach(t => t.addEventListener('click', e => {
@@ -753,11 +756,10 @@ Click for details`)}${detA(scope)}>${p >= 7 ? Math.round(p) + '%' : ''}</div>`).
 
   function renderDetail(scope) {
     const x = detailData;
-    const chg = x.prevTotal ? ((x.total - x.prevTotal) / x.prevTotal) * 100 : null;
     const stat = (l, v, style) => `<div class="ms"><div class="l">${l}</div><div class="v" style="${style || ''}">${v}</div></div>`;
     $('mStats').innerHTML = stat('Spend', money(x.total)) + stat('Spots', nf(x.spots)) +
       stat('Mine', x.total ? `${money(x.mineTotal)} <span style="font-size:11px;color:#8A93AD">${pctS((x.mineTotal / x.total) * 100)}</span>` : 'LKR 0', `color:${C.deep}`) +
-      stat(x.prevLabel.replace('vs ', 'Change vs '), chg == null ? 'n/a' : `<span class="${chg >= 0 ? 'up' : 'down'}">${chg >= 0 ? '▲' : '▼'} ${nf(Math.abs(chg), 1)}%</span>`);
+      stat('Avg per spot', money(x.spots ? x.total / x.spots : 0));
     // Actions that push what you found back into the dashboard.
     const acts = [];
     if (scope.month) acts.push(`<button class="abtn pri" data-act="month">Zoom dashboard to ${esc($('mSub').textContent.split(' · ')[0])}</button>`);
@@ -801,15 +803,11 @@ Click for details`)}${detA(scope)}>${p >= 7 ? Math.round(p) + '%' : ''}</div>`).
     if (detailTab === 'adv') {
       const rows = x.advertisers.filter(a => a.spend > 0);
       const max = rows.length ? rows[0].spend : 0;
-      html = `<table><tbody><tr><th>#</th><th>Advertiser</th><th class="num">Spend</th><th class="num">SOS</th><th class="num">Spots</th><th class="num">Avg per spot</th><th class="num">${esc(x.prevLabel)}</th></tr>` +
-        rows.map((a, i) => {
-          const ch = a.prev ? ((a.spend - a.prev) / a.prev) * 100 : null;
-          return `<tr class="${a.role === 'mine' ? 'me' : ''}"${sub({ advertiser: a.name, title: a.name, tab: 'camp' })} style="cursor:pointer" title="Click to see ${esc(a.name)} in detail">
+      html = `<table><tbody><tr><th>#</th><th>Advertiser</th><th class="num">Spend</th><th class="num">SOS</th><th class="num">Spots</th><th class="num">Avg per spot</th></tr>` +
+        rows.map((a, i) => `<tr class="${a.role === 'mine' ? 'me' : ''}"${sub({ advertiser: a.name, title: a.name, tab: 'camp' })} style="cursor:pointer" title="Click to see ${esc(a.name)} in detail">
             <td class="rk">${i + 1}</td><td class="nm">${esc(a.name)}${tag(a.role)}</td>
             <td class="num">${bar(a.spend, max)}${money(a.spend, false)}</td><td class="num">${x.total ? pctS((a.spend / x.total) * 100) : ''}</td>
-            <td class="num">${nf(a.spots)}</td><td class="num">${money(a.spots ? a.spend / a.spots : 0, false)}</td>
-            <td class="num ${ch == null ? 'flat' : ch >= 0 ? 'up' : 'down'}">${ch == null ? (a.prev === 0 ? 'new' : 'n/a') : (ch >= 0 ? '▲ ' : '▼ ') + nf(Math.abs(ch), 1) + '%'}</td></tr>`;
-        }).join('') + '</tbody></table>';
+            <td class="num">${nf(a.spots)}</td><td class="num">${money(a.spots ? a.spend / a.spots : 0, false)}</td></tr>`).join('') + '</tbody></table>';
       if (!rows.length) html = '<div class="mload">No spend in this selection</div>';
     } else if (detailTab === 'camp') {
       const max = x.campaigns.length ? x.campaigns[0].spend : 0;

@@ -17,8 +17,9 @@ assert.strictEqual(D.channelNameOf('TV - Derana TV'), 'Derana TV');
 assert.strictEqual(D.channelNameOf('FM Derana'), 'FM Derana');
 
 // Std_Dur
-const std = d => D.DURATIONS[D.stdDurIndex(d)];
-assert.deepStrictEqual([3, 9, 10, 17, 18, 22, 25, 28, 30, 45].map(std), [5, 5, 15, 15, 20, 20, 30, 30, 30, 30]);
+const std = d => D.DUR_BUCKETS[D.stdDurIndex(d)];
+assert.deepStrictEqual([3, 9, 10, 17, 18, 22, 25, 26, 28, 30, 31, 34, 45].map(std),
+  ['5s', '5s', '15s', '15s', '20s', '20s', '20s', '30s', '30s', '30s', '30s+', '30s+', '30s+']);
 
 // Daypart
 const dp = t => D.DAYPARTS[D.daypartOf(D.parseTime(t))];
@@ -74,7 +75,13 @@ assert.strictEqual(D.dayNumber(1, 'Jan', 26), D.dayNumber(1, 1, 2026));
   assert.strictEqual(det.total, 6000002);
   assert.deepStrictEqual(det.campaigns.map(c => c.name), ['Theme A']);
   assert.strictEqual(det.advertisers[0].role, 'mine');
-  assert.strictEqual(det.prevTotal, 700000); // December 2025
+  // Duration mix: % of ads per bucket and ACD = sum of raw Dur / ads (TV and Radio).
+  const durMe = out.duration.rows[0], durRival = out.duration.rows[1], durCat = out.duration.rows[2];
+  assert.deepStrictEqual(durMe.counts, [3, 1, 0, 1, 0]); // 5s x3, 15s, 30s
+  assert.strictEqual(durMe.acd, 12);                     // (30 + 15 + 5 + 5 + 5) / 5
+  assert.strictEqual(durRival.acd, 20);
+  assert.strictEqual(Math.round(durCat.acd * 100) / 100, 13.33); // 80 / 6
+  assert.strictEqual(durMe.split[0], 60);
   const detCh = compute.detail(ds, { from: '2026-01-01', to: '2026-02-28', pg: 'Biscuits', mine: ['Me'], comps: ['Rival'], medium: 'All' }, { channel: 'TV - Sirasa TV' });
   assert.deepStrictEqual(detCh.advertisers.map(a => a.name), ['Rival']);
   console.log('All smoke tests passed');

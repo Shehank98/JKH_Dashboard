@@ -41,7 +41,7 @@ Required: `Advertiser, Channel, Dd, Mn, Yr, Cost`. Header names are matched igno
 | ChannelName | Text after the `TV - ` / `FM - ` / `Radio - ` prefix. |
 | Date, MonthKey | Built from `Dd`, `Mn`, `Yr`. `Mn` can be a number or a name (Jan). Rows with an invalid date are skipped and counted. |
 | Daypart | Morning 05:00 to 12:00, Daytime 12:00 to 18:30, Prime 18:30 to 22:30, Late night 22:30 to 05:00, Not timed (no `Advt_time`, typical for Press). |
-| Std_Dur | Below 10s becomes 5s. 10 to 30s snaps to the nearest of 15, 20, 30 (ties go up). Above 30s becomes 30s. |
+| Std_Dur | Below 10s is 5s. 10 to 30s snaps to the nearest of 15, 20, 30 (ties go down, so 25s is 20s). Above 30s is 30s+. Raw `Dur` is kept too, and the bucket is worked out at query time. |
 | Break_Quality | `PosinBrk` = 1 or = `AdsinBrk` is Premium, otherwise Mid break. |
 | Campaign | `Advt_Theme`. |
 
@@ -51,10 +51,10 @@ Required: `Advertiser, Channel, Dd, Mn, Yr, Cost`. Header names are matched igno
 * **Category spend** = all advertisers in the product group and date range (and the medium, channel and daypart filters), not just the selected ones.
 * **SOS %** = my spend / category spend.
 * **Rank** = my advertisers combined as one entity, ranked against every other advertiser with spend.
-* **Previous period** = the same number of days immediately before the start date.
 * **Category avg.** (trend) = category spend in the month / advertisers active that month.
 * **Channel mix** = every channel in the medium, ordered by category spend in the selection.
-* **Duration mix** = share of TV and Radio spots by standardised duration (Press has no duration).
+* **Duration mix** = % of ads (TV and Radio) in each length bucket: ads of that length / total ads. Press has no duration.
+* **ACD** (average commercial duration) = sum of raw `Dur` / number of ads, for my advertiser, each competitor and the category.
 * **Month drill down** = the leader is the top spender in the whole category that month. The earliest run of quiet months (category spend below 80% of the monthly average, 2 or more months) is combined into one row.
 
 ## Run locally

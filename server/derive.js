@@ -5,6 +5,7 @@ const MEDIA = ['TV', 'Radio', 'Press'];
 const DAYPARTS = ['Morning', 'Daytime', 'Prime', 'Late night', 'Not timed'];
 const DAYPART_TIMES = ['05:00 to 12:00', '12:00 to 18:30', '18:30 to 22:30', '22:30 to 05:00', 'no Advt_time, e.g. Press'];
 const DURATIONS = [5, 15, 20, 30];
+const DUR_BUCKETS = ['5s', '15s', '20s', '30s', '30s+'];
 const BREAK_QUALITY = ['Premium', 'Mid break', 'Unknown'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -33,16 +34,17 @@ function daypartOf(minutes) {
   return 3;                      // 22:30 to 24:00
 }
 
-// Std_Dur as an index into DURATIONS. Below 10s -> 5s, 10 to 30s snaps to 15/20/30, above 30s -> 30s.
+// Std_Dur as an index into DUR_BUCKETS: below 10s -> 5s, 10 to 30s snaps to the nearest of 15/20/30
+// (ties go to the shorter standard, so 25s -> 20s), above 30s -> 30s+.
 function stdDurIndex(dur) {
   const d = Number(dur);
   if (!Number.isFinite(d) || d <= 0) return 255; // no duration (typical for Press)
   if (d < 10) return 0;
-  if (d > 30) return 3;
+  if (d > 30) return 4;
   let best = 1, bestDist = Infinity;
   for (let k = 1; k < DURATIONS.length; k++) {
     const dist = Math.abs(d - DURATIONS[k]);
-    if (dist <= bestDist) { best = k; bestDist = dist; } // ties go to the longer standard
+    if (dist < bestDist) { best = k; bestDist = dist; }
   }
   return best;
 }
@@ -118,7 +120,7 @@ function parseNumber(v) {
 }
 
 module.exports = {
-  MEDIA, DAYPARTS, DAYPART_TIMES, DURATIONS, BREAK_QUALITY, MONTHS,
+  MEDIA, DAYPARTS, DAYPART_TIMES, DURATIONS, DUR_BUCKETS, BREAK_QUALITY, MONTHS,
   mediumOf, channelNameOf, daypartOf, stdDurIndex, breakQualityOf,
   dayNumber, parseTime, parseNumber, isExcludedTheme, EXCLUDED_THEMES,
 };
