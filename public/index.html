@@ -22,7 +22,8 @@ button,select,input{font-family:inherit}
 .drawer{position:fixed;top:0;left:0;width:320px;height:100%;background:#141A2E;color:#C9D1E4;display:flex;flex-direction:column;transform:translateX(-330px);transition:transform .25s ease;z-index:9;box-shadow:6px 0 26px rgba(0,0,0,.25)}
 #drawerToggle:checked ~ .drawer{transform:translateX(0)}
 .dhead{padding:16px 16px 0;position:relative;flex-shrink:0}
-.brand{font-size:13.5px;font-weight:700;color:#fff;letter-spacing:.3px;padding-right:22px}
+.brand{padding:2px 22px 12px 0}
+.brand img{height:24px;display:block}
 .brandsub{font-size:10.5px;color:#6E7A99;margin-bottom:12px}
 .closeX{position:absolute;top:14px;right:14px;color:#6E7A99;font-size:16px;cursor:pointer;font-weight:700}
 .tabs{display:flex;gap:4px;background:#1E2540;border-radius:9px;padding:3px}
@@ -342,8 +343,7 @@ tr.me .sharebar{background:#FF8A3D}
 <div class="drawer" id="drawer">
   <div class="dhead">
     <label class="closeX" for="drawerToggle">✕</label>
-    <div class="brand">JKH GROUP DASHBOARD</div>
-    <div class="brandsub">Competitive media spend · Sri Lanka</div>
+    <div class="brand"><img src="ogilvy-arc.png" alt="Ogilvy ARC"></div>
     <div class="tabs">
       <button class="tab on" data-pane="paneFilters">Filters</button>
       <button class="tab" data-pane="paneData">Data file<span class="dot" id="dataDot" style="display:none"></span></button>
@@ -539,6 +539,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=18"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

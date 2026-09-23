@@ -708,7 +708,7 @@
     const cols = `grid-template-columns:minmax(74px,1.2fr) repeat(${buckets.length},minmax(34px,1fr)) 36px`;
     $('duration').innerHTML = `${legacy ? '<div class="durnote">Re-upload your file to apply the new length buckets and ACD</div>' : ''}
       <div class="bgrid" style="${cols}">
-        <span class="bh" style="text-align:left">${med ? med.toUpperCase() + ' ADS' : 'NUMBER OF ADS'}</span>${buckets.map(b => `<span class="bh">${b}</span>`).join('')}<span class="bh">ACD</span>
+        <span class="bh"></span>${buckets.map(b => `<span class="bh">${b}</span>`).join('')}<span class="bh">ACD</span>
       </div>
       <div class="bbody" style="--cols:${cols.replace('grid-template-columns:', '')}">${body}</div>
       <div class="legend" style="margin-top:6px"><div class="lg" style="margin-left:auto;color:#8A93AD">ACD = total seconds / ads</div></div>`;
