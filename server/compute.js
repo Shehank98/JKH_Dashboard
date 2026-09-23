@@ -277,10 +277,39 @@ function dashboard(ds, f) {
     months.forEach((_, k) => { restMonthly[k] -= monAdv[k * nAdv + a]; });
   }
   const restCount = activeAdv - mineIds.filter(a => advSpend[a] > 0).length - compSorted.filter(a => advSpend[a] > 0).length;
+  // Year by year over the whole dataset (the date range is ignored; every other filter applies).
+  const y0 = Math.floor(new Date(ds.meta.minDay * 86400000).getUTCFullYear());
+  const y1 = Math.floor(new Date(ds.meta.maxDay * 86400000).getUTCFullYear());
+  const nY = y1 - y0 + 1;
+  const yCat = new Float64Array(nY), yMine = new Float64Array(nY), yComp = compSorted.map(() => new Float64Array(nY));
+  const compIndex = new Int32Array(nAdv).fill(-1);
+  compSorted.forEach((a, j) => { compIndex[a] = j; });
+  for (let i = 0, n = pg.length; i < n; i++) {
+    if (pg[i] !== pgId) continue;
+    const c = ch[i];
+    if (mediumId >= 0 && chMed[c] !== mediumId) continue;
+    if (chId >= 0 && c !== chId) continue;
+    if (dpId >= 0 && dp[i] !== dpId) continue;
+    if (adType && (excluded[theme[i]] ? 2 : 1) !== adType) continue;
+    const y = Math.floor(mon[i] / 12) - y0, a = adv[i], v = cost[i];
+    yCat[y] += v;
+    if (role[a] === 1) yMine[y] += v;
+    else if (compIndex[a] >= 0) yComp[compIndex[a]][y] += v;
+  }
+  const yShare = arr => Array.from(arr, (v, k) => (yCat[k] ? (v / yCat[k]) * 100 : null));
+  const years = Array.from({ length: nY }, (_, k) => {
+    const y = y0 + k;
+    const first = Math.max(ds.meta.minDay, toDay(`${y}-01-01`)), last = Math.min(ds.meta.maxDay, toDay(`${y}-12-31`));
+    return { year: y, from: toIso(first), to: toIso(last), partial: toIso(first).slice(5) !== '01-01' || toIso(last).slice(5) !== '12-31' };
+  });
+  if (mineIds.length) sosRows[0].yearly = yShare(yMine);
+  compSorted.forEach((a, j) => { sosRows[(mineIds.length ? 1 : 0) + j].yearly = yShare(yComp[j]); });
+  const yRest = yCat.map((v, k) => v - yMine[k] - yComp.reduce((s2, arr) => s2 + arr[k], 0));
   const sos = {
     rows: sosRows,
-    others: sosRow({ name: `Other advertisers (${restCount})`, others: true, count: restCount }, Math.max(0, restSpend), Math.max(0, restSpots), restMonthly),
+    others: { ...sosRow({ name: `Other advertisers (${restCount})`, others: true, count: restCount }, Math.max(0, restSpend), Math.max(0, restSpots), restMonthly), yearly: yShare(yRest) },
     total: { spend: catSpend, spots: catSpots, advertisers: activeAdv },
+    years, yearTotals: Array.from(yCat),
   };
 
   const hasPrev = f.compare && prevRows > 0;
@@ -311,7 +340,15 @@ function dashboard(ds, f) {
 function detail(ds, f, scope = {}) {
   const { dicts, cols } = ds;
   const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
-  const { pgId, from, to, mediumId, chId, dpId, role, adType } = resolve(ds, f);
+  const base = resolve(ds, f);
+  const { pgId, mediumId, chId, dpId, role, adType } = base;
+  let { from, to } = base;
+  // A year cell of the SOS table covers that whole year of data, whatever the dashboard dates are.
+  if (scope.year) {
+    from = Math.max(ds.meta.minDay, toDay(`${scope.year}-01-01`));
+    to = Math.min(ds.meta.maxDay, toDay(`${scope.year}-12-31`));
+    if (!(to >= from)) throw new Error('No data in ' + scope.year);
+  }
   const excluded = excludedThemes(ds);
   let mon = -1;
   if (scope.month) { const [y, m] = scope.month.split('-').map(Number); mon = y * 12 + m - 1; }

@@ -392,10 +392,33 @@
   // Period view: one line each for the selected dates. By month view: the SOS % of each month as shaded numbers.
   function renderSos(d) {
     const S = d.sos;
-    const rows = S.rows.concat(S.others.spend > 0 ? [S.others] : []);
+    const rows = S.rows.slice().sort((a, b) => b.sos - a.sos).concat(S.others.spend > 0 ? [S.others] : []);
     if (!rows.length) { $('sosTable').innerHTML = '<div class="nodata">Pick your advertiser and competitors in Filters</div>'; return; }
     const scopeOf = (r, extra) => (r.mine ? { title: r.name + ' (mine)', mine: true, ...extra } : r.others ? { title: 'All advertisers', ...extra } : { title: r.name, advertiser: r.name, ...extra });
     const cls = r => (r.mine ? 'row me' : r.others ? 'row oth' : 'row');
+    if (sosView === 'year') {
+      const Y = S.years;
+      const max = Math.max(1, ...rows.filter(r => !r.others).flatMap(r => r.yearly.filter(v => v != null)));
+      const shade = (r, v) => {
+        if (v == null) return 'background:#F6F8FC;color:#B4BCD0';
+        const t = Math.min(1, v / max) * 0.85 + 0.08;
+        const rgb = r.mine ? '255,138,61' : r.others ? '154,166,196' : '68,116,214';
+        return `background:rgba(${rgb},${t.toFixed(2)});color:${t > 0.55 ? '#fff' : '#1A1F36'}`;
+      };
+      const span = y => (y.partial ? `${fmtDate(y.from).slice(3)} to ${fmtDate(y.to).slice(3)}` : 'Full year');
+      const head = `<tr><th class="an">Advertiser</th>${Y.map(y => `<th title="${esc(span(y))}">${y.year}${y.partial ? '*' : ''}</th>`).join('')}</tr>`;
+      const body = rows.map(r => `<tr class="${cls(r)}">
+        <td class="an" title="${esc(r.name)}"${detA(scopeOf(r, { tab: r.others ? 'adv' : 'mon' }))}>${esc(r.name)}</td>
+        ${r.yearly.map((v, k) => {
+          const y = Y[k];
+          return `<td class="c" style="${shade(r, v)}"${tipA(`${r.name} · ${y.year}\nSOS ${v == null ? 'n/a' : pctS(v)} · ${span(y)}\nClick for details`)}${detA(scopeOf(r, { title: `${r.others ? 'All advertisers' : r.name} · ${y.year}`, year: y.year, tab: r.others ? 'adv' : 'mon' }))}>${v == null ? 'n/a' : pctS(v)}</td>`;
+        }).join('')}</tr>`).join('');
+      const partial = Y.filter(y => y.partial);
+      $('sosTable').innerHTML = `<div class="sost sosm"><table><tbody>${head}${body}</tbody></table></div>
+        ${partial.length ? `<div class="hint" style="color:#8A93AD;margin:6px 2px 0">* ${partial.map(y => `${y.year}: ${span(y)}`).join(' · ')} (data available)</div>` : ''}`;
+      $('p-sos').textContent = 'SOS % of each year in the full data · ignores the date range · click a cell for details';
+      return;
+    }
     if (sosView === 'month') {
       const n = d.months.length, dec = n <= 7 ? 1 : 0;
       const max = Math.max(1, ...rows.filter(r => !r.others).flatMap(r => r.monthly.filter(v => v != null)));
@@ -810,6 +833,7 @@
   const scopeText = sc => {
     const parts = [];
     if (sc.month) { const [y, m] = sc.month.split('-'); parts.push(`${MON[+m - 1]} ${y}`); }
+    else if (sc.year) parts.push(`${sc.year} (full year of data)`);
     else if (sc.from) parts.push(`${fmtDate(sc.from)} to ${fmtDate(sc.to)}`);
     else parts.push(`${fmtDate(data.filters.from)} to ${fmtDate(data.filters.to)}`);
     parts.push(data.filters.pg);
@@ -860,7 +884,7 @@
       stat('Avg per spot', money(x.spots ? x.total / x.spots : 0));
     // Actions that push what you found back into the dashboard.
     const acts = [];
-    if (scope.month || scope.from) acts.push(`<button class="abtn pri" data-act="month">Zoom dashboard to ${esc($('mSub').textContent.split(' · ')[0])}</button>`);
+    if (scope.month || scope.from || scope.year) acts.push(`<button class="abtn pri" data-act="month">Zoom dashboard to ${esc($('mSub').textContent.split(' · ')[0])}</button>`);
     if (scope.channel) acts.push(`<button class="abtn" data-act="channel">Filter dashboard to ${esc(scope.channel)}</button>`);
     if (scope.medium && !scope.channel) acts.push(`<button class="abtn" data-act="medium">Show ${esc(scope.medium)} only</button>`);
     if (scope.advertiser && !state.mine.includes(scope.advertiser) && !state.comps.includes(scope.advertiser)) acts.push(`<button class="abtn" data-act="comp">Add ${esc(scope.advertiser)} as competitor</button>`);
@@ -873,7 +897,11 @@
     if (!b) return;
     const sc = detailStack[detailStack.length - 1];
     Object.assign(state, appliedFilters());
-    if (b.dataset.act === 'month' && sc.from) {
+    if (b.dataset.act === 'month' && sc.year) {
+      const fy = `${sc.year}-01-01`, ly = `${sc.year}-12-31`;
+      state.from = fy < overview.minDate ? overview.minDate : fy;
+      state.to = ly > overview.maxDate ? overview.maxDate : ly;
+    } else if (b.dataset.act === 'month' && sc.from) {
       state.from = sc.from; state.to = sc.to;
     } else if (b.dataset.act === 'month') {
       const [y, m] = sc.month.split('-').map(Number);

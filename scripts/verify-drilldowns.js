@@ -222,6 +222,21 @@ function pageScopes(d) {
         }
       }
     }
+    // By year: each year of the full data, whatever the dashboard dates (SOS % and the cell's pop-up).
+    const pgRows = rows.filter(r => r.pg === f.pg);
+    d.sos.years.forEach((y, k) => {
+      const fy = { ...f, from: y.from, to: y.to };
+      const catY = reference(pgRows, fy, {}).total;
+      for (const r of d.sos.rows.concat([d.sos.others])) {
+        if (r.others) { checks++; const v = catY ? 100 - d.sos.rows.reduce((s2, x) => s2 + (x.yearly[k] || 0), 0) : null; if (v != null && !near(r.yearly[k], v)) fail(`${name} · others ${y.year}`); continue; }
+        const who = r.mine ? { mine: true } : { advertiser: r.name };
+        const refY = reference(pgRows, fy, who);
+        checks++;
+        if (!near(r.yearly[k] == null ? 0 : r.yearly[k], catY ? (refY.total / catY) * 100 : 0)) fail(`${name} · SOS ${r.name} ${y.year}: ${r.yearly[k]} vs ${(refY.total / catY) * 100}`);
+        const clean = JSON.parse(JSON.stringify({ ...who, year: y.year }));
+        compare(`${name} · Year ${y.year} ${r.name}`, app(clean), refY, SP);
+      }
+    });
     // Grouped quiet months (a date range inside the period).
     const sub = { from: d.months[0].key + '-01' < f.from ? f.from : d.months[0].key + '-01', to: d.months[Math.min(2, d.months.length - 1)].key + '-28' };
     compare(`${name} · quiet months range`, app(sub), ref(sub), SP);
