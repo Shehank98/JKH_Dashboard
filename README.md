@@ -1,6 +1,6 @@
-# JKH Group Dashboard
+# Ogilvy Orbit – Chub
 
-A full-screen competitive media spend dashboard by Ogilvy ARC for John Keells Group for Sri Lankan advertisers. Upload a spot log (`.xlsx` or `.csv`, 400k+ rows), choose a product group, pick your advertiser and your competitors, and compare spend, share of spend, medium split, channel mix and duration mix.
+Ogilvy Orbit – Chub: a full-screen competitive media spend dashboard for Sri Lankan advertisers. Upload a spot log (`.xlsx` or `.csv`, 400k+ rows), choose a product group, pick your advertiser and your competitors, and compare spend, share of spend, medium split, channel mix and duration mix.
 
 ![Dashboard](docs/screenshot.jpg)
 

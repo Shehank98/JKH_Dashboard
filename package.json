@@ -1,7 +1,7 @@
 {
-  "name": "jkh-group-dashboard",
+  "name": "ogilvy-orbit-chub",
   "version": "1.0.0",
-  "description": "JKH Group Dashboard: competitive media spend for Sri Lankan advertisers. Upload an .xlsx or .csv spot log and compare your spend against competitors.",
+  "description": "Ogilvy Orbit – Chub: competitive media spend for Sri Lankan advertisers. Upload an .xlsx or .csv spot log and compare your spend against competitors.",
   "main": "server.js",
   "private": true,
   "scripts": {

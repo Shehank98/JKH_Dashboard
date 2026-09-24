@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JKH Group Dashboard</title>
+<title>Ogilvy Orbit – Chub</title>
 <link rel="icon" href="favicon.png">
 <link rel="stylesheet" href="vendor/inter/400.css">
 <link rel="stylesheet" href="vendor/inter/500.css">
@@ -23,7 +23,7 @@ button,select,input{font-family:inherit}
 #drawerToggle:checked ~ .drawer{transform:translateX(0)}
 .dhead{padding:16px 16px 0;position:relative;flex-shrink:0}
 .brand{padding:2px 22px 12px 0}
-.brand img{height:24px;display:block}
+.brand img{height:22px;display:block;max-width:250px}
 .brandsub{font-size:10.5px;color:#6E7A99;margin-bottom:12px}
 .closeX{position:absolute;top:14px;right:14px;color:#6E7A99;font-size:16px;cursor:pointer;font-weight:700}
 .tabs{display:flex;gap:4px;background:#1E2540;border-radius:9px;padding:3px}
@@ -91,7 +91,7 @@ input[type=date].inp{color-scheme:dark}
 .topbar{display:flex;align-items:center;gap:12px;height:44px;flex-shrink:0;min-width:0}
 .logo{display:flex;align-items:center;gap:10px;flex-shrink:0;padding-right:12px;border-right:1px solid #DDE3EF;height:44px}
 .lstack{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
-.logo img{height:19px;width:auto;display:block}
+.logo img{height:22px;width:auto;display:block}
 .logo .t1{font-size:11.5px;font-weight:700;letter-spacing:-.1px;line-height:1.1;white-space:nowrap;color:#1A1F36}
 .logo .t2{font-size:9.5px;color:#8A93AD;font-weight:600;letter-spacing:.3px;white-space:nowrap}
 .fbtn{background:#141A2E;color:#fff;border:none;border-radius:9px;padding:10px 15px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0}
@@ -242,7 +242,7 @@ details[open] .chev{transform:rotate(90deg)}
 .overlay{position:absolute;inset:68px 18px 14px 18px;display:none;align-items:center;justify-content:center;z-index:5;background:rgba(244,246,250,.82);border-radius:12px}
 .overlay.on{display:flex}
 .ovcard{background:#fff;border:1px solid #E5E9F2;border-radius:14px;padding:28px 34px;text-align:center;max-width:460px;box-shadow:0 8px 30px rgba(20,26,46,.08)}
-.ovcard .ovlogo{height:34px;margin-bottom:6px}
+.ovcard .ovlogo{height:34px;margin-bottom:16px}
 .ovsub{font-size:12px;font-weight:700;color:#4A5570;letter-spacing:.3px;margin-bottom:14px}
 .ovcard h2{font-size:17px;margin-bottom:6px}
 .ovcard p{font-size:12px;color:#6B7590;line-height:1.6;margin-bottom:16px}
@@ -328,10 +328,10 @@ tr.me .sharebar{background:#FF8A3D}
 /* Export frame for single-chart images */
 .xframe{background:#F4F6FA;padding:16px 20px 20px;font-family:'Inter','Segoe UI',system-ui,sans-serif}
 .xhead{display:flex;align-items:center;gap:14px;margin-bottom:12px}
-.xhead img{height:24px}
+.xhead img{height:26px}
 .xhead div{display:flex;flex-direction:column;border-left:1px solid #DDE3EF;padding-left:14px}
 .xhead b{font-size:13px;color:#1A1F36}
-.xhead span{font-size:10.5px;color:#6B7590;margin-top:1px}
+.xhead span{font-size:11.5px;color:#4A5570;font-weight:600}
 .exporting .card{opacity:1}
 .exporting .acc{overflow:hidden}
 </style>
@@ -343,7 +343,7 @@ tr.me .sharebar{background:#FF8A3D}
 <div class="drawer" id="drawer">
   <div class="dhead">
     <label class="closeX" for="drawerToggle">✕</label>
-    <div class="brand"><img src="ogilvy-arc.png" alt="Ogilvy ARC"></div>
+    <div class="brand"><img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"></div>
     <div class="tabs">
       <button class="tab on" data-pane="paneFilters">Filters</button>
       <button class="tab" data-pane="paneData">Data file<span class="dot" id="dataDot" style="display:none"></span></button>
@@ -431,7 +431,7 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="topbar">
   <div class="logo">
-    <div class="lstack"><img src="ogilvy-arc.png" alt="Ogilvy ARC"><div class="t1">JKH Group Dashboard</div></div>
+    <div class="lstack"><img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"></div>
   </div>
   <label class="fbtn" for="drawerToggle" id="filterBtn">☰ Filters</label>
   <div class="daterange">
@@ -508,8 +508,7 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="overlay" id="overlay">
   <div class="ovcard">
-    <img src="ogilvy-arc.png" alt="Ogilvy ARC" class="ovlogo">
-    <div class="ovsub">JKH Group Dashboard</div>
+    <img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub" class="ovlogo">
     <h2 id="ovTitle">No data uploaded yet</h2>
     <p id="ovText">Open the filter drawer and upload your spot log as .xlsx or .csv. Large files (400k+ rows) take up to a minute to process.</p>
     <label class="fbtn" for="drawerToggle" id="ovBtn">☰ Open Filters</label>
@@ -539,6 +538,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=21"></script>
+<script src="app.js?v=22"></script>
 </body>
 </html>

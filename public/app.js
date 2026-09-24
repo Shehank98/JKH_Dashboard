@@ -977,7 +977,7 @@
     if (!data) return toast('Nothing to export yet');
     ({ jpg: exportImage, pdf: exportPdf, csv: exportCsv })[b.dataset.x]();
   });
-  const fileBase = () => `JKH_Group_Dashboard_${data.filters.pg.replace(/[^\w]+/g, '-')}_${data.filters.from}_to_${data.filters.to}`;
+  const fileBase = () => `Ogilvy_Orbit_Chub_${data.filters.pg.replace(/[^\w]+/g, '-')}_${data.filters.from}_to_${data.filters.to}`;
   const loadScript = src => new Promise((ok, fail) => {
     if (document.querySelector(`script[src="${src}"]`)) return ok();
     const el = document.createElement('script');
@@ -1006,7 +1006,7 @@
     const h = el.offsetHeight;
     const chips = [...document.querySelectorAll('#chips .chip')].filter(c => c.id !== 'busyChip').map(c => c.textContent).join(' · ');
     stage.innerHTML = `<div class="xframe" style="width:${w + 40}px">
-      <div class="xhead"><img src="ogilvy-arc.png" alt="Ogilvy ARC"><div><b>JKH Group Dashboard</b><span>${esc($('periodText').textContent.replace(/\s+/g, ' '))} · ${esc(chips)}</span></div></div>
+      <div class="xhead"><img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"><div><span>${esc($('periodText').textContent.replace(/\s+/g, ' '))} · ${esc(chips)}</span></div></div>
       <div class="xbody"></div></div>`;
     const copy = el.cloneNode(true);
     copy.style.width = w + 'px'; copy.style.height = h + 'px'; copy.style.flex = 'none';
@@ -1046,7 +1046,7 @@
       const [{ url, w, h }] = await Promise.all([captureDashboard(), loadScript('vendor/jspdf/jspdf.umd.min.js')]);
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({ orientation: w >= h ? 'landscape' : 'portrait', unit: 'pt', format: [w, h] });
-      pdf.setProperties({ title: 'JKH Group Dashboard', author: 'John Keells Group' });
+      pdf.setProperties({ title: 'Ogilvy Orbit – Chub', author: 'Ogilvy' });
       pdf.addImage(url, 'JPEG', 0, 0, w, h);
       pdf.save(fileBase() + '.pdf');
       toast('PDF downloaded');
@@ -1055,7 +1055,7 @@
   function exportCsv() {
     const d = data, q = v => `"${String(v).replace(/"/g, '""')}"`;
     const lines = [
-      ['JKH Group Dashboard'], ['Period', `${fmtDate(d.filters.from)} to ${fmtDate(d.filters.to)}`], ['Product group', d.filters.pg],
+      ['Ogilvy Orbit – Chub'], ['Period', `${fmtDate(d.filters.from)} to ${fmtDate(d.filters.to)}`], ['Product group', d.filters.pg],
       ['Medium', d.filters.medium], ['Ad type', { Sponsorship: 'Value Additions', Commercial: 'Commercials' }[d.filters.adType] || 'All'], ['Channel', d.filters.channel || 'All'], ['Daypart', d.filters.daypart || 'All'], ['Spend basis', 'Rate card (LKR)'], [],
       ['KPI', 'Value'], ['Category spend', d.kpi.catSpend], ['My spend', d.kpi.mineSpend], ['Share of spend %', d.kpi.sos.toFixed(2)],
       ['Rank', d.kpi.rank ? `${d.kpi.rank} of ${d.kpi.rankOf}` : ''], ['Category spots', d.kpi.catSpots], ['My spots', d.kpi.mineSpots], [],
