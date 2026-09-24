@@ -370,6 +370,7 @@
     if (f.daypart) chips.push(`<span class="chip">${esc(dpLabel(f.daypart))}</span>`);
     const busy = $('busyChip');
     $('chips').innerHTML = chips.join('');
+    $('chips').querySelectorAll('.chip').forEach(c => { if (!c.title) c.title = c.textContent; });
     if (busy) $('chips').prepend(busy);
 
     $('k1v').textContent = money(k.catSpend);
