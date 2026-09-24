@@ -92,6 +92,7 @@ input[type=date].inp{color-scheme:dark}
 .logo{display:flex;align-items:center;gap:12px;flex-shrink:0;padding-right:12px;border-right:1px solid #DDE3EF;height:44px}
 .lstack{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
 .logo img{height:22px;width:auto;display:block}
+.logo img.xlogo{height:40px}
 .logo .t1{font-size:15px;font-weight:700;letter-spacing:-.2px;line-height:1;white-space:nowrap;color:#1A1F36}
 .logo .lsep{width:1px;height:22px;background:#DDE3EF}
 .logo .t2{font-size:9.5px;color:#8A93AD;font-weight:600;letter-spacing:.3px;white-space:nowrap}
@@ -328,9 +329,10 @@ tr.me .sharebar{background:#FF8A3D}
 .abtn:hover{filter:brightness(.97)}
 .mload{padding:40px;text-align:center;color:#9AA3BC;font-size:12px}
 /* Export frame for single-chart images */
+.xframe.bare{padding:0;background:#F4F6FA}
 .xframe{background:#F4F6FA;padding:16px 20px 20px;font-family:'Inter','Segoe UI',system-ui,sans-serif}
 .xhead{display:flex;align-items:center;gap:14px;margin-bottom:12px}
-.xhead img{height:26px}
+.xhead img{height:44px}
 .xhead div{display:flex;flex-direction:column;border-left:1px solid #DDE3EF;padding-left:14px}
 .xhead b{font-size:13px;color:#1A1F36}
 .xhead span{font-size:11.5px;color:#4A5570;font-weight:600}
@@ -448,6 +450,7 @@ tr.me .sharebar{background:#FF8A3D}
     <div class="menu" id="exportMenu">
       <button data-x="jpg"><b>JPG images (ZIP)</b><span>Full dashboard plus each chart as its own JPG</span></button>
       <button data-x="pdf"><b>PDF</b><span>The whole dashboard on one landscape page</span></button>
+      <button data-x="ppt"><b>PowerPoint (PPT)</b><span>Title slide, full dashboard, then one slide per chart</span></button>
       <hr>
       <button data-x="csv"><b>CSV data</b><span>Monthly numbers behind the charts</span></button>
     </div>
@@ -540,6 +543,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=24"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>

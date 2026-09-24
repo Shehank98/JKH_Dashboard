@@ -40,6 +40,7 @@ vendor('/vendor/inter', '@fontsource/inter');
 vendor('/vendor/html-to-image', 'html-to-image/dist');
 vendor('/vendor/jspdf', 'jspdf/dist');
 vendor('/vendor/jszip', 'jszip/dist');
+vendor('/vendor/pptxgenjs', 'pptxgenjs/dist');
 
 const upload = multer({
   dest: UPLOAD_DIR,

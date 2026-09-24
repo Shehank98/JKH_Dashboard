@@ -976,7 +976,7 @@
     if (!b) return;
     menu.classList.remove('on');
     if (!data) return toast('Nothing to export yet');
-    ({ jpg: exportImage, pdf: exportPdf, csv: exportCsv })[b.dataset.x]();
+    ({ jpg: exportImage, pdf: exportPdf, ppt: exportPpt, csv: exportCsv })[b.dataset.x]();
   });
   const fileBase = () => `Ogilvy_Orbit_Chub_${data.filters.pg.replace(/[^\w]+/g, '-')}_${data.filters.from}_to_${data.filters.to}`;
   const loadScript = src => new Promise((ok, fail) => {
@@ -985,35 +985,43 @@
     el.src = src; el.onload = ok; el.onerror = () => fail(new Error('Could not load ' + src));
     document.head.appendChild(el);
   });
+  // Exports carry the stacked Ogilvy Orbit Chub logo (the screen keeps the one-line logo).
+  const EXPORT_LOGO = 'ogilvy-orbit-chub-stacked.png';
+  const imgSize = src => new Promise(ok => { const i = new Image(); i.onload = () => ok({ w: i.naturalWidth, h: i.naturalHeight }); i.onerror = () => ok({ w: 1, h: 1 }); i.src = src; });
+
   // Renders the whole dashboard (every card) to one JPEG, leaving out the drawer, menus and buttons.
   async function captureDashboard() {
     await loadScript('vendor/html-to-image/html-to-image.js');
     $('drawerToggle').checked = false;
     await new Promise(r => setTimeout(r, 320));
     const b = document.body, w = b.offsetWidth, h = b.offsetHeight;
+    const logo = document.querySelector('.logo img'), screenLogo = logo.getAttribute('src');
+    logo.setAttribute('src', EXPORT_LOGO); logo.classList.add('xlogo');
+    await logo.decode().catch(() => {});
     b.classList.add('exporting');
     const skip = new Set(['drawer', 'drawerToggle', 'toast', 'overlay', 'filterBtn', 'tright', 'modal', 'tip', 'exportStage']);
     const url = await window.htmlToImage.toJpeg(b, {
       quality: 0.95, pixelRatio: 2, backgroundColor: '#F4F6FA', width: w, height: h,
       style: { transform: 'none' },
       filter: node => !(node.id && skip.has(node.id)) && !(node.classList && node.classList.contains('scrim')),
-    }).finally(() => b.classList.remove('exporting'));
+    }).finally(() => { b.classList.remove('exporting'); logo.setAttribute('src', screenLogo); logo.classList.remove('xlogo'); });
     return { url, w, h };
   }
-  // One chart as its own image: a copy of the card under a branded header (logo, name, period, filters).
-  async function captureCard(el) {
+  // One chart as its own image: a copy of the card, under a branded header (logo, period, filters) unless
+  // header is false (PowerPoint slides draw their own header).
+  async function captureCard(el, header = true) {
     const stage = $('exportStage');
     const w = Math.round(el.getBoundingClientRect().width / (parseFloat(document.body.style.getPropertyValue('--s')) || 1));
     const h = el.offsetHeight;
     const chips = [...document.querySelectorAll('#chips .chip')].filter(c => c.id !== 'busyChip').map(c => c.textContent).join(' · ');
-    stage.innerHTML = `<div class="xframe" style="width:${w + 40}px">
-      <div class="xhead"><img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"><div><span>${esc($('periodText').textContent.replace(/\s+/g, ' '))} · ${esc(chips)}</span></div></div>
+    stage.innerHTML = `<div class="xframe${header ? '' : ' bare'}" style="width:${w + (header ? 40 : 0)}px">
+      ${header ? '' : '<!--'}<div class="xhead"><img src="${EXPORT_LOGO}" alt="Ogilvy Orbit Chub"><div><span>${esc($('periodText').textContent.replace(/\s+/g, ' '))} · ${esc(chips)}</span></div></div>${header ? '' : '-->'}
       <div class="xbody"></div></div>`;
     const copy = el.cloneNode(true);
     copy.style.width = w + 'px'; copy.style.height = h + 'px'; copy.style.flex = 'none';
     copy.querySelectorAll('.acc, .sost, .heat').forEach(a => { a.style.overflow = 'hidden'; });
     stage.querySelector('.xbody').appendChild(copy);
-    await stage.querySelector('.xhead img').decode().catch(() => {});
+    if (header) await stage.querySelector('.xhead img').decode().catch(() => {});
     const frame = stage.firstElementChild;
     try {
       return await window.htmlToImage.toJpeg(frame, { quality: 0.95, pixelRatio: 2, backgroundColor: '#F4F6FA' });
@@ -1053,6 +1061,68 @@
       toast('PDF downloaded');
     } catch (e) { toast('Export failed: ' + e.message); }
   }
+  // PowerPoint: title slide, full dashboard, then one slide per chart, each with logo, chart name, period and filters.
+  async function exportPpt() {
+    toast('Preparing PowerPoint');
+    try {
+      const [{ url: full, w: fw, h: fh }] = await Promise.all([captureDashboard(), loadScript('vendor/pptxgenjs/pptxgen.bundle.js')]);
+      const logoSize = await imgSize(EXPORT_LOGO);
+      const logoData = await fetch(EXPORT_LOGO).then(r => r.blob()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); }));
+      const period = $('periodText').textContent.replace(/\s+/g, ' ').trim();
+      const chips = [...document.querySelectorAll('#chips .chip')].filter(c => c.id !== 'busyChip').map(c => c.textContent).join(' · ');
+      const pptx = new window.PptxGenJS();
+      pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 in
+      pptx.title = 'JKH Group Dashboard'; pptx.company = 'Ogilvy'; pptx.author = 'Ogilvy Orbit Chub';
+      const W = 13.33, H = 7.5, INK = '1A1F36', GREY = '6B7590';
+      const strip = u => u.replace(/^data:/, '');
+      const fit = (iw, ih, bw, bh) => { const r = Math.min(bw / iw, bh / ih); return { w: iw * r, h: ih * r }; };
+      const logoW = h => (logoSize.w / logoSize.h) * h;
+      let n = 0;
+      const chrome = (slide, title) => {
+        n++;
+        slide.background = { color: 'F4F6FA' };
+        slide.addImage({ data: strip(logoData), x: 0.45, y: 0.3, w: logoW(0.62), h: 0.62 });
+        slide.addShape(pptx.ShapeType.line, { x: 0.45 + logoW(0.62) + 0.25, y: 0.32, w: 0, h: 0.58, line: { color: 'DDE3EF', width: 1 } });
+        slide.addText(title, { x: 0.45 + logoW(0.62) + 0.45, y: 0.26, w: 8.6, h: 0.42, fontFace: 'Arial', fontSize: 20, bold: true, color: INK });
+        slide.addText(`${period} · ${chips}`, { x: 0.45 + logoW(0.62) + 0.45, y: 0.64, w: 9.5, h: 0.3, fontFace: 'Arial', fontSize: 10.5, color: GREY });
+        slide.addText('JKH Group Dashboard', { x: 0.45, y: H - 0.42, w: 6, h: 0.25, fontFace: 'Arial', fontSize: 9, color: '9AA3BC' });
+        slide.addText(String(n), { x: W - 1.0, y: H - 0.42, w: 0.55, h: 0.25, fontFace: 'Arial', fontSize: 9, color: '9AA3BC', align: 'right' });
+      };
+      const addPicture = (slide, url, iw, ih) => {
+        const box = { x: 0.45, y: 1.2, w: W - 0.9, h: H - 1.2 - 0.6 };
+        const s2 = fit(iw, ih, box.w, box.h);
+        slide.addImage({ data: strip(url), x: box.x + (box.w - s2.w) / 2, y: box.y + (box.h - s2.h) / 2, w: s2.w, h: s2.h });
+      };
+      // 1. Title slide
+      const t = pptx.addSlide();
+      n++;
+      t.background = { color: 'FFFFFF' };
+      t.addImage({ data: strip(logoData), x: (W - logoW(1.6)) / 2, y: 1.55, w: logoW(1.6), h: 1.6 });
+      t.addText('JKH Group Dashboard', { x: 0.5, y: 3.55, w: W - 1, h: 0.7, fontFace: 'Arial', fontSize: 32, bold: true, color: INK, align: 'center' });
+      t.addText(period, { x: 0.5, y: 4.3, w: W - 1, h: 0.45, fontFace: 'Arial', fontSize: 16, color: '4A5570', align: 'center' });
+      t.addText(chips, { x: 0.5, y: 4.8, w: W - 1, h: 0.4, fontFace: 'Arial', fontSize: 12, color: GREY, align: 'center' });
+      t.addText(`Competitive media spend · rate card LKR · generated ${fmtDate(new Date().toISOString().slice(0, 10))}`, { x: 0.5, y: H - 0.8, w: W - 1, h: 0.3, fontFace: 'Arial', fontSize: 10, color: '9AA3BC', align: 'center' });
+      // 2. Full dashboard
+      const s0 = pptx.addSlide(); chrome(s0, 'Full dashboard'); addPicture(s0, full, fw, fh);
+      // 3+. One slide per chart, titled with the card name and the view shown on screen
+      document.body.classList.add('exporting');
+      try {
+        for (const [, id] of EXPORT_PARTS) {
+          const el = $(id);
+          const url = await captureCard(el, false);
+          const size = await imgSize(url);
+          const h3 = el.querySelector('h3');
+          const view = [...el.querySelectorAll('.tgl button.on')].map(b => b.textContent).join(' · ');
+          const slide = pptx.addSlide();
+          chrome(slide, (h3 ? h3.textContent : 'Key figures') + (view ? ` · ${view}` : ''));
+          addPicture(slide, url, size.w, size.h);
+        }
+      } finally { document.body.classList.remove('exporting'); }
+      await pptx.writeFile({ fileName: fileBase() + '.pptx' });
+      toast(`PowerPoint downloaded: ${n} slides`);
+    } catch (e) { toast('Export failed: ' + e.message); }
+  }
+
   function exportCsv() {
     const d = data, q = v => `"${String(v).replace(/"/g, '""')}"`;
     const lines = [
