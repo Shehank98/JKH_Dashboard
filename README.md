@@ -17,7 +17,7 @@ Ogilvy Orbit – Chub: a full-screen competitive media spend dashboard for Sri L
 * Month Drill Down names the advertiser behind each lead campaign. Value addition themes (`-BB`, `Com Break`, `DJ`, `-Extro`, `-Intro`, `-LLogo`, `Next Card`, `Tag`, `Time Check`, `-Tr`) are ignored when picking campaigns: exact match, or a name ending in a dash marker such as `Summer Promo -BB`. Override the list with `EXCLUDED_THEMES="a;b;c"`.
 * **Export** menu: JPG images as a ZIP (the full dashboard plus each chart as its own branded JPG), PDF (one landscape page), PowerPoint (a title slide, the full dashboard, then one slide per chart), a **Planning report** (Markdown, see below), or CSV (monthly numbers). All image exports carry the stacked Ogilvy Orbit Chub logo. Charts avoid SVG url() paint references so exports never render black.
 
-* **Sign-in** (OgilvyTools Hub style): people create their own account with an Ogilvy email address, confirm it with a 6-digit code sent by email, and reset a forgotten password the same way. The top bar shows who is signed in, with **Sign out**.
+* **Sign-in** to the Live Dashboard: people create their own account with an Ogilvy email address, confirm it with a 6-digit code sent by email, and reset a forgotten password the same way. The top bar shows who is signed in, with **Sign out**.
 
 ## Planning report (Markdown)
 
