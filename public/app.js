@@ -31,6 +31,7 @@
   const api = async (url, opts) => {
     const r = await fetch(url, opts);
     const j = await r.json().catch(() => ({}));
+    if (r.status === 401 && j.signIn) { location.replace('/login'); throw new Error('Please sign in'); }
     if (!r.ok) throw new Error(j.error || r.statusText);
     return j;
   };
@@ -153,6 +154,7 @@
     xhr.onload = () => {
       let j = {};
       try { j = JSON.parse(xhr.responseText); } catch (e) { /* ignore */ }
+      if (xhr.status === 401) { location.replace('/login'); return; }
       if (xhr.status >= 400) { setProgress(null); setUploadStatus(j.error || 'Upload failed', true); $('uploadBtn').disabled = false; renderDataFile(j.dataset); return; }
       pendingFile = null; $('fileInput').value = '';
       $('dropText').textContent = 'Drop .xlsx or .csv here, or click to choose';
@@ -976,7 +978,7 @@
     if (!b) return;
     menu.classList.remove('on');
     if (!data) return toast('Nothing to export yet');
-    ({ jpg: exportImage, pdf: exportPdf, ppt: exportPpt, csv: exportCsv })[b.dataset.x]();
+    ({ jpg: exportImage, pdf: exportPdf, ppt: exportPpt, plan: exportPlanning, csv: exportCsv })[b.dataset.x]();
   });
   const fileBase = () => `Ogilvy_Orbit_Chub_${data.filters.pg.replace(/[^\w]+/g, '-')}_${data.filters.from}_to_${data.filters.to}`;
   const loadScript = src => new Promise((ok, fail) => {
@@ -1123,6 +1125,23 @@
     } catch (e) { toast('Export failed: ' + e.message); }
   }
 
+  // Planning report: the server writes every competitor number behind the current filters as Markdown.
+  async function exportPlanning() {
+    busyChip('Building planning report…');
+    try {
+      const r = await fetch('/api/planning', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(appliedFilters()) });
+      if (r.status === 401) { location.replace('/login'); return; }
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+      const blob = await r.blob();
+      const name = (/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || fileBase() + '_Planning.md';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = name; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      toast('Planning report downloaded');
+    } catch (e) { toast('Export failed: ' + e.message); }
+    finally { busyChip(null); }
+  }
+
   function exportCsv() {
     const d = data, q = v => `"${String(v).replace(/"/g, '""')}"`;
     const lines = [
@@ -1149,8 +1168,29 @@
     try { await navigator.clipboard.writeText(url); toast('Link with current filters copied'); } catch (e) { prompt('Copy this link', url); }
   });
 
+  // ---------- signed-in user ----------
+  const userMenu = $('userMenu');
+  $('userBtn').addEventListener('click', e => { e.stopPropagation(); menu.classList.remove('on'); userMenu.classList.toggle('on'); });
+  document.addEventListener('click', e => { if (!userMenu.contains(e.target)) userMenu.classList.remove('on'); });
+  $('signOutBtn').addEventListener('click', async () => {
+    try { await fetch('/api/auth/logout', { method: 'POST' }); } finally { location.replace('/login'); }
+  });
+  async function loadUser() {
+    try {
+      const { user } = await api('/api/auth/me');
+      if (!user) return; // sign-in switched off (local development)
+      const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+      $('userAv').textContent = initials || '?';
+      $('userName').textContent = user.name.split(/\s+/)[0];
+      $('userFull').textContent = user.name;
+      $('userEmail').textContent = user.email;
+      $('userBtn').hidden = false;
+    } catch (e) { /* api() already redirects on 401 */ }
+  }
+
   // ---------- boot ----------
   (async function boot() {
+    loadUser();
     try {
       const s = await api('/api/status');
       renderDataFile(s.dataset);

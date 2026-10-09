@@ -1,6 +1,6 @@
 # Ogilvy Orbit – Chub
 
-Ogilvy Orbit – Chub: a full-screen competitive media spend dashboard for Sri Lankan advertisers. Upload a spot log (`.xlsx` or `.csv`, 400k+ rows), choose a product group, pick your advertiser and your competitors, and compare spend, share of spend, medium split, channel mix and duration mix.
+Ogilvy Orbit – Chub: a full-screen competitive media spend dashboard for Sri Lankan advertisers. Sign in with your Ogilvy email, upload a spot log (`.xlsx` or `.csv`, 400k+ rows), choose a product group, pick your advertiser and your competitors, and compare spend, share of spend, medium split, channel mix and duration mix.
 
 ![Dashboard](docs/screenshot.jpg)
 
@@ -15,7 +15,21 @@ Ogilvy Orbit – Chub: a full-screen competitive media spend dashboard for Sri L
 * **Duration Mix** with TV + Radio, TV and Radio toggles (Press has no ad duration).
 * Interactive: hover any bar, line, cell or segment for a tooltip; click it to open a details pop-up (Advertisers, Campaigns, Channels). Duration bubbles open only the ads of that length, campaigns open only that campaign. Click rows to drill deeper, use Back to return, and push a finding into the dashboard (zoom to a month, filter to a channel, add a competitor). Click legend items in the trend to hide or show lines. KPI cards open the rankings.
 * Month Drill Down names the advertiser behind each lead campaign. Value addition themes (`-BB`, `Com Break`, `DJ`, `-Extro`, `-Intro`, `-LLogo`, `Next Card`, `Tag`, `Time Check`, `-Tr`) are ignored when picking campaigns: exact match, or a name ending in a dash marker such as `Summer Promo -BB`. Override the list with `EXCLUDED_THEMES="a;b;c"`.
-* **Export** menu: JPG images as a ZIP (the full dashboard plus each chart as its own branded JPG), PDF (one landscape page), PowerPoint (a title slide, the full dashboard, then one slide per chart), or CSV (monthly numbers). All image exports carry the stacked Ogilvy Orbit Chub logo. Charts avoid SVG url() paint references so exports never render black.
+* **Export** menu: JPG images as a ZIP (the full dashboard plus each chart as its own branded JPG), PDF (one landscape page), PowerPoint (a title slide, the full dashboard, then one slide per chart), a **Planning report** (Markdown, see below), or CSV (monthly numbers). All image exports carry the stacked Ogilvy Orbit Chub logo. Charts avoid SVG url() paint references so exports never render black.
+
+* **Sign-in** (OgilvyTools Hub style): people create their own account with an Ogilvy email address, confirm it with a 6-digit code sent by email, and reset a forgotten password the same way. The top bar shows who is signed in, with **Sign out**.
+
+## Planning report (Markdown)
+
+**Export, Planning report** downloads one `.md` file with every number a planning tool needs to read competitor behaviour, for the filters on screen:
+
+1. Settings and definitions (SOS, SOV, ACD, duration buckets, Value Additions, dayparts) and auto-written key facts per competitor.
+2. Competitor summary for **every** advertiser in the category: rank, spend, SOS, spots, SOV, cost per spot, ACD, active months, channels, campaigns, TV/Radio/Press %, Commercials vs Value Additions %, first and last spot.
+3. Monthly spend, monthly SOS and monthly spots (mine, each competitor, other advertisers, category).
+4. Medium mix, channel mix (% of each advertiser's spend, every channel) and channel spend/spots.
+5. Daypart mix, and duration mix (TV + Radio, TV, Radio) with ACD.
+6. Top campaigns per advertiser with spend, spots, months active, dates and channels, and the leader of each month.
+7. A flat **advertiser x month x channel** table (spend in whole LKR, spots, ACD, share of the advertiser's month and of the channel's month), ready to import or pivot.
 
 ## How it works
 
@@ -64,8 +78,9 @@ Required: `Advertiser, Channel, Dd, Mn, Yr, Cost`. Header names are matched igno
 
 ```bash
 npm install
-npm start            # http://localhost:3000
-npm test             # smoke tests for the derived fields and metrics
+npm start            # http://localhost:3000 (sign-in codes print to the log until APPS_SCRIPT_URL is set)
+npm test             # smoke tests for the derived fields, metrics and planning report
+npm run test:auth    # sign-up, email code, sign-in, sign-out and password reset, end to end
 npm run check        # cross-checks every drill-down total against its chart (needs npm run sample first)
 npm run verify       # independent recount of every pop-up, row by row, from the raw CSV
 npm run sample       # writes samples/sample_420000.csv and .xlsx for testing
@@ -77,10 +92,30 @@ npm run sample       # writes samples/sample_420000.csv and .xlsx for testing
 2. Add a **Volume** to the service and mount it at `/data`.
 3. Add the variable `DATA_DIR=/data`. Without a volume, the uploaded data is lost on each redeploy.
 4. Optional variables: `MAX_UPLOAD_MB` (default 100), `EXCLUDED_THEMES` (semicolon separated).
-5. Railway sets `PORT` automatically. Health check: `/api/status`.
+5. Railway sets `PORT` automatically. Health check: `/healthz` (open without sign-in).
+6. Set up email for the sign-in codes (next section).
+
+## Sign-in emails (Google Apps Script)
+
+The 6-digit codes are sent through a small Google Apps Script web app, so no SMTP setup is needed (Railway blocks SMTP on Trial and Hobby plans).
+
+1. Open [script.google.com](https://script.google.com) with the Google account that should send the emails, create a project and paste in [`docs/apps-script-mailer.gs`](docs/apps-script-mailer.gs).
+2. Project Settings, Script properties: add `MAIL_SECRET` with a long random value.
+3. Deploy, New deployment, Web app, Execute as **Me**, Who has access **Anyone**. Copy the `/exec` URL.
+4. On Railway add `APPS_SCRIPT_URL` (that URL) and `APPS_SCRIPT_SECRET` (the same random value).
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `APPS_SCRIPT_URL` | none | Apps Script web app URL. Without it, codes are printed to the server log instead of emailed (handy locally). |
+| `APPS_SCRIPT_SECRET` | none | Shared secret the script checks before sending. |
+| `ALLOWED_EMAIL_DOMAINS` | `ogilvy.com` | Comma separated list of email domains allowed to sign up. |
+| `SESSION_DAYS` | `30` | How long a sign-in lasts on a device. |
+| `AUTH_DISABLED` | off | `1` switches sign-in off. Local development and automated tests only. |
+
+Accounts are stored in `DATA_DIR/auth.json` on the same volume as the data. Passwords are scrypt hashes; codes and session tokens are stored only as SHA-256 hashes. Codes expire after 10 minutes, allow 5 attempts and can be re-sent once a minute; 8 wrong passwords lock an email for 15 minutes; a password reset signs out every other device. Gmail allows about 100 emails a day (Workspace 1,500).
 
 Memory: the start script allows Node up to 3 GB. A 50 MB `.xlsx` needs roughly 400 to 600 MB while processing and about 150 MB after that.
 
 ## Security note
 
-Anyone with the link can view, upload and delete data. There is no login. If you need one later, add a password check to `/api/upload` and `/api/data`.
+Every page and API call except the sign-in page, its images and `/healthz` needs a signed-in Ogilvy account. Any signed-in user can upload and delete data; there are no separate roles yet.

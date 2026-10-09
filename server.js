@@ -7,6 +7,8 @@ const multer = require('multer');
 const { ingestFile } = require('./server/ingest');
 const store = require('./server/store');
 const compute = require('./server/compute');
+const { planning } = require('./server/planning');
+const { createAuth } = require('./server/auth');
 
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
@@ -24,11 +26,30 @@ try {
   console.error('Could not load saved dataset:', e.message);
 }
 
+// Sign-in is on unless AUTH_DISABLED=1 (local development and automated tests only).
+const AUTH_DISABLED = process.env.AUTH_DISABLED === '1';
+const auth = AUTH_DISABLED ? null : createAuth(DATA_DIR);
+if (AUTH_DISABLED) console.warn('WARNING: AUTH_DISABLED=1, the dashboard is open to anyone who can reach it.');
+else if (!auth.mailConfigured) console.warn('APPS_SCRIPT_URL is not set: sign-in codes are printed to this log instead of emailed.');
+
 const app = express();
+app.set('trust proxy', 1); // Railway terminates HTTPS in front of the app; needed for secure cookies
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
+const PUBLIC_DIR = path.join(__dirname, 'public');
+app.get('/healthz', (req, res) => res.json({ ok: true })); // Railway health check, open without sign-in
+const sendPage = name => (req, res) => { res.setHeader('Cache-Control', 'no-cache'); res.sendFile(path.join(PUBLIC_DIR, name)); };
+if (auth) {
+  app.use('/api/auth', auth.router(express));
+  app.get('/login', (req, res, next) => (auth.userOf(req) ? res.redirect('/') : next()), sendPage('login.html'));
+  app.get(['/', '/index.html'], auth.requirePage, sendPage('index.html'));
+  app.use('/api', auth.requireApi);
+} else {
+  app.get('/api/auth/me', (req, res) => res.json({ user: null, authDisabled: true }));
+  app.get('/login', (req, res) => res.redirect('/'));
+}
 // Page, script and styles are revalidated on every load (cheap 304 via ETag), so a redeploy is picked up immediately.
-app.use(express.static(path.join(__dirname, 'public'), {
+app.use(express.static(PUBLIC_DIR, {
   setHeaders: (res, file) => {
     if (/\.(html|js|css)$/.test(file)) res.setHeader('Cache-Control', 'no-cache');
     else res.setHeader('Cache-Control', 'public, max-age=3600');
@@ -119,6 +140,20 @@ app.post('/api/detail', needData, (req, res) => {
   try {
     const { filters, scope } = req.body || {};
     res.json(compute.detail(dataset, filters || {}, scope || {}));
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// Planning export: every competitor number behind the current filters, as one Markdown file.
+app.post('/api/planning', needData, (req, res) => {
+  try {
+    const f = req.body || {};
+    const md = planning(dataset, f, { user: req.user ? `${req.user.name} (${req.user.email})` : '' });
+    const name = `Ogilvy_Orbit_Chub_Planning_${String(f.pg).replace(/[^\w]+/g, '-')}_${f.from}_to_${f.to}.md`;
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${name}"`);
+    res.send(md);
   } catch (e) {
     res.status(400).json({ error: e.message });
   }

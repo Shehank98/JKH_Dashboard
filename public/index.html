@@ -108,6 +108,13 @@ input[type=date].inp{color-scheme:dark}
 .chip.s{background:#F3EDFF;color:#6B46C1}
 .chip.busy{background:#141A2E;color:#FFC599}
 .tright{margin-left:auto;display:flex;gap:8px;flex-shrink:0;position:relative}
+.ubtn{max-width:170px}
+.ubtn .av{width:22px;height:22px;border-radius:50%;background:#FDE8E8;color:#E0383E;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ubtn .un{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:1600px){.ubtn{padding:8px 9px}.ubtn .un{display:none}}
+#userMenu{width:230px}
+#userMenu .uinfo{padding:9px 10px 10px;font-size:11px;color:#6B7590;border-bottom:1px solid #EEF1F7;margin-bottom:4px;word-break:break-all}
+#userMenu .uinfo b{display:block;font-size:12.5px;color:#1A1F36;margin-bottom:2px}
 .menu{position:absolute;top:46px;right:0;background:#fff;border:1px solid #DDE3EF;border-radius:10px;box-shadow:0 10px 30px rgba(20,26,46,.14);padding:6px;width:250px;display:none;z-index:15}
 .menu.on{display:block}
 .menu button{display:flex;flex-direction:column;align-items:flex-start;width:100%;border:none;background:none;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left}
@@ -452,7 +459,13 @@ tr.me .sharebar{background:#FF8A3D}
       <button data-x="pdf"><b>PDF</b><span>The whole dashboard on one landscape page</span></button>
       <button data-x="ppt"><b>PowerPoint (PPT)</b><span>Title slide, full dashboard, then one slide per chart</span></button>
       <hr>
+      <button data-x="plan"><b>Planning report (Markdown)</b><span>Every competitor number: spend, SOS, months, media, channels, dayparts, durations, campaigns</span></button>
       <button data-x="csv"><b>CSV data</b><span>Monthly numbers behind the charts</span></button>
+    </div>
+    <button class="fbtn light ubtn" id="userBtn" hidden><span class="av" id="userAv"></span><span class="un" id="userName"></span></button>
+    <div class="menu" id="userMenu">
+      <div class="uinfo"><b id="userFull"></b><span id="userEmail"></span></div>
+      <button id="signOutBtn"><b>Sign out</b><span>End this session on this device</span></button>
     </div>
   </div>
 </div>
@@ -543,6 +556,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>

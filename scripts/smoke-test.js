@@ -7,6 +7,7 @@ const path = require('path');
 const D = require('../server/derive');
 const { ingestFile } = require('../server/ingest');
 const compute = require('../server/compute');
+const { planning } = require('../server/planning');
 
 // Medium and channel name
 assert.strictEqual(D.MEDIA[D.mediumOf('TV - Derana TV')], 'TV');
@@ -108,5 +109,15 @@ assert.strictEqual(D.dayNumber(1, 'Jan', 26), D.dayNumber(1, 1, 2026));
   const spDet = compute.detail(ds, { ...F, adType: 'Sponsorship' }, {});
   assert.deepStrictEqual(spDet.campaigns.map(c => c.name).sort(), ['-BB', 'Summer -BB', 'Time Check']);
   assert.strictEqual(compute.detail(ds, { ...F, adType: 'Commercial' }, {}).total, 4000000);
+  // Planning report: the flat table adds up to the dashboard, and the summary matches the SOS numbers.
+  const md = planning(ds, F, { user: 'Test' });
+  const flat = md.split('## 12.')[1].split('\n').filter(l => /^\| (Me|Rival|Other) \|/.test(l)).map(l => l.split('|').map(x => x.trim()));
+  assert.strictEqual(flat.reduce((s2, r) => s2 + Number(r[6]), 0), out.kpi.catSpend);
+  assert.strictEqual(flat.reduce((s2, r) => s2 + Number(r[7]), 0), out.kpi.catSpots);
+  assert.strictEqual(flat.filter(r => r[1] === 'Me').reduce((s2, r) => s2 + Number(r[6]), 0), out.kpi.mineSpend);
+  assert.ok(md.includes('| 1 | Me | Mine | 6.50 | 72.2 |'));
+  assert.ok(md.includes('| Me (mine) | 3 | 0 | 1 | 0 | 1 | 0 | 60.0 |'), 'duration counts match the dashboard');
+  assert.ok(md.includes('### Me (mine)') && md.includes('| -BB | VA |'));
+  assert.ok(planning(ds, { ...F, from: '2030-01-01', to: '2030-02-01' }).includes('nothing to report'));
   console.log('All smoke tests passed');
 })().catch(e => { console.error(e); process.exit(1); });
