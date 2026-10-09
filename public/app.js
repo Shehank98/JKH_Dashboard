@@ -1185,6 +1185,7 @@
       $('userFull').textContent = user.name;
       $('userEmail').textContent = user.email;
       $('userBtn').hidden = false;
+      $('adminLink').hidden = !user.admin;
     } catch (e) { /* api() already redirects on 401 */ }
   }
 

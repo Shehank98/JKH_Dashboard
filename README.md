@@ -19,6 +19,18 @@ Ogilvy Orbit – Chub: a full-screen competitive media spend dashboard for Sri L
 
 * **Sign-in** to the Live Dashboard: people create their own account with an Ogilvy email address, confirm it with a 6-digit code sent by email, and reset a forgotten password the same way. The top bar shows who is signed in, with **Sign out**.
 
+## Admin panel
+
+A separate admin area at **`/admin`** (link: "Automation team? Admin sign-in" on the login page, or **Admin panel** in the dashboard's user menu for admins). Admins sign in with their normal account at `/admin/login`; the admin session is separate from the dashboard one and lasts 12 hours.
+
+* **Users:** everyone who signed up or was invited, with status (Online, Active, Not confirmed, Invited, Disabled), role, last active, last sign-in, devices and join date. Search, filter, and export to CSV.
+* **Per person** (click a row): disable or enable, sign out everywhere, send a password reset code (24 hours, with a link), unlock after too many wrong passwords, confirm their email, make or remove admin, delete. Shows the devices they are signed in on and their recent activity. You cannot disable, delete or demote yourself.
+* **Invite user:** enter a name and Ogilvy email; they get a code and a link to set their own password (valid 3 days), optionally with admin access.
+* **Activity:** the last 500 sign-ins, wrong passwords, blocked attempts, sign-ups, resets and admin actions with IP address and who did it.
+* **Settings:** read-only view of the Railway variables that control sign-in.
+
+The first admin comes from **`ADMIN_EMAILS`** on Railway (comma separated). Those people are always admins; anyone else can be made admin from the panel.
+
 ## Planning report (Markdown)
 
 **Export, Planning report** downloads one `.md` file with every number a planning tool needs to read competitor behaviour, for the filters on screen:
@@ -80,7 +92,7 @@ Required: `Advertiser, Channel, Dd, Mn, Yr, Cost`. Header names are matched igno
 npm install
 npm start            # http://localhost:3000 (sign-in codes print to the log until APPS_SCRIPT_URL is set)
 npm test             # smoke tests for the derived fields, metrics and planning report
-npm run test:auth    # sign-up, email code, sign-in, sign-out and password reset, end to end
+npm run test:auth    # sign-up, email code, sign-in, reset and the admin panel API, end to end
 npm run check        # cross-checks every drill-down total against its chart (needs npm run sample first)
 npm run verify       # independent recount of every pop-up, row by row, from the raw CSV
 npm run sample       # writes samples/sample_420000.csv and .xlsx for testing
@@ -93,7 +105,7 @@ npm run sample       # writes samples/sample_420000.csv and .xlsx for testing
 3. Add the variable `DATA_DIR=/data`. Without a volume, the uploaded data is lost on each redeploy.
 4. Optional variables: `MAX_UPLOAD_MB` (default 100), `EXCLUDED_THEMES` (semicolon separated).
 5. Railway sets `PORT` automatically. Health check: `/healthz` (open without sign-in).
-6. Set up email for the sign-in codes (next section).
+6. Set up email for the sign-in codes (next section), and set `ADMIN_EMAILS` to your own Ogilvy email so you can open the admin panel.
 
 ## Sign-in emails (Google Apps Script)
 
@@ -110,6 +122,8 @@ The 6-digit codes are sent through a small Google Apps Script web app, so no SMT
 | `APPS_SCRIPT_SECRET` | none | Shared secret the script checks before sending. |
 | `ALLOWED_EMAIL_DOMAINS` | `ogilvy.com` | Comma separated list of email domains allowed to sign up. |
 | `SESSION_DAYS` | `30` | How long a sign-in lasts on a device. |
+| `ADMIN_EMAILS` | none | Comma separated emails that are always admins. Set at least one, or nobody can open the admin panel. |
+| `ADMIN_SESSION_HOURS` | `12` | How long an admin panel sign-in lasts. |
 | `AUTH_DISABLED` | off | `1` switches sign-in off. Local development and automated tests only. |
 
 Accounts are stored in `DATA_DIR/auth.json` on the same volume as the data. Passwords are scrypt hashes; codes and session tokens are stored only as SHA-256 hashes. Codes expire after 10 minutes, allow 5 attempts and can be re-sent once a minute; 8 wrong passwords lock an email for 15 minutes; a password reset signs out every other device. Gmail allows about 100 emails a day (Workspace 1,500).
@@ -118,4 +132,4 @@ Memory: the start script allows Node up to 3 GB. A 50 MB `.xlsx` needs roughly 4
 
 ## Security note
 
-Every page and API call except the sign-in page, its images and `/healthz` needs a signed-in Ogilvy account. Any signed-in user can upload and delete data; there are no separate roles yet.
+Every page and API call except the sign-in pages, their images and `/healthz` needs a signed-in Ogilvy account; the admin panel and its API also need an admin session. Any signed-in user can upload and delete data.

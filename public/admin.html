@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin panel · Ogilvy Orbit Chub</title>
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/vendor/inter/400.css">
+<link rel="stylesheet" href="/vendor/inter/500.css">
+<link rel="stylesheet" href="/vendor/inter/600.css">
+<link rel="stylesheet" href="/vendor/inter/700.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--red:#E0383E;--red-d:#C42A30;--ink:#1A1F36;--grey:#6B7590;--soft:#8A93AD;--line:#E3E8F2;--bg:#F4F6FA;--navy:#141A2E;--green:#1E8E57;--amber:#B7791F}
+html,body{height:100%}
+body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+button,input,select{font-family:inherit;font-size:inherit}
+.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh;min-height:100dvh}
+
+/* sidebar */
+.side{background:radial-gradient(140% 70% at 0% 0%,#26315A 0%,var(--navy) 60%,#0E1322 100%);color:#C9D0E4;padding:26px 18px;display:flex;flex-direction:column;gap:26px;position:sticky;top:0;height:100vh;height:100dvh}
+.side .brand img{height:50px;display:block}
+.side .tag{display:inline-flex;align-items:center;gap:6px;margin-top:12px;font-size:10.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#FF8A8E;background:rgba(224,56,62,.14);border:1px solid rgba(224,56,62,.3);padding:4px 9px;border-radius:20px}
+nav{display:flex;flex-direction:column;gap:4px}
+nav button{display:flex;align-items:center;gap:11px;border:0;background:none;color:#AEB7D1;padding:11px 12px;border-radius:10px;cursor:pointer;font-weight:600;text-align:left;transition:background .15s,color .15s}
+nav button svg{width:18px;height:18px;flex-shrink:0}
+nav button:hover{background:rgba(255,255,255,.06);color:#fff}
+nav button.on{background:rgba(255,255,255,.1);color:#fff;box-shadow:inset 3px 0 0 var(--red)}
+nav .count{margin-left:auto;font-size:11px;background:rgba(255,255,255,.12);padding:2px 8px;border-radius:20px;color:#fff}
+.side .me{margin-top:auto;border-top:1px solid rgba(255,255,255,.1);padding-top:16px;display:flex;flex-direction:column;gap:10px;font-size:12.5px}
+.side .me b{color:#fff;display:block;font-size:13.5px}
+.side .me span{word-break:break-all}
+.side a,.side .lo{color:#C9D0E4;text-decoration:none;font-weight:600;font-size:12.5px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:9px 11px;text-align:center;cursor:pointer;transition:background .15s}
+.side a:hover,.side .lo:hover{background:rgba(255,255,255,.12);color:#fff}
+
+/* main */
+main{padding:26px 30px 40px;min-width:0}
+.head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.head h1{font-size:24px;letter-spacing:-.5px}
+.head .sub{font-size:13px;color:var(--grey);margin-top:3px}
+.head .actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:#fff;color:#3A4560;border-radius:10px;padding:9px 14px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:border-color .15s,background .15s,transform .15s}
+.btn:hover{border-color:#C5CDE0}
+.btn svg{width:15px;height:15px}
+.btn.primary{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 6px 16px rgba(224,56,62,.25)}
+.btn.primary:hover{background:var(--red-d)}
+.btn.dark{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.danger{color:#B4232A;border-color:#F3C9CB;background:#FFF7F7}
+.btn.danger:hover{background:#FDECEC}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.spin svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;cursor:pointer;transition:transform .15s,box-shadow .15s;animation:up .5s cubic-bezier(.2,.8,.2,1) backwards}
+.stat:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(26,31,54,.07)}
+.stat .l{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--soft);display:flex;align-items:center;gap:6px}
+.stat .v{font-size:28px;font-weight:700;letter-spacing:-.6px;margin-top:6px;font-variant-numeric:tabular-nums}
+.stat .h{font-size:11.5px;color:var(--grey);margin-top:2px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot.live{background:#22C55E;box-shadow:0 0 0 3px rgba(34,197,94,.2);animation:pulse 1.8s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(34,197,94,0)}}
+@keyframes up{from{opacity:0;transform:translateY(10px)}}
+
+.panel{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.toolbar{display:flex;gap:10px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.search{position:relative;flex:1;min-width:220px;max-width:380px}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--soft)}
+.search input{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px 9px 34px;outline:none}
+.search input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(224,56,62,.12)}
+.seg{display:flex;background:var(--bg);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:none;padding:7px 11px;border-radius:8px;font-weight:600;font-size:12.5px;color:var(--grey);cursor:pointer}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(26,31,54,.12)}
+.seg button i{font-style:normal;color:var(--soft);margin-left:4px;font-weight:600}
+select{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fff;outline:none}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--soft);text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);white-space:nowrap;background:#FBFCFE}
+td{padding:12px 16px;border-bottom:1px solid #EEF1F7;vertical-align:middle}
+tbody tr{transition:background .12s}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover{background:#F8FAFD}
+tbody tr:last-child td{border-bottom:0}
+.person{display:flex;align-items:center;gap:11px;min-width:220px}
+.av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12.5px;flex-shrink:0;color:#fff}
+.person b{display:block;font-size:13.5px}
+.person .av,.dh .av{color:#fff}
+.person span{font-size:12px;color:var(--grey)}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.b-ok{background:#E8F6EE;color:var(--green)}
+.b-pend{background:#FFF4E0;color:var(--amber)}
+.b-off{background:#FDECEC;color:#B4232A}
+.b-admin{background:#EAEFFF;color:#3B5BDB}
+.b-grey{background:var(--bg);color:var(--grey)}
+.muted{color:var(--grey);font-size:12.5px;white-space:nowrap}
+.empty{padding:40px;text-align:center;color:var(--grey)}
+.ev{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:13px;white-space:nowrap}
+.ev i{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* settings */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.scard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+.scard h3{font-size:14px;margin-bottom:4px}
+.scard p{font-size:13px;color:var(--grey);line-height:1.5}
+.scard .val{font-size:15px;font-weight:700;margin:10px 0 6px;word-break:break-all}
+.scard code{background:var(--bg);padding:2px 6px;border-radius:5px;font-size:12px;color:#3A4560}
+
+/* drawer + modal */
+.scrim{position:fixed;inset:0;background:rgba(14,19,34,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:20}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);background:#fff;z-index:21;transform:translateX(100%);transition:transform .32s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;box-shadow:-20px 0 50px rgba(14,19,34,.18)}
+.drawer.on{transform:none}
+.dh{padding:22px 22px 16px;border-bottom:1px solid var(--line);display:flex;gap:14px;align-items:center}
+.dh .av{width:48px;height:48px;font-size:16px}
+.dh b{font-size:17px;display:block}
+.dh span{font-size:12.5px;color:var(--grey);word-break:break-all}
+.x{margin-left:auto;border:0;background:var(--bg);width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px;color:var(--grey);flex-shrink:0}
+.db{padding:18px 22px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:18px}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:9px 12px;font-size:13px}
+.kv dt{color:var(--grey)}
+.kv dd{font-weight:600}
+.db h4{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--soft);margin-bottom:8px}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.acts .btn{justify-content:center}
+.dev{font-size:12.5px;padding:9px 11px;background:var(--bg);border-radius:9px;margin-bottom:6px;line-height:1.4}
+.dev b{font-weight:600}
+.mini{font-size:12.5px;display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #EEF1F7}
+.modal{position:fixed;left:50%;top:50%;width:min(440px,calc(100vw - 32px));background:#fff;border-radius:18px;z-index:22;padding:24px;transform:translate(-50%,-46%) scale(.97);opacity:0;pointer-events:none;transition:transform .25s cubic-bezier(.2,.8,.2,1),opacity .2s;display:flex;flex-direction:column;gap:14px;box-shadow:0 30px 70px rgba(14,19,34,.3)}
+.modal.on{transform:translate(-50%,-50%);opacity:1;pointer-events:auto}
+.modal h3{font-size:18px}
+.modal p{font-size:13.5px;color:var(--grey);line-height:1.5}
+.modal label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
+.modal input[type=text],.modal input[type=email]{border:1px solid var(--line);border-radius:10px;padding:11px 12px;outline:none;font-weight:400}
+.modal input:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(224,56,62,.12)}
+.modal .chk{flex-direction:row;align-items:center;gap:9px;font-weight:500}
+.modal .row{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.merr{display:none;font-size:13px;background:#FDECEC;color:#A4262C;padding:9px 11px;border-radius:9px}
+.merr.on{display:block}
+.toast{position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);background:var(--navy);color:#fff;padding:11px 18px;border-radius:11px;font-size:13px;font-weight:600;opacity:0;transition:opacity .2s,transform .25s;z-index:30;pointer-events:none;max-width:calc(100vw - 32px)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.err{background:#B4232A}
+.view{display:none}
+.view.on{display:block;animation:up .35s cubic-bezier(.2,.8,.2,1)}
+
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 16px}
+  .side .brand img{height:36px}
+  .side .tag{display:none}
+  nav{flex-direction:row;flex:1;justify-content:flex-end}
+  nav button{padding:8px 10px}
+  nav button span.t{display:none}
+  nav .count{display:none}
+  .side .me{display:none}
+  main{padding:18px 16px 32px}
+  .kv{grid-template-columns:110px 1fr}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><img src="/ogilvy-orbit-chub-stacked.png" alt="Ogilvy Orbit Chub"><span class="tag">Admin panel</span></div>
+    <nav>
+      <button class="on" data-view="users"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="t">Users</span><span class="count" id="nUsers">0</span></button>
+      <button data-view="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="t">Activity</span></button>
+      <button data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="t">Settings</span></button>
+    </nav>
+    <div class="me">
+      <div><b id="meName"></b><span id="meEmail"></span></div>
+      <a href="/">Open the Live Dashboard</a>
+      <button class="lo" id="logout">Sign out of admin</button>
+    </div>
+  </aside>
+
+  <main>
+    <!-- Users -->
+    <section class="view on" id="v-users">
+      <div class="head">
+        <div><h1>Users</h1><div class="sub">Everyone who has signed up or been invited to the Live Dashboard.</div></div>
+        <div class="actions">
+          <button class="btn" id="refresh" title="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8M21 3v5h-5"/></svg>Refresh</button>
+          <button class="btn" id="csv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>Export CSV</button>
+          <button class="btn primary" id="inviteBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Invite user</button>
+        </div>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="panel">
+        <div class="toolbar">
+          <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" placeholder="Search name or email"></div>
+          <div class="seg" id="filter"></div>
+        </div>
+        <div class="tw"><table>
+          <thead><tr><th>Person</th><th>Status</th><th>Role</th><th>Last active</th><th>Last sign-in</th><th>Devices</th><th>Joined</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- Activity -->
+    <section class="view" id="v-activity">
+      <div class="head">
+        <div><h1>Activity</h1><div class="sub">Sign-ins, failed attempts, sign-ups, password resets and admin actions (latest 500).</div></div>
+        <div class="actions"><button class="btn" id="refresh2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8M21 3v5h-5"/></svg>Refresh</button></div>
+      </div>
+      <div class="panel">
+        <div class="toolbar">
+          <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q2" placeholder="Search email or IP"></div>
+          <select id="evType">
+            <option value="">All events</option><option value="login">Sign-ins</option><option value="failed">Failed or blocked</option>
+            <option value="signup">Sign-ups and confirmations</option><option value="reset">Password resets</option><option value="admin">Admin actions</option>
+          </select>
+        </div>
+        <div class="tw"><table>
+          <thead><tr><th>When</th><th>Event</th><th>User</th><th>By</th><th>IP address</th></tr></thead>
+          <tbody id="evRows"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section class="view" id="v-settings">
+      <div class="head"><div><h1>Settings</h1><div class="sub">How sign-in is set up. These come from the variables on Railway.</div></div></div>
+      <div class="cards" id="settings"></div>
+    </section>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="User details"></aside>
+
+<div class="modal" id="invite" role="dialog" aria-modal="true">
+  <h3>Invite someone</h3>
+  <p>They get an email with a code and a link to set their own password. The invite lasts 3 days.</p>
+  <div class="merr" id="invErr"></div>
+  <label>Full name<input type="text" id="invName" autocomplete="off"></label>
+  <label>Ogilvy email<input type="email" id="invEmail" placeholder="firstname.lastname@ogilvy.com" autocomplete="off"></label>
+  <label class="chk"><input type="checkbox" id="invAdmin"> Give admin access too</label>
+  <div class="row"><button class="btn" data-close>Cancel</button><button class="btn primary" id="invSend">Send invite</button></div>
+</div>
+
+<div class="modal" id="confirm" role="dialog" aria-modal="true">
+  <h3 id="cTitle"></h3>
+  <p id="cText"></p>
+  <div class="row"><button class="btn" data-close>Cancel</button><button class="btn" id="cOk"></button></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let data = null, filter = 'all', openEmail = null;
+
+  const api = async (url, body) => {
+    const r = await fetch(url, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401 && j.adminSignIn) { location.replace('/admin/login'); throw new Error('Please sign in'); }
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    return j;
+  };
+  let toastT;
+  const toast = (m, err) => { const t = $('toast'); t.textContent = m; t.className = 'toast on' + (err ? ' err' : ''); clearTimeout(toastT); toastT = setTimeout(() => { t.className = 'toast'; }, 3200); };
+
+  // ---- formatting ----
+  const ago = iso => {
+    if (!iso) return 'Never';
+    const s = (Date.now() - Date.parse(iso)) / 1000;
+    if (s < 60) return 'Just now';
+    if (s < 3600) return Math.floor(s / 60) + ' min ago';
+    if (s < 86400) return Math.floor(s / 3600) + ' h ago';
+    if (s < 86400 * 30) return Math.floor(s / 86400) + ' d ago';
+    return fmt(iso, true);
+  };
+  const fmt = (iso, dateOnly) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + (dateOnly ? '' : ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
+  };
+  const COLORS = ['#E0383E', '#3B5BDB', '#0CA678', '#F08C00', '#7048E8', '#1098AD', '#D6336C', '#5C7CFA'];
+  const avatar = u => {
+    const ini = String(u.name || u.email).split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+    let h = 0; for (const c of u.email) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return `<span class="av" style="background:${COLORS[h % COLORS.length]}">${esc(ini || '?')}</span>`;
+  };
+  const status = u => u.disabled ? '<span class="badge b-off">Disabled</span>'
+    : !u.verified ? `<span class="badge b-pend">${u.invited ? 'Invited' : 'Not confirmed'}</span>`
+    : (u.lastSeen && Date.now() - Date.parse(u.lastSeen) < 15 * 60e3) ? '<span class="badge b-ok"><span class="dot live"></span>Online</span>'
+    : '<span class="badge b-ok">Active</span>';
+  const device = ua => {
+    if (!ua) return 'Unknown device';
+    const b = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+    const o = /Windows/.test(ua) ? 'Windows' : /iPhone|iPad/.test(ua) ? 'iPhone/iPad' : /Android/.test(ua) ? 'Android' : /Mac OS/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : '';
+    return b + (o ? ' on ' + o : '');
+  };
+  const EV = {
+    login: ['Signed in', '#1E8E57'], logout: ['Signed out', '#8A93AD'], login_failed: ['Wrong password', '#E0383E'], login_blocked: ['Blocked (disabled)', '#E0383E'],
+    signup: ['Signed up', '#3B5BDB'], verified: ['Confirmed email', '#3B5BDB'], reset_requested: ['Asked for reset code', '#F08C00'], password_reset: ['Reset password', '#F08C00'],
+    admin_login: ['Admin signed in', '#141A2E'], admin_login_failed: ['Admin wrong password', '#E0383E'], admin_login_denied: ['Admin access denied', '#E0383E'],
+    admin_invite: ['Invited', '#7048E8'], admin_disable: ['Disabled', '#B4232A'], admin_enable: ['Enabled', '#1E8E57'], admin_signout: ['Signed out everywhere', '#7048E8'],
+    admin_verify: ['Confirmed by admin', '#7048E8'], admin_unlock: ['Unlocked', '#7048E8'], admin_make_admin: ['Made admin', '#7048E8'], admin_remove_admin: ['Admin removed', '#7048E8'],
+    admin_reset: ['Reset code sent by admin', '#7048E8'], admin_delete: ['Deleted', '#B4232A'],
+  };
+  const evGroup = t => /failed|denied|blocked/.test(t) ? 'failed' : t.startsWith('admin_') && t !== 'admin_login' ? 'admin' : /login|logout/.test(t) ? 'login' : /signup|verified/.test(t) ? 'signup' : /reset/.test(t) ? 'reset' : '';
+
+  // ---- load ----
+  async function load(quiet) {
+    try {
+      data = await api('/api/admin/overview');
+      $('meName').textContent = data.me.name; $('meEmail').textContent = data.me.email;
+      $('nUsers').textContent = data.users.length;
+      renderStats(); renderUsers(); renderEvents(); renderSettings();
+      if (openEmail) openDrawer(openEmail, true);
+      if (!quiet) toast('Up to date');
+    } catch (e) { if (!quiet) toast(e.message, true); }
+  }
+
+  function renderStats() {
+    const s = data.stats;
+    const cards = [
+      ['all', 'Total users', s.total, `${s.admins} admin${s.admins === 1 ? '' : 's'}`],
+      ['online', '<span class="dot live"></span>Online now', s.online, 'Active in the last 15 min'],
+      ['active', 'Active this week', s.active7, `${s.logins24} sign-in${s.logins24 === 1 ? '' : 's'} today`],
+      ['pending', 'Not confirmed', s.pending, 'Signed up or invited'],
+      ['disabled', 'Disabled', s.disabled, `${s.failed24} failed attempt${s.failed24 === 1 ? '' : 's'} today`],
+    ];
+    $('stats').innerHTML = cards.map(([f, l, v, h], i) => `<div class="stat" data-f="${f}" style="animation-delay:${i * 50}ms"><div class="l">${l}</div><div class="v">${v}</div><div class="h">${esc(h)}</div></div>`).join('');
+  }
+
+  const FILTERS = [['all', 'All'], ['active', 'Active'], ['online', 'Online'], ['pending', 'Not confirmed'], ['disabled', 'Disabled'], ['admins', 'Admins']];
+  const inFilter = (u, f) => f === 'all' || (f === 'active' && u.verified && !u.disabled) || (f === 'online' && !u.disabled && u.lastSeen && Date.now() - Date.parse(u.lastSeen) < 15 * 60e3)
+    || (f === 'pending' && !u.verified && !u.disabled) || (f === 'disabled' && u.disabled) || (f === 'admins' && u.admin);
+  function renderUsers() {
+    $('filter').innerHTML = FILTERS.map(([k, l]) => `<button data-f="${k}" class="${filter === k ? 'on' : ''}">${l}<i>${data.users.filter(u => inFilter(u, k)).length}</i></button>`).join('');
+    const q = $('q').value.trim().toLowerCase();
+    const list = data.users.filter(u => inFilter(u, filter) && (!q || (u.name + ' ' + u.email).toLowerCase().includes(q)));
+    $('rows').innerHTML = list.length ? list.map(u => `<tr class="click" data-email="${esc(u.email)}">
+      <td><div class="person">${avatar(u)}<div><b>${esc(u.name)}</b><span>${esc(u.email)}</span></div></div></td>
+      <td>${status(u)}${u.failed >= 8 ? ' <span class="badge b-off">Locked</span>' : ''}</td>
+      <td>${u.admin ? '<span class="badge b-admin">Admin</span>' : '<span class="badge b-grey">User</span>'}</td>
+      <td class="muted">${esc(ago(u.lastSeen || u.lastLogin))}</td>
+      <td class="muted">${esc(u.lastLogin ? fmt(u.lastLogin) : 'Never')}</td>
+      <td class="muted">${u.sessions}</td>
+      <td class="muted">${esc(fmt(u.created, true))}</td></tr>`).join('')
+      : `<tr><td colspan="7" class="empty">${data.users.length ? 'Nobody matches this search.' : 'No accounts yet. Invite someone to get started.'}</td></tr>`;
+  }
+
+  function renderEvents() {
+    const q = $('q2').value.trim().toLowerCase(), t = $('evType').value;
+    const list = data.events.filter(e => (!t || evGroup(e.type) === t) && (!q || (e.email + ' ' + e.ip + ' ' + (e.by || '')).toLowerCase().includes(q)));
+    $('evRows').innerHTML = list.length ? list.map(e => {
+      const [label, color] = EV[e.type] || [e.type, '#8A93AD'];
+      return `<tr><td class="muted" title="${esc(fmt(e.t))}">${esc(ago(e.t))}</td><td><span class="ev"><i style="background:${color}"></i>${esc(label)}</span></td>
+        <td>${esc(e.email)}</td><td class="muted">${esc(e.by || '')}</td><td class="muted">${esc(e.ip)}</td></tr>`;
+    }).join('') : '<tr><td colspan="5" class="empty">No activity to show.</td></tr>';
+  }
+
+  function renderSettings() {
+    const s = data.settings;
+    $('settings').innerHTML = [
+      ['Who can sign up', s.domains.map(d => '@' + d).join(', '), 'Only these email domains can create an account.', 'ALLOWED_EMAIL_DOMAINS'],
+      ['Sign-in emails', s.mail ? 'Connected (Google Apps Script)' : 'Not connected', s.mail ? '6-digit codes are emailed through the Apps Script web app.' : 'Codes are only written to the server log. Add APPS_SCRIPT_URL and APPS_SCRIPT_SECRET.', 'APPS_SCRIPT_URL'],
+      ['Dashboard sign-in lasts', s.sessionDays + ' days', 'After this, people sign in again on that device.', 'SESSION_DAYS'],
+      ['Admin sign-in lasts', s.adminHours + ' hours', 'Admin sessions are separate and shorter.', 'ADMIN_SESSION_HOURS'],
+      ['Permanent admins', s.envAdmins.length ? s.envAdmins.join(', ') : 'None set', 'Always admins and cannot be removed here. Others can be made admin from the Users list.', 'ADMIN_EMAILS'],
+      ['Codes', s.codeMinutes + ' minutes, 5 tries', 'Sign-up and reset codes. Invites last 3 days and admin-sent reset codes 24 hours.', ''],
+    ].map(([h, v, p, env]) => `<div class="scard"><h3>${esc(h)}</h3><div class="val">${esc(v)}</div><p>${esc(p)}${env ? ` Railway variable: <code>${env}</code>` : ''}</p></div>`).join('');
+  }
+
+  // ---- drawer ----
+  function openDrawer(email, refresh) {
+    const u = data.users.find(x => x.email === email);
+    if (!u) { closeAll(); return; }
+    openEmail = email;
+    const self = u.email === data.me.email;
+    const recent = data.events.filter(e => e.email === u.email).slice(0, 8);
+    const btn = (act, label, cls = '', dis) => `<button class="btn ${cls}" data-act="${act}" ${dis ? 'disabled title="' + esc(dis) + '"' : ''}>${label}</button>`;
+    $('drawer').innerHTML = `
+      <div class="dh">${avatar(u)}<div><b>${esc(u.name)}</b><span>${esc(u.email)}</span></div><button class="x" data-close aria-label="Close">×</button></div>
+      <div class="db">
+        <dl class="kv">
+          <dt>Status</dt><dd>${status(u)}</dd>
+          <dt>Role</dt><dd>${u.admin ? '<span class="badge b-admin">Admin</span>' + (u.envAdmin ? ' <span class="muted">via ADMIN_EMAILS</span>' : '') : 'User'}</dd>
+          <dt>Joined</dt><dd>${esc(fmt(u.created) || '-')}</dd>
+          <dt>Last sign-in</dt><dd>${esc(u.lastLogin ? fmt(u.lastLogin) : 'Never')}</dd>
+          <dt>Last active</dt><dd>${esc(ago(u.lastSeen || u.lastLogin))}</dd>
+          <dt>Failed attempts</dt><dd>${u.failed}${u.failed >= 8 ? ' (locked for 15 min)' : ''}</dd>
+        </dl>
+        <div><h4>Actions</h4><div class="acts">
+          ${u.disabled ? btn('enable', 'Enable account', 'dark') : btn('disable', 'Disable account', 'danger', self && 'You cannot disable yourself')}
+          ${btn('signout', 'Sign out everywhere', '', !u.sessions && 'No active sessions')}
+          ${btn('reset', 'Send reset code', '', u.disabled && 'Enable the account first')}
+          ${u.verified ? btn('unlock', 'Unlock sign-in', '', !u.failed && 'Not locked') : btn('verify', 'Confirm email', '')}
+          ${u.admin ? btn('remove_admin', 'Remove admin', '', (self && 'You cannot remove your own admin rights') || (u.envAdmin && 'Set by ADMIN_EMAILS on Railway')) : btn('make_admin', 'Make admin', '')}
+          ${btn('delete', 'Delete account', 'danger', self && 'You cannot delete yourself')}
+        </div></div>
+        <div><h4>Signed in on (${u.sessions})</h4>${u.devices.length ? u.devices.map(d => `<div class="dev"><b>${esc(device(d.ua))}</b><br><span class="muted">${esc(d.ip || 'Unknown IP')} · active ${esc(ago(d.lastSeen))}</span></div>`).join('') : '<div class="muted">Not signed in anywhere.</div>'}</div>
+        <div><h4>Recent activity</h4>${recent.length ? recent.map(e => `<div class="mini"><span>${esc((EV[e.type] || [e.type])[0])}${e.by ? ' <span class="muted">by ' + esc(e.by) + '</span>' : ''}</span><span class="muted" title="${esc(fmt(e.t))}">${esc(ago(e.t))}</span></div>`).join('') : '<div class="muted">No activity yet.</div>'}</div>
+      </div>`;
+    if (!refresh) { $('drawer').classList.add('on'); $('scrim').classList.add('on'); }
+  }
+  function closeAll() {
+    openEmail = null;
+    document.querySelectorAll('.drawer,.modal,.scrim').forEach(el => el.classList.remove('on'));
+  }
+
+  // ---- actions ----
+  const CONFIRM = {
+    disable: ['Disable this account?', 'They will be signed out straight away and cannot sign in until you enable the account again.', 'Disable', 'danger'],
+    delete: ['Delete this account?', 'This removes the account completely. They can sign up again later with the same email unless you disable them instead.', 'Delete', 'danger'],
+    signout: ['Sign out everywhere?', 'Every device signed in with this account will be signed out.', 'Sign out', 'dark'],
+    make_admin: ['Give admin access?', 'They will be able to open this panel and manage every account.', 'Make admin', 'dark'],
+    remove_admin: ['Remove admin access?', 'They keep their dashboard account but can no longer open this panel.', 'Remove admin', 'dark'],
+    reset: ['Send a password reset code?', 'They get an email with a code and a link to choose a new password. The code lasts 24 hours.', 'Send code', 'dark'],
+  };
+  const DONE = { disable: 'Account disabled', enable: 'Account enabled', signout: 'Signed out of every device', verify: 'Email confirmed', unlock: 'Sign-in unlocked', make_admin: 'Admin access given', remove_admin: 'Admin access removed', reset: 'Reset code emailed', delete: 'Account deleted' };
+  async function run(act, email) {
+    try {
+      await api('/api/admin/action', { action: act, email });
+      toast(DONE[act] || 'Done');
+      if (act === 'delete') closeAll();
+      await load(true);
+    } catch (e) { toast(e.message, true); }
+  }
+  function ask(act, email) {
+    const c = CONFIRM[act];
+    if (!c) return run(act, email);
+    const u = data.users.find(x => x.email === email);
+    $('cTitle').textContent = c[0];
+    $('cText').textContent = `${u ? u.name + ' (' + u.email + '). ' : ''}${c[1]}`;
+    const ok = $('cOk');
+    ok.textContent = c[2]; ok.className = 'btn ' + (c[3] === 'danger' ? 'primary' : 'dark');
+    ok.onclick = async () => { ok.disabled = true; await run(act, email); ok.disabled = false; $('confirm').classList.remove('on'); if (!openEmail) $('scrim').classList.remove('on'); };
+    $('confirm').classList.add('on'); $('scrim').classList.add('on');
+  }
+
+  // ---- events ----
+  document.addEventListener('click', e => {
+    const nav = e.target.closest('nav button');
+    if (nav) {
+      document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b === nav));
+      document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + nav.dataset.view));
+      return;
+    }
+    const st = e.target.closest('.stat');
+    if (st) { filter = st.dataset.f; renderUsers(); return; }
+    const fb = e.target.closest('#filter button');
+    if (fb) { filter = fb.dataset.f; renderUsers(); return; }
+    const row = e.target.closest('tr.click');
+    if (row) { openDrawer(row.dataset.email); return; }
+    const act = e.target.closest('[data-act]');
+    if (act && !act.disabled) { ask(act.dataset.act, openEmail); return; }
+    if (e.target.closest('[data-close]')) {
+      const m = e.target.closest('.modal');
+      if (m) { m.classList.remove('on'); if (!openEmail) $('scrim').classList.remove('on'); } else closeAll();
+      return;
+    }
+    if (e.target.id === 'scrim') closeAll();
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
+  $('q').addEventListener('input', renderUsers);
+  $('q2').addEventListener('input', renderEvents);
+  $('evType').addEventListener('change', renderEvents);
+  const refreshBtn = b => async () => { b.classList.add('spin'); await load(); b.classList.remove('spin'); };
+  $('refresh').addEventListener('click', refreshBtn($('refresh')));
+  $('refresh2').addEventListener('click', refreshBtn($('refresh2')));
+  $('logout').addEventListener('click', async () => { try { await api('/api/admin/logout', {}); } finally { location.replace('/admin/login'); } });
+
+  $('inviteBtn').addEventListener('click', () => {
+    $('invName').value = ''; $('invEmail').value = ''; $('invAdmin').checked = false; $('invErr').className = 'merr';
+    $('invite').classList.add('on'); $('scrim').classList.add('on');
+    setTimeout(() => $('invName').focus(), 50);
+  });
+  $('invSend').addEventListener('click', async () => {
+    const b = $('invSend'); b.disabled = true; $('invErr').className = 'merr';
+    try {
+      await api('/api/admin/invite', { name: $('invName').value, email: $('invEmail').value, admin: $('invAdmin').checked });
+      $('invite').classList.remove('on'); $('scrim').classList.remove('on');
+      toast('Invite sent to ' + $('invEmail').value.trim());
+      await load(true);
+    } catch (e) { $('invErr').textContent = e.message; $('invErr').className = 'merr on'; }
+    b.disabled = false;
+  });
+
+  $('csv').addEventListener('click', () => {
+    const q = v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+    const head = ['Name', 'Email', 'Status', 'Role', 'Joined', 'Last sign-in', 'Last active', 'Devices signed in'];
+    const lines = [head.map(q).join(',')].concat(data.users.map(u => [u.name, u.email, u.disabled ? 'Disabled' : !u.verified ? (u.invited ? 'Invited' : 'Not confirmed') : 'Active',
+      u.admin ? 'Admin' : 'User', u.created || '', u.lastLogin || '', u.lastSeen || '', u.sessions].map(q).join(',')));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' }));
+    a.download = `Ogilvy_Orbit_Chub_Users_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  load(true);
+  setInterval(() => { if (!document.hidden) load(true); }, 30000);
+})();
+</script>
+</body>
+</html>

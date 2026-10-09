@@ -118,7 +118,9 @@ input[type=date].inp{color-scheme:dark}
 .menu{position:absolute;top:46px;right:0;background:#fff;border:1px solid #DDE3EF;border-radius:10px;box-shadow:0 10px 30px rgba(20,26,46,.14);padding:6px;width:250px;display:none;z-index:15}
 .menu.on{display:block}
 .menu button{display:flex;flex-direction:column;align-items:flex-start;width:100%;border:none;background:none;padding:9px 10px;border-radius:7px;cursor:pointer;text-align:left}
-.menu button:hover{background:#F4F6FA}
+.menu button:hover,.menu a:hover{background:#F4F6FA}
+.menu a{display:flex;flex-direction:column;align-items:flex-start;width:100%;padding:9px 10px;border-radius:7px;text-decoration:none;color:inherit}
+.menu a[hidden]{display:none}
 .menu b{font-size:12px;color:#1A1F36}
 .menu span{font-size:10px;color:#8A93AD;margin-top:1px}
 .menu hr{border:none;border-top:1px solid #EEF1F7;margin:4px 0}
@@ -465,6 +467,7 @@ tr.me .sharebar{background:#FF8A3D}
     <button class="fbtn light ubtn" id="userBtn" hidden><span class="av" id="userAv"></span><span class="un" id="userName"></span></button>
     <div class="menu" id="userMenu">
       <div class="uinfo"><b id="userFull"></b><span id="userEmail"></span></div>
+      <a id="adminLink" href="/admin" hidden><b>Admin panel</b><span>Manage who can sign in</span></a>
       <button id="signOutBtn"><b>Sign out</b><span>End this session on this device</span></button>
     </div>
   </div>
@@ -556,6 +559,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=26"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>

@@ -30,7 +30,10 @@ try {
 const AUTH_DISABLED = process.env.AUTH_DISABLED === '1';
 const auth = AUTH_DISABLED ? null : createAuth(DATA_DIR);
 if (AUTH_DISABLED) console.warn('WARNING: AUTH_DISABLED=1, the dashboard is open to anyone who can reach it.');
-else if (!auth.mailConfigured) console.warn('APPS_SCRIPT_URL is not set: sign-in codes are printed to this log instead of emailed.');
+else {
+  if (!auth.mailConfigured) console.warn('APPS_SCRIPT_URL is not set: sign-in codes are printed to this log instead of emailed.');
+  if (!auth.envAdmins.length) console.warn('ADMIN_EMAILS is not set: nobody can open the admin panel until it is.');
+}
 
 const app = express();
 app.set('trust proxy', 1); // Railway terminates HTTPS in front of the app; needed for secure cookies
@@ -41,6 +44,10 @@ app.get('/healthz', (req, res) => res.json({ ok: true })); // Railway health che
 const sendPage = name => (req, res) => { res.setHeader('Cache-Control', 'no-cache'); res.sendFile(path.join(PUBLIC_DIR, name)); };
 if (auth) {
   app.use('/api/auth', auth.router(express));
+  app.use('/api/admin', auth.adminRouter(express));
+  app.get('/admin/login', (req, res, next) => (auth.adminOf(req) ? res.redirect('/admin') : next()), sendPage('admin-login.html'));
+  app.get(['/admin', '/admin.html'], auth.requireAdminPage, sendPage('admin.html'));
+  app.get('/admin-login.html', (req, res) => res.redirect('/admin/login'));
   app.get('/login', (req, res, next) => (auth.userOf(req) ? res.redirect('/') : next()), sendPage('login.html'));
   app.get(['/', '/index.html'], auth.requirePage, sendPage('index.html'));
   app.use('/api', auth.requireApi);
