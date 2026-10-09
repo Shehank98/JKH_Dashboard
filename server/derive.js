@@ -102,7 +102,8 @@ function parseTime(v) {
 }
 
 // Sponsorship and filler items that are not real campaigns. Override with EXCLUDED_THEMES="a;b;c".
-const EXCLUDED_THEMES = (process.env.EXCLUDED_THEMES || '-BB;Com Break;DJ;-Extro;-Intro;-LLogo;Next Card;Tag;Time Check;-Tr')
+// (In the browser there is no process.env, so the default list applies.)
+const EXCLUDED_THEMES = ((typeof process !== 'undefined' && process.env && process.env.EXCLUDED_THEMES) || '-BB;Com Break;DJ;-Extro;-Intro;-LLogo;Next Card;Tag;Time Check;-Tr')
   .split(';').map(t => t.trim().toLowerCase()).filter(Boolean);
 
 // Excluded when the theme equals an item, or ends with a dash marker such as "Summer Promo -BB".

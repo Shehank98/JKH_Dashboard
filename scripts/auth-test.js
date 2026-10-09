@@ -87,7 +87,6 @@ const wrong = c => String((Number(c) + 1) % 1e6).padStart(6, '0');
     assert.strictEqual(r.status, 302); assert.strictEqual(r.headers.get('location'), '/login');
     r = await call('GET', '/login'); assert.strictEqual(r.status, 200); assert.ok(r.text.includes('Sign in to the <em>Live Dashboard.</em>'));
     r = await call('GET', '/api/status'); assert.strictEqual(r.status, 401); assert.strictEqual(r.json.signIn, true);
-    r = await call('POST', '/api/planning', {}); assert.strictEqual(r.status, 401);
     r = await call('GET', '/api/auth/me'); assert.strictEqual(r.status, 401);
     r = await call('GET', '/healthz'); assert.strictEqual(r.status, 200, 'health check is public');
     r = await call('GET', '/ogilvy-orbit-chub-stacked.png'); assert.strictEqual(r.status, 200, 'login page assets are public');
@@ -128,7 +127,9 @@ const wrong = c => String((Number(c) + 1) % 1e6).padStart(6, '0');
     r = await call('GET', '/login'); assert.strictEqual(r.status, 302);
     r = await call('GET', '/api/status'); assert.strictEqual(r.status, 200);
     r = await call('GET', '/api/auth/me'); assert.strictEqual(r.json.user.email, email);
-    r = await call('POST', '/api/planning', {}); assert.strictEqual(r.status, 404, 'no dataset yet, but past the sign-in check');
+    r = await call('GET', '/engine/lib/compute.js'); assert.strictEqual(r.status, 200, 'the browser engine code is served');
+    r = await call('GET', '/engine/lib/auth.js'); assert.strictEqual(r.status, 404, 'only the engine modules are served, never server code');
+    r = await call('POST', '/api/upload', {}); assert.strictEqual(r.status, 404, 'the server no longer accepts data files');
 
     // Sign out.
     const oldCookie = cookie;

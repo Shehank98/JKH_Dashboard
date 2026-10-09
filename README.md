@@ -1,13 +1,13 @@
 # Ogilvy Orbit – Chub
 
-Ogilvy Orbit – Chub: a full-screen competitive media spend dashboard for Sri Lankan advertisers. Sign in with your Ogilvy email, upload a spot log (`.xlsx` or `.csv`, 400k+ rows), choose a product group, pick your advertiser and your competitors, and compare spend, share of spend, medium split, channel mix and duration mix.
+Ogilvy Orbit – Chub: a full-screen competitive media spend dashboard for Sri Lankan advertisers. Sign in with your Ogilvy email, load your own spot log (`.xlsx` or `.csv`, 400k+ rows; it is processed in your browser and only you see it), choose a product group, pick your advertiser and your competitors, and compare spend, share of spend, medium split, channel mix and duration mix.
 
 ![Dashboard](docs/screenshot.jpg)
 
 ## Features
 
 * Fills the whole browser window. Below 1280 x 720 it scales down to fit instead of scrolling.
-* Filter drawer with two tabs: **Filters** (period and category, advertisers, media) and **Data file** (upload, delete, required columns). Apply and Reset stay pinned at the bottom.
+* Filter drawer with two tabs: **Filters** (period and category, advertisers, media) and **Data file** (load or remove your file, required columns). Apply and Reset stay pinned at the bottom.
 * Daypart filter lists the time range for each bucket.
 * **Ad type** filter: All (default), Commercials or Value Additions. Value Additions are the Advt_Theme items `-BB`, `Com Break`, `DJ`, `-Extro`, `-Intro`, `-LLogo`, `Next Card`, `Tag`, `Time Check`, `-Tr` (exact name, or ending in a dash marker such as `Summer Promo -BB`); everything else is a commercial. The choice applies to every card and pop-up, and Commercials + Value Additions always add up to All. Value addition items always count in the 5s bubble of Duration Mix (ACD uses their real Dur, or 5 seconds when Dur is blank). They are skipped only when Month Drill Down picks its lead campaign (in All and Commercials; in Value Additions the top item is shown); pop-up campaign lists include them like any other theme.
 * **Share of Spend Comparison**: my advertiser, each competitor and all other advertisers for the selected period, with SOS, spend, spots and rank. Rows are sorted by SOS with my advertiser highlighted. A **Period | By year | By month** toggle switches to a grid of SOS %: **By year** covers every year in the full data (ignoring the date range; other filters apply; part years are marked), **By month** each month of the selected period (shaded, darker = bigger share). Click a row or cell for details (rows open on a Months tab with share of category per month).
@@ -46,15 +46,18 @@ The first admin comes from **`ADMIN_EMAILS`** on Railway (comma separated). Thos
 ## How it works
 
 ```
-Browser (HTML, CSS, JS)  ──upload──▶  Node.js server on Railway
-        ▲                              │ streams the file (ExcelJS / csv-parse)
-        │ small JSON summaries          │ computes derived fields once
-        └──── /api/dashboard ◀──────────┘ keeps compact typed arrays in memory + on disk
+Your browser                                             Node.js server on Railway
+  page (HTML, CSS, JS)                                     sign-in, admin panel, Postgres accounts
+  data engine (Web Worker) ◀── engine code (/engine/lib) ─ serves the app and the engine code
+    reads your .xlsx / .csv on this computer               never receives data files
+    keeps compact typed arrays in memory
+    saves them in this browser (IndexedDB, per account)
 ```
 
-* Uploading a 45 MB `.xlsx` with 420,000 rows takes about 30 seconds and under 400 MB of RAM. The same data as `.csv` takes about 8 seconds.
-* Every filter change runs one pass over the rows on the server (about 30 ms) and returns about 8 KB of JSON.
-* The latest upload is saved to `DATA_DIR`, so it survives restarts. **Delete data** in the drawer removes it, and a new upload replaces it.
+* **Each person has their own data.** The file someone chooses is read and analysed in their own browser and never sent to the server, so several people can work with different files at the same time without seeing or replacing each other's data. A new person, or a new computer, starts with an empty dashboard.
+* **It stays until you remove it.** The processed data is saved in that browser under the signed-in account and reopens automatically on the next visit; **Remove data** deletes it. Another person signing in on the same browser gets their own, separate slot.
+* The browser runs exactly the same calculation code as the test scripts verify (`server/derive.js`, `builder.js`, `compute.js`, `planning.js`), and `npm run test:readers` proves the browser readers build an identical dataset to the Node reader.
+* Reading the 420,000-row sample takes about 3 seconds as `.csv` and 9 seconds as a 45 MB `.xlsx` (streamed, so memory stays low). Every filter change is one pass over the rows (about 30 ms) on the person's computer.
 
 ## Expected columns
 
@@ -62,7 +65,7 @@ Browser (HTML, CSS, JS)  ──upload──▶  Node.js server on Railway
 
 Required: `Advertiser, Channel, Dd, Mn, Yr, Cost`. Header names are matched ignoring case, spaces and underscores. The header row can sit below a few title rows. Only the first worksheet of an `.xlsx` is read. Old `.xls` files are not supported, so save them as `.xlsx` or `.csv` first.
 
-## Derived fields (computed once at upload)
+## Derived fields (computed once when a file is loaded)
 
 | Field | Rule |
 |---|---|
@@ -92,6 +95,7 @@ Required: `Advertiser, Channel, Dd, Mn, Yr, Cost`. Header names are matched igno
 npm install
 npm start            # http://localhost:3000 (sign-in codes print to the log until APPS_SCRIPT_URL is set)
 npm test             # smoke tests for the derived fields, metrics and planning report
+npm run test:readers # browser .xlsx/.csv readers build exactly the same dataset as the Node reader
 npm run test:auth    # sign-up, email code, sign-in, reset and the admin panel API, end to end
 TEST_DATABASE_URL=postgres://user@host:5432/postgres npm run test:db   # accounts survive restarts with an empty disk (uses a throwaway database)
 npm run check        # cross-checks every drill-down total against its chart (needs npm run sample first)
@@ -102,9 +106,9 @@ npm run sample       # writes samples/sample_420000.csv and .xlsx for testing
 ## Deploy on Railway
 
 1. Push this repo to GitHub, then in Railway choose **New Project, Deploy from GitHub repo**.
-2. Add a **Volume** to the service and mount it at `/data`.
-3. Add the variable `DATA_DIR=/data`. Without a volume, the uploaded data is lost on each redeploy.
-4. Optional variables: `MAX_UPLOAD_MB` (default 100), `EXCLUDED_THEMES` (semicolon separated).
+2. No volume is needed for data files: they stay in each person's browser. (`DATA_DIR` only holds the accounts file when there is no database.)
+3. Optional variable: `EXCLUDED_THEMES` (semicolon separated) for the Node test scripts; the browser uses the default Value Additions list.
+4. Accounts need the Postgres database below.
 5. Railway sets `PORT` automatically. Health check: `/healthz` (open without sign-in).
 6. Add a **Postgres** database to the project and give this service `DATABASE_URL` (see "Accounts database" below). Without it, accounts are lost on every redeploy.
 7. Set up email for the sign-in codes (next section), and set `ADMIN_EMAILS` to your own Ogilvy email so you can open the admin panel.
@@ -141,8 +145,8 @@ The 6-digit codes are sent through a small Google Apps Script web app, so no SMT
 
 Accounts are stored in Postgres (or `DATA_DIR/auth.json` without a database). Passwords are scrypt hashes; codes and session tokens are stored only as SHA-256 hashes. Codes expire after 10 minutes, allow 5 attempts and can be re-sent once a minute; 8 wrong passwords lock an email for 15 minutes; a password reset signs out every other device. Gmail allows about 100 emails a day (Workspace 1,500).
 
-Memory: the start script allows Node up to 3 GB. A 50 MB `.xlsx` needs roughly 400 to 600 MB while processing and about 150 MB after that.
+Memory: the server no longer holds datasets, so a small Railway plan is enough. Each person's browser uses roughly 200 to 400 MB while reading a 50 MB `.xlsx`.
 
 ## Security note
 
-Every page and API call except the sign-in pages, their images and `/healthz` needs a signed-in Ogilvy account; the admin panel and its API also need an admin session. Any signed-in user can upload and delete data.
+Every page and API call except the sign-in pages, their images and `/healthz` needs a signed-in Ogilvy account; the admin panel and its API also need an admin session. Data files never reach the server: each signed-in person loads and removes their own data in their browser.

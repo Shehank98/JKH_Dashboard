@@ -25,7 +25,6 @@
   let mixMedium = 'TV';                          // channel mix: TV, Radio or Press
   let durMedium = 'All';
   let sosView = 'period';                        // SOS table: whole period or by month                         // duration mix: All (TV + Radio), TV or Radio
-  let pollTimer = null;
 
   // ---------- helpers ----------
   const api = async (url, opts) => {
@@ -35,6 +34,33 @@
     if (!r.ok) throw new Error(j.error || r.statusText);
     return j;
   };
+  // The data engine runs in this browser (engine/worker.js): the file the person chooses is read, analysed
+  // and saved here, under their account, and is never sent to the server.
+  const engine = (() => {
+    const w = new Worker('engine/worker.js?v=1');
+    let seq = 0;
+    const pending = new Map();
+    w.onmessage = e => {
+      const { id, result, error, progress } = e.data;
+      const p = pending.get(id);
+      if (!p) return;
+      if (progress) { if (p.onProgress) p.onProgress(progress); return; }
+      pending.delete(id);
+      if (error) p.reject(new Error(error)); else p.resolve(result);
+    };
+    w.onerror = e => { for (const p of pending.values()) p.reject(new Error(e.message || 'The data engine stopped')); pending.clear(); };
+    return {
+      call(cmd, args, onProgress) {
+        const id = ++seq;
+        return new Promise((resolve, reject) => { pending.set(id, { resolve, reject, onProgress }); w.postMessage({ id, cmd, args }); });
+      },
+    };
+  })();
+  // Hooks for the automated browser checks: the last detail request and answer, and direct engine calls.
+  window.__lastDetail = null;
+  window.__engineCall = (cmd, args) => engine.call(cmd, args);
+  let me = null; // signed-in person, owner of the data saved in this browser
+
   const nf = (v, d = 0) => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
   function money(v, withLkr = true) {
     const a = Math.abs(v || 0);
@@ -111,7 +137,8 @@
     $('dfile').innerHTML = ds ? `<div class="dfile"><b title="${esc(ds.fileName)}">${esc(ds.fileName)}</b>
       <div class="row"><span>${nf(ds.rows)} rows</span><span>${ds.size ? nf(ds.size / 1048576, 1) + ' MB' : ''}</span></div>
       <div class="row"><span>${fmtDate(ds.minDate)} to ${fmtDate(ds.maxDate)}</span></div>
-      <div class="row"><span>Uploaded ${new Date(ds.uploadedAt).toLocaleString()}</span></div>
+      <div class="row"><span>Loaded ${new Date(ds.uploadedAt).toLocaleString()}</span></div>
+      <div class="row"><span>Saved in this browser only</span></div>
       ${ds.skipped ? `<div class="row"><span>${nf(ds.skipped)} rows skipped (invalid date)</span></div>` : ''}</div>`
       : '<div class="dfile" style="color:#6E7A99">No data file loaded</div>';
     $('deleteBtn').disabled = !ds;
@@ -131,7 +158,7 @@
     pendingFile = f;
     $('dropText').textContent = `${f.name} (${nf(f.size / 1048576, 1)} MB)`;
     $('uploadBtn').disabled = false;
-    setUploadStatus('Ready to upload. This replaces the current data.');
+    setUploadStatus('Ready. The file is read on this computer and replaces your current data.');
   }
   $('fileInput').addEventListener('change', e => pickFile(e.target.files[0]));
   const drop = $('drop');
@@ -139,64 +166,46 @@
   ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
   drop.addEventListener('drop', e => pickFile(e.dataTransfer.files[0]));
 
-  $('uploadBtn').addEventListener('click', () => {
+  $('uploadBtn').addEventListener('click', async () => {
     if (!pendingFile) return;
-    const fd = new FormData();
-    fd.append('file', pendingFile);
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/upload');
+    const file = pendingFile;
     $('uploadBtn').disabled = true; $('deleteBtn').disabled = true;
-    xhr.upload.onprogress = e => {
-      if (!e.lengthComputable) return;
-      const p = Math.round((e.loaded / e.total) * 100);
-      setProgress(p); setUploadStatus(`Uploading ${p}%`);
-    };
-    xhr.onload = () => {
-      let j = {};
-      try { j = JSON.parse(xhr.responseText); } catch (e) { /* ignore */ }
-      if (xhr.status === 401) { location.replace('/login'); return; }
-      if (xhr.status >= 400) { setProgress(null); setUploadStatus(j.error || 'Upload failed', true); $('uploadBtn').disabled = false; renderDataFile(j.dataset); return; }
+    setProgress(0);
+    setUploadStatus(`Reading ${file.name} on this computer…`);
+    busyChip('Reading file · 0%');
+    try {
+      const r = await engine.call('ingest', { file }, p => {
+        const pct = Math.round(p.pct * 100);
+        setProgress(pct);
+        setUploadStatus(p.saving ? `Saving ${nf(p.rows)} rows in this browser…` : `Reading ${file.name}: ${pct}% · ${nf(p.rows)} rows`);
+        busyChip(`Reading file · ${pct}%`);
+      });
       pendingFile = null; $('fileInput').value = '';
       $('dropText').textContent = 'Drop .xlsx or .csv here, or click to choose';
-      pollStatus();
-    };
-    xhr.onerror = () => { setProgress(null); setUploadStatus('Network error during upload', true); $('uploadBtn').disabled = false; };
-    xhr.send(fd);
+      renderDataFile(r.dataset);
+      setUploadStatus(`Loaded ${nf(r.dataset.rows)} rows in ${nf(r.dataset.parseMs / 1000, 1)}s.` +
+        (r.saved ? '' : ' It could not be saved in this browser, so it will be gone after you close the tab.'), !r.saved);
+      await loadOverview(true);
+    } catch (e) {
+      setUploadStatus('Could not read the file: ' + e.message, true);
+      $('uploadBtn').disabled = !pendingFile;
+    } finally {
+      setProgress(null);
+      busyChip(null);
+      $('deleteBtn').disabled = !overview;
+    }
   });
 
   $('deleteBtn').addEventListener('click', async () => {
-    if (!confirm('Delete the uploaded data? The dashboard will be empty until a new file is uploaded.')) return;
+    if (!confirm('Remove your data file from this browser? The dashboard will be empty until you load a file again.')) return;
     try {
-      await api('/api/data', { method: 'DELETE' });
+      await engine.call('clear');
       overview = null; data = null;
-      renderDataFile(null); setUploadStatus('Data deleted.');
+      renderDataFile(null); setUploadStatus('Data removed from this browser.');
       showEmpty();
     } catch (e) { setUploadStatus(e.message, true); }
   });
 
-  async function pollStatus() {
-    clearTimeout(pollTimer);
-    let s;
-    try { s = await api('/api/status'); } catch (e) { pollTimer = setTimeout(pollStatus, 2000); return; }
-    renderDataFile(s.dataset);
-    const job = s.job;
-    if (job.state === 'processing') {
-      setProgress(-1);
-      setUploadStatus(`Processing ${job.fileName}: ${nf(job.rows)} rows read`);
-      $('uploadBtn').disabled = true; $('deleteBtn').disabled = true;
-      busyChip(`Processing upload · ${nf(job.rows)} rows`);
-      pollTimer = setTimeout(pollStatus, 1000);
-      return;
-    }
-    busyChip(null);
-    setProgress(null);
-    $('uploadBtn').disabled = !pendingFile;
-    if (job.state === 'error') setUploadStatus(`Could not process ${job.fileName}: ${job.error}`, true);
-    else if (job.lastFile && s.dataset && (!overview || overview.meta.uploadedAt !== s.dataset.uploadedAt)) {
-      setUploadStatus(`Loaded ${nf(s.dataset.rows)} rows in ${nf(s.dataset.parseMs / 1000, 1)}s.`);
-      await loadOverview(true);
-    }
-  }
   function busyChip(text) {
     let el = $('busyChip');
     if (!text) { if (el) el.remove(); return; }
@@ -206,7 +215,7 @@
 
   // ---------- filters ----------
   async function loadOverview(fresh) {
-    overview = await api('/api/overview');
+    overview = await engine.call('overview');
     const saved = fresh ? null : readSaved();
     $('fPg').innerHTML = overview.productGroups.map(g => `<option>${esc(g.name)}</option>`).join('');
     $('fDaypart').innerHTML = '<option value="">All dayparts</option>' +
@@ -233,7 +242,7 @@
   }
 
   async function loadOptions(resetSelection) {
-    options = await api('/api/options?pg=' + encodeURIComponent(state.pg));
+    options = await engine.call('options', { pg: state.pg });
     const names = options.advertisers.map(a => a.name);
     if (resetSelection) {
       state.mine = names.slice(0, 1);
@@ -332,7 +341,7 @@
     saveState();
     document.body.classList.add('loading');
     try {
-      data = await api('/api/dashboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state) });
+      data = await engine.call('dashboard', JSON.parse(JSON.stringify(state)));
       render();
       hideOverlay();
       if (!state.mine.length) showOverlay('Pick your advertiser', 'Open Filters and tick at least one advertiser under My Advertiser.');
@@ -347,7 +356,7 @@
   function showOverlay(title, text) { $('ovTitle').textContent = title; $('ovText').textContent = text; $('overlay').classList.add('on'); }
   function hideOverlay() { $('overlay').classList.remove('on'); }
   function showEmpty() {
-    showOverlay('No data uploaded yet', 'Open the filter drawer and upload your spot log as .xlsx or .csv. Large files (400k+ rows) take up to a minute to process.');
+    showOverlay('Load your data file', 'Open the filter drawer and choose your spot log (.xlsx or .csv). It is read on this computer and only you can see it; it stays saved in this browser until you remove it.');
     $('periodText').textContent = 'No data'; $('periodLen').textContent = '0 months';
     $('chips').innerHTML = '';
     ['k1v', 'k2v'].forEach(id => { $(id).textContent = 'LKR 0'; }); $('k3v').textContent = '0%';
@@ -872,7 +881,10 @@
     modal.classList.add('on');
     try {
       const { title, tab, ...s2 } = scope;
-      detailData = await api('/api/detail', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filters: appliedFilters(), scope: s2 }) });
+      const req = { filters: appliedFilters(), scope: s2 };
+      window.__lastDetail = { body: JSON.parse(JSON.stringify(req)) };
+      detailData = await engine.call('detail', req);
+      window.__lastDetail.resp = detailData;
       renderDetail(scope);
     } catch (e) {
       $('mBody').innerHTML = `<div class="mload">${esc(e.message)}</div>`;
@@ -1125,17 +1137,16 @@
     } catch (e) { toast('Export failed: ' + e.message); }
   }
 
-  // Planning report: the server writes every competitor number behind the current filters as Markdown.
+  // Planning report: every competitor number behind the current filters as Markdown, built in this browser.
   async function exportPlanning() {
     busyChip('Building planning report…');
     try {
-      const r = await fetch('/api/planning', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(appliedFilters()) });
-      if (r.status === 401) { location.replace('/login'); return; }
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
-      const blob = await r.blob();
-      const name = (/filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') || '') || [])[1] || fileBase() + '_Planning.md';
+      const f = appliedFilters();
+      const md = await engine.call('planning', { filters: f, user: me ? `${me.name} (${me.email})` : '' });
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob); a.download = name; a.click();
+      a.href = URL.createObjectURL(new Blob([md], { type: 'text/markdown;charset=utf-8' }));
+      a.download = `Ogilvy_Orbit_Chub_Planning_${String(f.pg).replace(/[^\w]+/g, '-')}_${f.from}_to_${f.to}.md`;
+      a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       toast('Planning report downloaded');
     } catch (e) { toast('Export failed: ' + e.message); }
@@ -1178,6 +1189,7 @@
   async function loadUser() {
     try {
       const { user } = await api('/api/auth/me');
+      me = user;
       if (!user) return; // sign-in switched off (local development)
       const initials = user.name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
       $('userAv').textContent = initials || '?';
@@ -1187,20 +1199,21 @@
       $('userBtn').hidden = false;
       $('adminLink').hidden = !user.admin;
     } catch (e) { /* api() already redirects on 401 */ }
+    return me;
   }
 
   // ---------- boot ----------
   (async function boot() {
-    loadUser();
     try {
-      const s = await api('/api/status');
+      // Each person gets their own saved data in this browser; a new person (or computer) starts empty.
+      await loadUser();
+      const s = await engine.call('init', { user: me ? me.email : 'local' });
       renderDataFile(s.dataset);
+      if (s.storageError) setUploadStatus('This browser does not allow saving data, so you will need to load your file each time.', true);
       if (s.dataset) await loadOverview(false);
       else { showEmpty(); showPane('paneData'); }
-      if (s.job.state === 'processing') pollStatus();
-      else if (s.job.state === 'error') setUploadStatus(`Last upload failed: ${s.job.error}`, true);
     } catch (e) {
-      showOverlay('Cannot reach the server', e.message);
+      showOverlay('Could not start the dashboard', e.message);
     }
   })();
 })();

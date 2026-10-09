@@ -424,6 +424,11 @@ label.f input:focus{border-color:var(--red);box-shadow:0 0 0 4px rgba(224,56,62,
     show('reset');
     say('Enter the 6-digit code from your email and choose a password.', true);
   } else show(start === 'signup' || start === 'forgot' ? start : 'signin');
+  // Links to /login#signup or #forgot while already on this page switch the form too.
+  window.addEventListener('hashchange', () => {
+    const h = location.hash.slice(1);
+    if (h === 'signup' || h === 'forgot' || h === '') show(h || 'signin');
+  });
 })();
 </script>
 </body>

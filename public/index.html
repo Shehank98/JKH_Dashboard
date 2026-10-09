@@ -413,15 +413,15 @@ tr.me .sharebar{background:#FF8A3D}
     <!-- Data tab -->
     <div class="pane" id="paneData">
       <div class="sec">
-        <div class="sech">Current data</div>
+        <div class="sech">Your data (this browser)</div>
         <div id="dfile"></div>
-        <div class="btnrow"><button class="btn ghost" id="deleteBtn" disabled>Delete data</button></div>
+        <div class="btnrow"><button class="btn ghost" id="deleteBtn" disabled>Remove data</button></div>
       </div>
       <div class="sec">
-        <div class="sech">Upload new file</div>
+        <div class="sech">Load a file</div>
         <label class="drop" id="drop" for="fileInput">
           <span id="dropText">Drop .xlsx or .csv here, or click to choose</span>
-          <small>Up to 100 MB · CSV loads fastest · replaces current data</small>
+          <small>Read on this computer, never sent to the server · only you see it · CSV loads fastest</small>
         </label>
         <input type="file" id="fileInput" accept=".xlsx,.xlsm,.csv" style="display:none">
         <div class="btnrow"><button class="btn pri" id="uploadBtn" disabled>Upload</button></div>
@@ -559,6 +559,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=27"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>

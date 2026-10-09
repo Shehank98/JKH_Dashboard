@@ -11,6 +11,7 @@
     "test": "node scripts/smoke-test.js",
     "test:auth": "node scripts/auth-test.js",
     "test:db": "node scripts/db-test.js",
+    "test:readers": "node --max-old-space-size=4096 scripts/browser-readers-test.js",
     "check": "node scripts/check-drilldowns.js samples/sample_420000.csv",
     "verify": "node scripts/verify-drilldowns.js samples/sample_420000.csv"
   },
@@ -26,7 +27,6 @@
     "html-to-image": "^1.11.13",
     "jspdf": "^2.5.2",
     "jszip": "^3.10.2",
-    "multer": "^2.0.0",
     "pg": "^8.23.1",
     "pptxgenjs": "^4.0.1"
   }
