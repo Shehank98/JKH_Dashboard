@@ -312,7 +312,10 @@ function createAuth(dataDir) {
       const wait = lockedFor(email);
       if (wait) throw new HttpError(429, `Too many failed attempts. Try again in ${wait} minute${wait === 1 ? '' : 's'}.`);
       const u = db.users[email];
-      if (!u || !passwordMatches(u, req.body.password)) { failed(email); log(req, 'admin_login_failed', email); save(); throw new HttpError(401, 'Email or password is not right.'); }
+      // An ADMIN_EMAILS address with no account yet: say so, instead of a confusing "wrong password".
+      if (!u && ENV_ADMINS.includes(email)) throw new HttpError(404, 'This admin email has no account yet. Create it first on the dashboard sign-in page (Create account), confirm the emailed code, then come back here with the same password.', { setup: true });
+      if (u && !u.verified && ENV_ADMINS.includes(email)) throw new HttpError(403, 'Please confirm this account first: sign in on the dashboard sign-in page and enter the emailed code, then come back here.', { setup: true });
+      if (!u || !passwordMatches(u, req.body.password)) { failed(email); log(req, 'admin_login_failed', email); save(); throw new HttpError(401, 'Email or password is not right. Use the password of your dashboard account, or reset it with "Forgot password?" on the dashboard sign-in page.'); }
       fails.delete(email);
       if (u.disabled) throw new HttpError(403, DISABLED);
       if (!u.verified) throw new HttpError(403, 'Please confirm your email first by signing in to the dashboard.');
@@ -407,7 +410,7 @@ function createAuth(dataDir) {
       req.body = req.body || {};
       Promise.resolve(fn(req, res)).catch(e => {
         if (!(e instanceof HttpError)) console.error('[admin]', e);
-        res.status(e.status || 500).json({ error: e instanceof HttpError ? e.message : 'Something went wrong. Please try again.' });
+        res.status(e.status || 500).json({ error: e instanceof HttpError ? e.message : 'Something went wrong. Please try again.', ...((e instanceof HttpError && e.extra) || {}) });
       });
     };
     r.post('/login', wrap(adminHandlers.login));

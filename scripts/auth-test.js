@@ -71,7 +71,7 @@ const wrong = c => String((Number(c) + 1) % 1e6).padStart(6, '0');
 (async () => {
   await new Promise(ok => mailer.listen(MAIL_PORT, ok));
   const server = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {
-    env: { ...process.env, PORT: String(PORT), DATA_DIR: dataDir, AUTH_DISABLED: '', APPS_SCRIPT_URL: `http://127.0.0.1:${MAIL_PORT}/exec`, APPS_SCRIPT_SECRET: 'test-secret', CODE_RESEND_SECONDS: '2', ADMIN_EMAILS: 'jane.perera@ogilvy.com' },
+    env: { ...process.env, PORT: String(PORT), DATA_DIR: dataDir, AUTH_DISABLED: '', APPS_SCRIPT_URL: `http://127.0.0.1:${MAIL_PORT}/exec`, APPS_SCRIPT_SECRET: 'test-secret', CODE_RESEND_SECONDS: '2', ADMIN_EMAILS: 'jane.perera@ogilvy.com, new.admin@ogilvy.com' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let log = '';
@@ -192,6 +192,9 @@ const wrong = c => String((Number(c) + 1) % 1e6).padStart(6, '0');
     r = await callJar(bob, 'POST', '/api/admin/login', { email: bobEmail, password: 'bobpass1' });
     assert.strictEqual(r.status, 403); assert.match(r.json.error, /does not have admin access/);
     r = await callJar(adm, 'POST', '/api/admin/login', { email, password: 'wrong999' }); assert.strictEqual(r.status, 401);
+    // An ADMIN_EMAILS address that has not signed up yet is told to create the account first.
+    r = await callJar({ c: '' }, 'POST', '/api/admin/login', { email: 'new.admin@ogilvy.com', password: 'whatever1' });
+    assert.strictEqual(r.status, 404); assert.strictEqual(r.json.setup, true); assert.match(r.json.error, /no account yet/);
     r = await callJar(adm, 'POST', '/api/admin/login', { email, password: 'newpass9' });
     assert.strictEqual(r.status, 200); assert.ok(adm.c.includes('ooc_admin=')); assert.match(r.headers.get('set-cookie'), /SameSite=Strict/i);
     r = await callJar(adm, 'GET', '/admin'); assert.strictEqual(r.status, 200); assert.ok(r.text.includes('Invite user'));
