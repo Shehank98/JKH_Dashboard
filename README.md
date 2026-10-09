@@ -31,6 +31,10 @@ A separate admin area at **`/admin`** (link: "Automation team? Admin sign-in" on
 
 The first admin comes from **`ADMIN_EMAILS`** on Railway (comma separated). Those people are always admins; anyone else can be made admin from the panel.
 
+## Competitor data for the media planning tool
+
+**Export, Send to planning tool** opens the media planning tool (`PLANNING_TOOL_URL`) and hands it, browser to browser, what every advertiser bought for the current filters: channels, programmes, Start / Mid / End break and position in the break, break number, ad lengths, day × hour, dayparts, months, weeks and campaigns. **Competitor data for planning tool (JSON)** saves the same data as a file. The receiver to add to the planning tool, the data format and 15 suggested Chart.js charts are in [docs/planning-tool](docs/planning-tool/README.md). Totals match the dashboard (checked in `npm test`).
+
 ## Planning report (Markdown)
 
 **Export, Planning report** downloads one `.md` file with every number a planning tool needs to read competitor behaviour, for the filters on screen:
@@ -138,6 +142,7 @@ The 6-digit codes are sent through a small Google Apps Script web app, so no SMT
 | `APPS_SCRIPT_SECRET` | none | Shared secret the script checks before sending. |
 | `ALLOWED_EMAIL_DOMAINS` | `ogilvy.com` | Comma separated list of email domains allowed to sign up. |
 | `SESSION_DAYS` | `30` | How long a sign-in lasts on a device. |
+| `PLANNING_TOOL_URL` | `https://media-planing-v2-copy-production.up.railway.app` | Where **Send to planning tool** opens. |
 | `DATABASE_URL` | none | Postgres connection string (a reference to the Railway Postgres service). Keeps accounts across redeploys. `PGSSL=0` or `1` overrides TLS (default: off on the private network, on for public hosts). |
 | `ADMIN_EMAILS` | none | Comma separated emails that are always admins. Set at least one, or nobody can open the admin panel. |
 | `ADMIN_SESSION_HOURS` | `12` | How long an admin panel sign-in lasts. |

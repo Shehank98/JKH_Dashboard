@@ -7,7 +7,7 @@
 importScripts('/vendor/jszip/jszip.min.js');
 
 // ---- a tiny CommonJS loader for the shared modules ----
-const LIB = ['derive', 'builder', 'compute', 'planning', 'browser-readers'];
+const LIB = ['derive', 'builder', 'compute', 'planning', 'competitor', 'browser-readers'];
 const SRC = {}, CACHE = {};
 function requireLib(name) {
   if (name === 'jszip') return self.JSZip;
@@ -89,6 +89,7 @@ const handlers = {
   },
   detail({ filters, scope }) { return requireLib('compute').detail(need(), filters || {}, scope || {}); },
   planning({ filters, user }) { return requireLib('planning').planning(need(), filters || {}, { user: user || '' }); },
+  competitor({ filters, user }) { return requireLib('competitor').competitorIntel(need(), filters || {}, { user: user || '' }); },
 };
 function need() {
   if (!dataset) throw new Error('No data file loaded yet. Open Filters, Data file, and choose your file.');

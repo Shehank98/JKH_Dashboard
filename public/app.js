@@ -990,7 +990,7 @@
     if (!b) return;
     menu.classList.remove('on');
     if (!data) return toast('Nothing to export yet');
-    ({ jpg: exportImage, pdf: exportPdf, ppt: exportPpt, plan: exportPlanning, csv: exportCsv })[b.dataset.x]();
+    ({ jpg: exportImage, pdf: exportPdf, ppt: exportPpt, plan: exportPlanning, send: sendToPlanning, json: exportCompetitorJson, csv: exportCsv })[b.dataset.x]();
   });
   const fileBase = () => `Ogilvy_Orbit_Chub_${data.filters.pg.replace(/[^\w]+/g, '-')}_${data.filters.from}_to_${data.filters.to}`;
   const loadScript = src => new Promise((ok, fail) => {
@@ -1151,6 +1151,56 @@
       toast('Planning report downloaded');
     } catch (e) { toast('Export failed: ' + e.message); }
     finally { busyChip(null); }
+  }
+
+  // ---------- competitor data for the media planning tool ----------
+  // Built in this browser from the current filters and handed straight to the planning tool's tab with
+  // postMessage, addressed only to the planning tool's own origin. Nothing goes through either server.
+  let planningUrl = null;
+  async function planningToolUrl() {
+    if (!planningUrl) { try { planningUrl = (await api('/api/config')).planningToolUrl; } catch (e) { planningUrl = ''; } }
+    return planningUrl;
+  }
+  const competitorPayload = () => engine.call('competitor', { filters: appliedFilters(), user: me ? `${me.name} (${me.email})` : '' });
+  async function exportCompetitorJson() {
+    busyChip('Preparing competitor data…');
+    try {
+      const payload = await competitorPayload();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+      a.download = fileBase().replace('Ogilvy_Orbit_Chub_', 'Ogilvy_Orbit_Chub_Competitors_') + '.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      toast('Competitor data downloaded' + (payload.warnings.length ? ' · ' + payload.warnings[0] : ''));
+    } catch (e) { toast('Export failed: ' + e.message); }
+    finally { busyChip(null); }
+  }
+  function sendToPlanning() {
+    // Open the tab inside the click, before any await, so pop-up blockers allow it.
+    const win = window.open('about:blank', 'ooc-planning-tool');
+    if (!win) { toast('The browser blocked the new tab. Allow pop-ups for this site, or use "Competitor data for planning tool (JSON)".'); return; }
+    busyChip('Sending to planning tool…');
+    (async () => {
+      let done = false;
+      try {
+        const [base, payload] = await Promise.all([planningToolUrl(), competitorPayload()]);
+        if (!base) throw new Error('No planning tool address is set (PLANNING_TOOL_URL).');
+        const origin = new URL(base).origin;
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => finish(new Error('The planning tool did not answer. Make sure it has the competitor import added, then try again, or download the JSON instead.')), 30000);
+          function finish(err) { if (done) return; done = true; clearTimeout(timer); window.removeEventListener('message', onMsg); err ? reject(err) : resolve(); }
+          function onMsg(e) {
+            if (e.source !== win || e.origin !== origin || !e.data || typeof e.data !== 'object') return;
+            if (e.data.type === 'ooc:ready') win.postMessage({ type: 'ooc:competitor-intel', version: payload.version, payload }, origin);
+            else if (e.data.type === 'ooc:received') e.data.ok === false ? finish(new Error(e.data.error || 'The planning tool could not read the data.')) : finish();
+          }
+          window.addEventListener('message', onMsg);
+          win.location.href = base + '/#competitors';
+        });
+        toast(`Sent to the planning tool: ${payload.advertisers.length} advertisers, ${payload.programmes.length} programme rows`);
+      } catch (e) { toast('Send failed: ' + e.message); }
+      finally { busyChip(null); }
+    })();
   }
 
   function exportCsv() {

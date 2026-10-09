@@ -109,6 +109,7 @@ input[type=date].inp{color-scheme:dark}
 .chip.busy{background:#141A2E;color:#FFC599}
 .tright{margin-left:auto;display:flex;gap:8px;flex-shrink:0;position:relative}
 .ubtn{max-width:170px}
+.ubtn[hidden]{display:none}
 .ubtn .av{width:22px;height:22px;border-radius:50%;background:#FDE8E8;color:#E0383E;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .ubtn .un{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:1600px){.ubtn{padding:8px 9px}.ubtn .un{display:none}}
@@ -461,6 +462,8 @@ tr.me .sharebar{background:#FF8A3D}
       <button data-x="pdf"><b>PDF</b><span>The whole dashboard on one landscape page</span></button>
       <button data-x="ppt"><b>PowerPoint (PPT)</b><span>Title slide, full dashboard, then one slide per chart</span></button>
       <hr>
+      <button data-x="send"><b>Send to planning tool</b><span>Opens the media planning tool with competitor channels, programmes, breaks, lengths and timing</span></button>
+      <button data-x="json"><b>Competitor data for planning tool (JSON)</b><span>The same data as a file, to import by hand</span></button>
       <button data-x="plan"><b>Planning report (Markdown)</b><span>Every competitor number: spend, SOS, months, media, channels, dayparts, durations, campaigns</span></button>
       <button data-x="csv"><b>CSV data</b><span>Monthly numbers behind the charts</span></button>
     </div>
@@ -559,6 +562,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=28"></script>
+<script src="app.js?v=29"></script>
 </body>
 </html>

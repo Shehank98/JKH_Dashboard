@@ -28,7 +28,11 @@ class Dict {
 class Builder {
   constructor() {
     this.pg = new Dict(); this.adv = new Dict(); this.channel = new Dict(); this.theme = new Dict();
-    this.cols = { pg: [], adv: [], ch: [], theme: [], day: [], mon: [], dp: [], dur: [], durRaw: [], bq: [], cost: [] };
+    this.program = new Dict(); this.adPos = new Dict();
+    // prog/adPos: programme and which break of it (Start / Mid / End); brk: break number; pos/ads: slot in the
+    // break and ads in that break (0 = not given); hour: hour the ad aired (255 = no time, e.g. Press).
+    this.cols = { pg: [], adv: [], ch: [], theme: [], day: [], mon: [], dp: [], dur: [], durRaw: [], bq: [], cost: [],
+      prog: [], adPos: [], brk: [], pos: [], ads: [], hour: [] };
     this.header = null; // array index -> key
     this.rows = 0; this.skipped = 0; this.scanned = 0;
   }
@@ -74,7 +78,13 @@ class Builder {
     c.theme.push(this.theme.id(r.theme));
     c.day.push(day);
     c.mon.push(dt.getUTCFullYear() * 12 + dt.getUTCMonth());
-    c.dp.push(D.daypartOf(D.parseTime(r.advtTime)));
+    const minutes = D.parseTime(r.advtTime);
+    c.dp.push(D.daypartOf(minutes));
+    c.hour.push(minutes == null || Number.isNaN(minutes) ? 255 : Math.floor(minutes / 60) % 24);
+    c.prog.push(this.program.id(r.program));
+    c.adPos.push(this.adPos.id(r.adPos));
+    const small = v => { const n = D.parseNumber(v); return Number.isFinite(n) && n > 0 ? Math.min(255, Math.round(n)) : 0; };
+    c.brk.push(small(r.brkNo)); c.pos.push(small(r.posInBrk)); c.ads.push(small(r.adsInBrk));
     const dur = D.parseNumber(r.dur);
     c.dur.push(D.stdDurIndex(dur));
     c.durRaw.push(Number.isFinite(dur) && dur > 0 ? dur : NaN);
@@ -92,6 +102,8 @@ class Builder {
       theme: Int32Array.from(c.theme), day: Int32Array.from(c.day), mon: Int32Array.from(c.mon),
       dp: Uint8Array.from(c.dp), dur: Uint8Array.from(c.dur), durRaw: Float32Array.from(c.durRaw), bq: Uint8Array.from(c.bq),
       cost: Float64Array.from(c.cost),
+      prog: Int32Array.from(c.prog), adPos: Int32Array.from(c.adPos),
+      brk: Uint8Array.from(c.brk), pos: Uint8Array.from(c.pos), ads: Uint8Array.from(c.ads), hour: Uint8Array.from(c.hour),
     };
     this.cols = null;
     let minDay = Infinity, maxDay = -Infinity;
@@ -105,6 +117,7 @@ class Builder {
       meta: { ...meta, rows: this.rows, skipped: this.skipped, minDay, maxDay },
       dicts: {
         pg: this.pg.list, adv: this.adv.list, channel: channels, theme: this.theme.list,
+        program: this.program.list, adPos: this.adPos.list,
         channelMedium: channels.map(D.mediumOf), channelName: channels.map(D.channelNameOf),
       },
       cols,

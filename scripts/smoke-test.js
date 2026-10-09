@@ -8,6 +8,7 @@ const D = require('../server/derive');
 const { ingestFile } = require('../server/ingest');
 const compute = require('../server/compute');
 const { planning } = require('../server/planning');
+const { competitorIntel } = require('../server/competitor');
 
 // Medium and channel name
 assert.strictEqual(D.MEDIA[D.mediumOf('TV - Derana TV')], 'TV');
@@ -119,5 +120,22 @@ assert.strictEqual(D.dayNumber(1, 'Jan', 26), D.dayNumber(1, 1, 2026));
   assert.ok(md.includes('| Me (mine) | 3 | 0 | 1 | 0 | 1 | 0 | 60.0 |'), 'duration counts match the dashboard');
   assert.ok(md.includes('### Me (mine)') && md.includes('| -BB | VA |'));
   assert.ok(planning(ds, { ...F, from: '2030-01-01', to: '2030-02-01' }).includes('nothing to report'));
+  // Competitor package for the planning tool: totals, breaks, positions, programmes and hours.
+  const ci = competitorIntel(ds, { ...F, compare: false }, { user: 'Test' });
+  assert.strictEqual(ci.format, 'ogilvy-orbit-chub/competitor-intel');
+  assert.strictEqual(ci.totals.spend, out.kpi.catSpend); assert.strictEqual(ci.totals.spots, out.kpi.catSpots);
+  const meRow = ci.summary.find(r => r.advertiser === 'Me');
+  assert.strictEqual(meRow.role, 'mine'); assert.strictEqual(meRow.spend, out.kpi.mineSpend); assert.strictEqual(meRow.acd, 12);
+  const meSum = (k, field = 'spots') => ci[k].filter(r => r.advertiser === 'Me').reduce((s2, r) => s2 + r[field], 0);
+  for (const k of ['channels', 'breakPositions', 'dayparts', 'months', 'weeks']) assert.strictEqual(meSum(k), meRow.spots, k + ' spots add up');
+  assert.strictEqual(meSum('durations'), 5); // TV and Radio ads only
+  assert.strictEqual(meSum('hours'), 5);     // ads with an Advt_time
+  // Me's ads: Theme A TV 19:45 (pos 1 of 5), FM 08:10 (pos 2 of 5), -BB 19:50 and Summer -BB 19:51 (pos 1 of 5), Time Check FM 08:10 (pos 1 of 5).
+  const pos = Object.fromEntries(ci.breakPositions.filter(r => r.advertiser === 'Me').map(r => [r.positionInBreak, r.spots]));
+  assert.deepStrictEqual(pos, { First: 4, Second: 1 });
+  const news = ci.programmes.find(r => r.advertiser === 'Me' && r.channel === 'Derana TV' && r.programme === 'News');
+  assert.strictEqual(news.spots, 3); assert.strictEqual(news.usualHour, 19); assert.deepStrictEqual(news.airDays, ['Mon', 'Fri']);
+  assert.strictEqual(ci.hours.find(r => r.advertiser === 'Me' && r.day === 'Fri' && r.hour === 19).spots, 2);
+  assert.deepStrictEqual(ci.warnings, []);
   console.log('All smoke tests passed');
 })().catch(e => { console.error(e); process.exit(1); });
