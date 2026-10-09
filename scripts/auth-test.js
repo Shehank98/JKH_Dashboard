@@ -66,7 +66,7 @@ const wrong = c => String((Number(c) + 1) % 1e6).padStart(6, '0');
     // Locked down until signed in.
     r = await call('GET', '/');
     assert.strictEqual(r.status, 302); assert.strictEqual(r.headers.get('location'), '/login');
-    r = await call('GET', '/login'); assert.strictEqual(r.status, 200); assert.ok(r.text.includes('Sign in to the Live Dashboard.'));
+    r = await call('GET', '/login'); assert.strictEqual(r.status, 200); assert.ok(r.text.includes('Sign in to the <em>Live Dashboard.</em>'));
     r = await call('GET', '/api/status'); assert.strictEqual(r.status, 401); assert.strictEqual(r.json.signIn, true);
     r = await call('POST', '/api/planning', {}); assert.strictEqual(r.status, 401);
     r = await call('GET', '/api/auth/me'); assert.strictEqual(r.status, 401);
