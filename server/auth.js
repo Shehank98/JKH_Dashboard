@@ -3,9 +3,8 @@
 // Accounts, sessions and pending codes live in DATA_DIR/auth.json (the same Railway volume as the data).
 // Passwords are scrypt hashes; codes and session tokens are stored as SHA-256 hashes only.
 
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
+const { createStore } = require('./authstore');
 
 const COOKIE = 'ooc_session';
 const ADMIN_COOKIE = 'ooc_admin';
@@ -44,19 +43,16 @@ const escHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&
 
 class HttpError extends Error { constructor(status, msg, extra) { super(msg); this.status = status; this.extra = extra; } }
 
-function createAuth(dataDir) {
-  const file = path.join(dataDir, 'auth.json');
-  let db = { users: {}, sessions: {}, codes: {}, adminSessions: {}, events: [] };
-  try { db = { ...db, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch (e) { /* first run */ }
+async function createAuth(dataDir) {
+  const store = createStore(dataDir);
+  const db = await store.load();
   const save = () => {
     const t = now();
     for (const [k, s] of Object.entries(db.sessions)) if (s.exp < t) delete db.sessions[k];
     for (const [k, c] of Object.entries(db.codes)) if (c.exp < t - 3600e3) delete db.codes[k];
     for (const [k, s] of Object.entries(db.adminSessions)) if (s.exp < t) delete db.adminSessions[k];
     if (db.events.length > MAX_EVENTS) db.events.splice(0, db.events.length - MAX_EVENTS);
-    const tmp = file + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(db));
-    fs.renameSync(tmp, file);
+    store.persist(db);
   };
 
   const isAdmin = u => !!u && (u.role === 'admin' || ENV_ADMINS.includes(u.email));
@@ -354,6 +350,7 @@ function createAuth(dataDir) {
         settings: {
           domains: DOMAINS, mail: !!MAIL_URL, sessionDays: SESSION_DAYS, adminHours: ADMIN_HOURS,
           envAdmins: ENV_ADMINS, codeMinutes: CODE_MINUTES,
+          storage: store.kind, storageError: store.lastError || null,
         },
       });
     },
@@ -454,7 +451,7 @@ function createAuth(dataDir) {
     res.redirect('/login');
   };
 
-  return { router, adminRouter, requireApi, requirePage, requireAdminPage, userOf, adminOf, mailConfigured: !!MAIL_URL, domains: DOMAINS, envAdmins: ENV_ADMINS };
+  return { storage: store.kind, storageLabel: store.label, flush: () => store.flush(db), close: () => store.close(), router, adminRouter, requireApi, requirePage, requireAdminPage, userOf, adminOf, mailConfigured: !!MAIL_URL, domains: DOMAINS, envAdmins: ENV_ADMINS };
 }
 
 module.exports = { createAuth };

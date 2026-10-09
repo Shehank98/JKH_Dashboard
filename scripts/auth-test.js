@@ -272,7 +272,18 @@ const wrong = c => String((Number(c) + 1) % 1e6).padStart(6, '0');
     assert.strictEqual(r.status, 429); assert.match(r.json.error, /Too many code requests/);
 
     // Stored data: no plain passwords, codes or tokens.
-    const saved = fs.readFileSync(path.join(dataDir, 'auth.json'), 'utf8');
+    let saved;
+    if (process.env.DATABASE_URL) {
+      await new Promise(res => setTimeout(res, 300)); // let the last write commit
+      const { Client } = require('pg');
+      const c = new Client({ connectionString: process.env.DATABASE_URL }); await c.connect();
+      const dump = [];
+      for (const t of ['ooc_users', 'ooc_sessions', 'ooc_codes', 'ooc_events']) dump.push(await c.query(`SELECT * FROM ${t}`));
+      await c.end();
+      saved = JSON.stringify(dump.map(q => q.rows));
+      assert.ok(saved.includes('jane.perera@ogilvy.com'), 'accounts are in Postgres');
+    } else saved = fs.readFileSync(path.join(dataDir, 'auth.json'), 'utf8');
+    assert.ok(!log.includes('save failed'), 'every database write succeeded');
     assert.ok(!saved.includes('newpass9') && !saved.includes(code3) && !saved.includes(fresh.split('=')[1]));
 
     console.log('All auth checks passed');

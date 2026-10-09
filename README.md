@@ -93,6 +93,7 @@ npm install
 npm start            # http://localhost:3000 (sign-in codes print to the log until APPS_SCRIPT_URL is set)
 npm test             # smoke tests for the derived fields, metrics and planning report
 npm run test:auth    # sign-up, email code, sign-in, reset and the admin panel API, end to end
+TEST_DATABASE_URL=postgres://user@host:5432/postgres npm run test:db   # accounts survive restarts with an empty disk (uses a throwaway database)
 npm run check        # cross-checks every drill-down total against its chart (needs npm run sample first)
 npm run verify       # independent recount of every pop-up, row by row, from the raw CSV
 npm run sample       # writes samples/sample_420000.csv and .xlsx for testing
@@ -105,7 +106,18 @@ npm run sample       # writes samples/sample_420000.csv and .xlsx for testing
 3. Add the variable `DATA_DIR=/data`. Without a volume, the uploaded data is lost on each redeploy.
 4. Optional variables: `MAX_UPLOAD_MB` (default 100), `EXCLUDED_THEMES` (semicolon separated).
 5. Railway sets `PORT` automatically. Health check: `/healthz` (open without sign-in).
-6. Set up email for the sign-in codes (next section), and set `ADMIN_EMAILS` to your own Ogilvy email so you can open the admin panel.
+6. Add a **Postgres** database to the project and give this service `DATABASE_URL` (see "Accounts database" below). Without it, accounts are lost on every redeploy.
+7. Set up email for the sign-in codes (next section), and set `ADMIN_EMAILS` to your own Ogilvy email so you can open the admin panel.
+
+## Accounts database (Postgres)
+
+Accounts, sessions, codes and the activity log are stored in Postgres when the service has a `DATABASE_URL`, so they survive redeploys.
+
+1. In the Railway project: **New, Database, Add PostgreSQL** (skip if you already have one).
+2. Open this app's service, **Variables, New Variable, Add Reference**, pick the Postgres service's `DATABASE_URL`. It shows up as `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
+3. Redeploy. The log should say `Sign-in accounts are stored in Postgres ...`, `/healthz` returns `"accounts":"postgres"`, and the admin panel's Settings page shows **Postgres database**.
+
+The app creates its tables on start (`ooc_users`, `ooc_sessions`, `ooc_codes`, `ooc_events`); `ooc_users` has readable columns (email, name, role, verified, disabled, last login) and only scrypt password hashes. If the database is unreachable at start, the app stops and Railway restarts it rather than running with no accounts. An old `auth.json` in `DATA_DIR` is imported once into an empty database. Without `DATABASE_URL`, accounts fall back to `DATA_DIR/auth.json`, and the admin panel shows a warning.
 
 ## Sign-in emails (Google Apps Script)
 
@@ -122,11 +134,12 @@ The 6-digit codes are sent through a small Google Apps Script web app, so no SMT
 | `APPS_SCRIPT_SECRET` | none | Shared secret the script checks before sending. |
 | `ALLOWED_EMAIL_DOMAINS` | `ogilvy.com` | Comma separated list of email domains allowed to sign up. |
 | `SESSION_DAYS` | `30` | How long a sign-in lasts on a device. |
+| `DATABASE_URL` | none | Postgres connection string (a reference to the Railway Postgres service). Keeps accounts across redeploys. `PGSSL=0` or `1` overrides TLS (default: off on the private network, on for public hosts). |
 | `ADMIN_EMAILS` | none | Comma separated emails that are always admins. Set at least one, or nobody can open the admin panel. |
 | `ADMIN_SESSION_HOURS` | `12` | How long an admin panel sign-in lasts. |
 | `AUTH_DISABLED` | off | `1` switches sign-in off. Local development and automated tests only. |
 
-Accounts are stored in `DATA_DIR/auth.json` on the same volume as the data. Passwords are scrypt hashes; codes and session tokens are stored only as SHA-256 hashes. Codes expire after 10 minutes, allow 5 attempts and can be re-sent once a minute; 8 wrong passwords lock an email for 15 minutes; a password reset signs out every other device. Gmail allows about 100 emails a day (Workspace 1,500).
+Accounts are stored in Postgres (or `DATA_DIR/auth.json` without a database). Passwords are scrypt hashes; codes and session tokens are stored only as SHA-256 hashes. Codes expire after 10 minutes, allow 5 attempts and can be re-sent once a minute; 8 wrong passwords lock an email for 15 minutes; a password reset signs out every other device. Gmail allows about 100 emails a day (Workspace 1,500).
 
 Memory: the start script allows Node up to 3 GB. A 50 MB `.xlsx` needs roughly 400 to 600 MB while processing and about 150 MB after that.
 

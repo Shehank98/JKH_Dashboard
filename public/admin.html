@@ -51,6 +51,8 @@ main{padding:26px 30px 40px;min-width:0}
 .spin svg{animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+.warn{background:#FFF4E0;border:1px solid #F5D9A8;color:#8A5A12;border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:16px}
+.warn code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
 .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;cursor:pointer;transition:transform .15s,box-shadow .15s;animation:up .5s cubic-bezier(.2,.8,.2,1) backwards}
 .stat:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(26,31,54,.07)}
@@ -185,6 +187,7 @@ tbody tr:last-child td{border-bottom:0}
           <button class="btn primary" id="inviteBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Invite user</button>
         </div>
       </div>
+      <div class="warn" id="storeWarn" hidden></div>
       <div class="stats" id="stats"></div>
       <div class="panel">
         <div class="toolbar">
@@ -312,6 +315,11 @@ tbody tr:last-child td{border-bottom:0}
       $('meName').textContent = data.me.name; $('meEmail').textContent = data.me.email;
       $('nUsers').textContent = data.users.length;
       renderStats(); renderUsers(); renderEvents(); renderSettings();
+      const st = data.settings, w = $('storeWarn');
+      w.hidden = st.storage === 'postgres' && !st.storageError;
+      w.innerHTML = st.storage !== 'postgres'
+        ? '<b>Accounts are not in the database yet.</b> They are saved in a file and will disappear on the next deploy. On Railway, add <code>DATABASE_URL</code> to this service (a reference to your Postgres database) and redeploy.'
+        : '<b>The database could not be saved to:</b> ' + esc(st.storageError) + '. Changes are kept in memory and retried every few seconds.';
       if (openEmail) openDrawer(openEmail, true);
       if (!quiet) toast('Up to date');
     } catch (e) { if (!quiet) toast(e.message, true); }
@@ -360,6 +368,9 @@ tbody tr:last-child td{border-bottom:0}
   function renderSettings() {
     const s = data.settings;
     $('settings').innerHTML = [
+      ['Where accounts are saved', s.storage === 'postgres' ? 'Postgres database' : 'File on the server', s.storage === 'postgres'
+        ? (s.storageError ? 'Last save failed: ' + s.storageError + '. It retries automatically.' : 'Accounts, sign-ins and activity are kept in the database, so they survive every redeploy.')
+        : 'Accounts are lost on every redeploy unless the data folder is on a volume. Connect the Postgres database.', 'DATABASE_URL'],
       ['Who can sign up', s.domains.map(d => '@' + d).join(', '), 'Only these email domains can create an account.', 'ALLOWED_EMAIL_DOMAINS'],
       ['Sign-in emails', s.mail ? 'Connected (Google Apps Script)' : 'Not connected', s.mail ? '6-digit codes are emailed through the Apps Script web app.' : 'Codes are only written to the server log. Add APPS_SCRIPT_URL and APPS_SCRIPT_SECRET.', 'APPS_SCRIPT_URL'],
       ['Dashboard sign-in lasts', s.sessionDays + ' days', 'After this, people sign in again on that device.', 'SESSION_DAYS'],
