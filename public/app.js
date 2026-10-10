@@ -658,34 +658,37 @@
     return 0.299 * r + 0.587 * g + 0.114 * b > 165 ? '#1A1F36' : '#fff';
   };
 
-  // Channel mix: Top 5 stacked bars (rest grouped as Other) or an all-channel heatmap, per card toggle.
+  // Channel mix: Top 5 paired bars (rest grouped as Other) or an all-channel heatmap, per card toggle.
   function mixHtml(mix, d, medium, key) {
     if (!mix.channels.length) return `<div class="nodata">No ${medium} spend in this selection</div>`;
-    return mixView[key] === 'heat' ? heatHtml(mix, d, medium, key) : top5Html(mix, d, medium, key);
+    return mixView[key] === 'heat' ? heatHtml(mix, d, medium, key) : top5Html(mix, d, medium);
   }
 
-  function top5Html(mix, d, medium, key) {
-    const n = d.months.length, TOP = 5;
-    const k = mix.channels.length, top = Math.min(TOP, k), hasOther = k > TOP;
+  // Top 5 as paired bars for the whole period: category (grey) and mine (orange) on one row per channel,
+  // every bar from the same zero line. The rest of the medium is grouped as Other.
+  function top5Html(mix, d, medium) {
+    // A single leftover channel is shown by name rather than as "Other (1)".
+    const k = mix.channels.length, TOP = k === 6 ? 6 : 5, top = Math.min(TOP, k), hasOther = k > TOP;
     const otherName = { TV: 'Other TV', Radio: 'Other FM', Press: 'Other Press' }[medium];
+    const fold = parts => parts && parts.slice(0, top).concat(hasOther ? [parts.slice(TOP).reduce((x, y) => x + y, 0)] : []);
+    const cat = fold(mix.total.category), mine = fold(mix.total.mine);
     const names = mix.channels.slice(0, top).concat(hasOther ? [`${otherName} (${k - TOP})`] : []);
-    const fold = parts => parts && parts.slice(0, top).concat(hasOther ? [parts.slice(TOP).reduce((a, b) => a + b, 0)] : []);
-    const blues = scale(top, '#1E3F8A', '#BFD3F6').concat(hasOther ? ['#DDE2EC'] : []);
-    const oranges = scale(top, '#C4560F', '#FFD2AE').concat(hasOther ? ['#F2E6DC'] : []);
-    const showText = n <= 16;
-    const scopeFor = (j, m, mine) => (j < top
-      ? { title: `${mix.channels[j]} · ${m.label} ${m.year}`, month: m.key, channel: mix.keys[j], mine: mine || undefined, tab: 'adv' }
-      : { title: `${otherName} · ${m.label} ${m.year}`, month: m.key, medium, exclude: mix.keys.slice(0, top), mine: mine || undefined, tab: 'ch' });
-    const bars = (series, colors, mine) => `<div class="bars" style="grid-template-columns:repeat(${n},minmax(0,1fr))">` + series.map((raw, i) => {
-      const parts = fold(raw), m = d.months[i];
-      const segs = parts ? parts.map((p, j) => ({ p, c: colors[j], j })).reverse()
-        .map(s => `<div style="height:${s.p}%;background:${s.c};color:${textOn(s.c)}"${tipA(`${names[s.j]} · ${m.label} ${m.year}\n${pctS(s.p)} of ${mine ? 'my' : 'category'} ${medium} spend\nClick for details`)}${detA(scopeFor(s.j, m, mine))}>${showText && s.p >= 7 ? Math.round(s.p) + '%' : ''}</div>`).join('') : '';
-      return `<div class="bcol"><div class="stack">${segs}</div><div class="bl">${esc(monthLabel(m, d.months))}</div></div>`;
-    }).join('') + '</div>';
-    const legend = names.map((c, j) => `<div class="lg"><span class="sw" style="background:${blues[j]}"></span>${esc(c)}</div>`).join('');
-    return `<p class="secl" id="p-${key}a">CATEGORY</p>${bars(mix.category, blues, false)}
-      <p class="secl" id="p-${key}b" style="color:${C.deep}">${esc(d.mineLabel.toUpperCase())} (MINE)</p>${bars(mix.mine, oranges, true)}
-      <div class="legend">${legend}<div class="lg" style="margin-left:6px"><span class="sw" style="background:${C.orange}"></span>Mine, same order</div></div>`;
+    const maxV = Math.max(...cat, ...(mine || [0]));
+    const step = maxV <= 20 ? 5 : 10, max = Math.max(step, Math.ceil(maxV / step) * step), n = max / step;
+    const base = j => (j < top ? { channel: mix.keys[j] } : { medium, exclude: mix.keys.slice(0, top) });
+    const bar = (j, v, isMine) => {
+      const who = isMine ? `${d.mineLabel} (mine)` : 'Category';
+      const scope = { title: `${names[j]} · ${isMine ? d.mineLabel + ' (mine)' : 'category'}`, ...base(j), mine: isMine || undefined, tab: isMine ? 'camp' : (j < top ? 'adv' : 'ch') };
+      return `<div class="pbar ${isMine ? 'me' : 'cat'}"><div class="pfill" style="width:${(v / max) * 100}%"${tipA(`${names[j]} · ${who}\n${pctS(v)} of ${isMine ? 'my' : 'category'} ${medium} spend in the period\nClick for details`)}${detA(scope)}></div><span class="pv">${nf(v, 1)}%</span></div>`;
+    };
+    const rows = names.map((name, j) => `<div class="prow">
+        <span class="pname" title="${esc(name)}: click for month by month"${detA({ title: name, ...base(j), tab: 'mon' })}>${esc(name)}</span>
+        <div class="ptrack" style="--n:${n}">${bar(j, cat[j], false)}${mine ? bar(j, mine[j], true) : ''}</div></div>`).join('');
+    const ticks = Array.from({ length: n + 1 }, (_, i) => `<span style="left:${(i / n) * 100}%">${i * step}%</span>`).join('');
+    return `<div class="pmix">${rows}<div class="paxis"><span></span><div class="pticks">${ticks}</div></div></div>
+      <div class="legend"><div class="lg"><span class="sw" style="background:#A9B0C2"></span>Category</div>
+        ${mine ? `<div class="lg"><span class="sw" style="background:${C.deep}"></span>${esc(d.mineLabel)} (mine)</div>` : '<div class="lg" style="color:#8A93AD">No spend from my advertiser in this medium</div>'}
+        <div class="lg" style="margin-left:auto;color:#8A93AD">Click a channel name for its months</div></div>`;
   }
 
   function heatHtml(mix, d, medium, key) {
@@ -779,7 +782,7 @@
   function renderMix() {
     const mix = { TV: data.tvMix, Radio: data.radioMix, Press: data.pressMix }[mixMedium];
     $('chMix').innerHTML = mixHtml(mix, data, mixMedium, 'mx');
-    $('p-mix').textContent = `% of ${mixMedium} spend per month`;
+    $('p-mix').textContent = mixView.mx === 'heat' ? `% of ${mixMedium} spend per month` : `% of ${mixMedium} spend, ${fmtDate(data.filters.from)} to ${fmtDate(data.filters.to)} · category vs mine`;
   }
   document.querySelector('.tgl[data-mixmed]').addEventListener('click', e => {
     const b = e.target.closest('button');

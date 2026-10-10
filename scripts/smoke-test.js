@@ -120,6 +120,11 @@ assert.strictEqual(D.dayNumber(1, 'Jan', 26), D.dayNumber(1, 1, 2026));
   assert.ok(md.includes('| Me (mine) | 3 | 0 | 1 | 0 | 1 | 0 | 60.0 |'), 'duration counts match the dashboard');
   assert.ok(md.includes('### Me (mine)') && md.includes('| -BB | VA |'));
   assert.ok(planning(ds, { ...F, from: '2030-01-01', to: '2030-02-01' }).includes('nothing to report'));
+  // Channel Mix paired bars: whole-period share of the medium per channel (TV: Derana 6,000,002 of 8,000,001).
+  const tvTot = out.tvMix.total;
+  assert.deepStrictEqual(out.tvMix.channels, ['Derana TV', 'Sirasa TV']);
+  assert.ok(Math.abs(tvTot.category[0] - (6000002 / 8000001) * 100) < 1e-9 && Math.abs(tvTot.mine[0] - 100) < 1e-9);
+  assert.ok(Math.abs(tvTot.category.reduce((a, b) => a + b, 0) - 100) < 1e-9);
   // Competitor package for the planning tool: totals, breaks, positions, programmes and hours.
   const ci = competitorIntel(ds, { ...F, compare: false }, { user: 'Test' });
   assert.strictEqual(ci.format, 'ogilvy-orbit-chub/competitor-intel');

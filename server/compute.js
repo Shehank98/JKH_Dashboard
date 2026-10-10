@@ -235,7 +235,14 @@ function dashboard(ds, f) {
       if (total <= 0) return null;
       return ids.map(c => (src[k * nCh + c] / total) * 100);
     });
-    return { channels: ids.map(c => dicts.channelName[c]), keys: ids.map(c => dicts.channel[c]), category: series(chCat), mine: series(chMine) };
+    // Whole-period share of the medium's spend per channel (same channel order), for the paired-bar view.
+    const mineSpendCh = ids.map(c => { let v = 0; for (let k = 0; k < nM; k++) v += chMine[k * nCh + c]; return v; });
+    const catSum = ids.reduce((s2, c) => s2 + chTot[c], 0), mineSum = mineSpendCh.reduce((s2, v) => s2 + v, 0);
+    const total = {
+      category: ids.map(c => (catSum ? (chTot[c] / catSum) * 100 : 0)),
+      mine: mineSum ? mineSpendCh.map(v => (v / mineSum) * 100) : null,
+    };
+    return { channels: ids.map(c => dicts.channelName[c]), keys: ids.map(c => dicts.channel[c]), category: series(chCat), mine: series(chMine), total };
   };
 
   // Duration mix, share of TV and Radio spots.
