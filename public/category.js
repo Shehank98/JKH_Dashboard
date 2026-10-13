@@ -319,7 +319,7 @@
         <div class="cc-h"><div class="cc-av">${esc(initials(c.name))}</div><div class="cc-n" title="${esc(c.name)}">${esc(c.name)}</div></div>
         <div class="cc-m"><div><div class="cc-l">${esc(cur)}</div><div class="cc-v">${mnTxt(c.cur)}</div></div>
           <div class="cc-g"><div class="cc-l">Y-o-Y growth</div><div class="cc-gv ${gcls}">${gtxt}</div></div></div>
-        <div class="cc-b"><div><span>${esc(yoy)}</span><b>${box(c.yoy)}</b></div><div><span>${esc(prev)}</span><b>${box(c.prev)}</b></div></div>
+        <div class="cc-b"><div data-tip="${esc(`Same period last year: ${yoy}\n${c.name}: ${c.yoy == null || c.yoy <= 0 ? 'no spend' : mnTxt(c.yoy)}`)}"><i>Last year</i><span>${esc(yoy)}</span><b>${box(c.yoy)}</b></div><div data-tip="${esc(`Previous period: ${prev}\n${c.name}: ${c.prev == null || c.prev <= 0 ? 'no spend' : mnTxt(c.prev)}`)}"><i>Previous</i><span>${esc(prev)}</span><b>${box(c.prev)}</b></div></div>
         <div class="cc-f"><div class="cc-s"><span>${esc(cur)} share</span><b>${nf(c.share, 0)}%</b></div>
         <div class="cc-bar"><i style="width:${Math.max(c.share > 0 ? 2 : 0, Math.min(100, c.share))}%"></i></div>
         <div class="cc-med">${c.medium.map((v, k) => `<i style="width:${medTot ? (v / medTot) * 100 : 0}%;background:${MED_COL[k]}"></i>`).join('')}</div></div>
