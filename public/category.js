@@ -13,7 +13,7 @@
 
   let overview = null, options = { advertisers: [], subs: [] }, data = null, pendingFile = null, started = false, busy = false;
   const state = { from: '', to: '', pg: '', sub: '', mine: [], comps: [], top: 10, yearType: 'CY' };
-  const ui = { labels: true };                  // chart value labels on or off
+  const ui = { labels: true, part: 'm', hideInc: false };   // chart: value labels, months / quarters / halves / years, hide incomplete
   const hiddenBrands = new Set();               // brands switched off in the chart legend
 
   // ---------- month helpers ----------
@@ -347,58 +347,111 @@
     const pool = d.cards.filter(c => c.mine).concat(d.cards.filter(c => !c.mine)).slice(0, 8).sort((a, b) => b.cur - a.cur);
     return { pool, colors: new Map(pool.map((c, i) => [c.name, CHART_COLORS[i % CHART_COLORS.length]])) };
   }
+  const PART_NAME = { m: 'Month-On-Month', q: 'Quarter-On-Quarter', h: 'Half-On-Half', y: 'Year-On-Year' };
+  const PART_ADJ = { m: 'Monthly', q: 'Quarterly', h: 'Half-yearly', y: 'Yearly' };
+  // The periods the chart shows: months (the selected ones plus earlier months, about 15 in all), or quarters, half
+  // years or years of the chosen year type, built from the monthly history. Brands with no spend in any shown
+  // period are left out, and so is any zero value.
+  function chartData(d) {
+    const M = d.monthly, n = M.months.length, part = ui.part, yt = state.yearType;
+    const { pool: pool0, colors } = chartPool(d);
+    let periods = [];
+    if (part === 'm') {
+      const len = n - M.selStart, start = Math.max(0, M.selStart - Math.max(0, 15 - len));
+      for (let i = start; i < n; i++) periods.push({ label: monLabel(M.months[i]).replace('-', " '"), tipLabel: monLabel(M.months[i]), complete: true, inSel: i >= M.selStart, cat: M.cat[i], vals: pool0.map(c => c.monthly[i]) });
+    } else {
+      const L = { q: 3, h: 6, y: 12 }[part], shift = yt === 'FY' ? 3 : 0;
+      const first = idx(M.months[0]), last = idx(M.months[n - 1]), groups = new Map();
+      M.months.forEach((k, i) => {
+        const g = Math.floor((idx(k) - shift) / L) * L + shift;
+        if (!groups.has(g)) groups.set(g, { g, cat: 0, vals: pool0.map(() => 0) });
+        const G = groups.get(g);
+        G.cat += M.cat[i]; pool0.forEach((c, j) => { G.vals[j] += c.monthly[i]; });
+      });
+      periods = [...groups.values()].sort((x, y) => x.g - y.g).map(G => {
+        const a = keyOf(G.g), b = keyOf(G.g + L - 1), label = periodLabel(a, b, yt);
+        return { label, tipLabel: `${label} (${monLabel(a)} to ${monLabel(b)})`, complete: G.g >= first && G.g + L - 1 <= last, inSel: false, cat: G.cat, vals: G.vals };
+      });
+      if (ui.hideInc) periods = periods.filter(p => p.complete);
+    }
+    const keep = pool0.map((c, j) => periods.some(p => p.vals[j] > 0));
+    const pool = pool0.filter((c, j) => keep[j]);
+    periods.forEach(p => { p.vals = p.vals.filter((v, j) => keep[j]); });
+    return { part, periods, pool, colors, hiddenCount: pool0.length - pool.length };
+  }
   function renderChart(d, curLabel) {
     const host = $('catChart');
-    // Up to 8 mother brands: ours first, then the biggest. Each gets its own colour (ours are marked with a star)
-    // because several of ours can be in the chart at once.
-    const { pool, colors } = chartPool(d);
     if (!curLabel) curLabel = labelsOf(d).cur;
-    const M = d.monthly, n = M.months.length;
-    heading($('catTitle2'), 's2', `Monthly ${d.filters.pg} Investment by Brand`);
-    $('catSub2').textContent = `Category total against ${pool.length} mother brand${pool.length === 1 ? '' : 's'} · ${monLabel(M.months[0])} to ${monLabel(M.months[n - 1])}, selected period ${curLabel} shaded | Investment in Rs. Mn`;
-    host.innerHTML = `<div class="cch-t">Category Behaviour – Month-On-Month</div><div class="cch-box" id="cchBox"></div><div class="cch-lg" id="cchLg"></div>`;
+    const CD = chartData(d), { periods, pool, colors, part } = CD, n = periods.length;
+    const M = d.monthly;
+    heading($('catTitle2'), 's2', `${PART_ADJ[part]} ${d.filters.pg} Investment by Brand`);
+    const incomplete = periods.filter(p => !p.complete).length;
+    $('catSub2').textContent = n
+      ? `Category total against ${pool.length} mother brand${pool.length === 1 ? '' : 's'} · ${periods[0].label} to ${periods[n - 1].label}${part === 'm' ? `, selected period ${curLabel} shaded` : incomplete ? `, ${incomplete} incomplete period${incomplete === 1 ? '' : 's'} hatched` : ''} | Investment in Rs. Mn`
+      : 'No complete periods in this range';
+    [...$('catPartTgl').children].forEach(b => b.classList.toggle('on', b.dataset.v === part));
+    $('catPartTgl').querySelector('[data-v=y]').textContent = state.yearType === 'FY' ? 'Years (FY)' : 'Years';
+    host.innerHTML = `<div class="cch-t">Category Behaviour – ${PART_NAME[part]}</div><div class="cch-box" id="cchBox"></div><div class="cch-lg" id="cchLg"></div>`;
     $('cchLg').innerHTML = pool.map(c => `<span class="lg2${hiddenBrands.has(c.name) ? ' off' : ''}" data-b="${esc(c.name)}" title="Click to show or hide"><i style="background:${colors.get(c.name)}"></i>${c.mine ? '★ ' : ''}${esc(c.name)}</span>`).join('')
       + `<span class="lg2" style="cursor:default"><i style="background:linear-gradient(#8BC34A,#E6F4D4)"></i>Category total</span>`
-      + `<label class="opt2"><input type="checkbox" id="cchLabels" ${ui.labels ? 'checked' : ''}>Value labels</label>`;
+      + `<label class="opt2"><input type="checkbox" id="cchLabels" ${ui.labels ? 'checked' : ''}>Value labels</label>`
+      + (part === 'm' ? '' : `<label class="opt2"><input type="checkbox" id="cchHide" ${ui.hideInc ? 'checked' : ''}>Hide incomplete periods</label>`);
     const box = $('cchBox'), W = Math.max(400, box.clientWidth), H = Math.max(200, box.clientHeight);
-    if (!d.cards.length) { box.innerHTML = '<div class="nodata2">No spend found for these filters.</div>'; return; }
-    const L = 58, R = 58, T = 26, B = 28, X0 = L, X1 = W - R, Y0 = H - B;
+    if (!d.cards.length || !n) { box.innerHTML = `<div class="nodata2">${d.cards.length ? 'No complete periods here. Untick “Hide incomplete periods” or widen the dates.' : 'No spend found for these filters.'}</div>`; return; }
+    const two = false, L = 58, R = 58, T = 26, B = part !== 'm' && incomplete ? 40 : 28, X0 = L, X1 = W - R, Y0 = H - B;
+    const idxOf = new Map(pool.map((c, j) => [c.name, j]));
     const shown = pool.filter(c => !hiddenBrands.has(c.name));
-    const maxCat = niceMax(Math.max(0, ...M.cat) / 1000), maxBr = niceMax(Math.max(0, ...shown.flatMap(c => c.monthly)) / 1000);
+    const maxCat = niceMax(Math.max(0, ...periods.map(p => p.cat)) / 1000);
+    const maxBr = niceMax(Math.max(0, ...periods.flatMap(p => shown.map(c => p.vals[idxOf.get(c.name)]))) / 1000);
     const yc = v => Y0 - (v / 1000 / maxCat) * (Y0 - T), yb = v => Y0 - (v / 1000 / maxBr) * (Y0 - T);
-    const gw = (X1 - X0) / n, catW = Math.min(gw * 0.86, 120);
-    const k = Math.max(1, shown.length), bw = Math.min(16, (gw * 0.8) / k), groupW = bw * k;
+    const gw = (X1 - X0) / n, catW = Math.min(gw * 0.86, 130);
+    // Only brands with spend get a bar, so a period with fewer brands is not left with gaps.
+    const maxCount = Math.max(1, ...periods.map(p => shown.filter(c => p.vals[idxOf.get(c.name)] > 0).length));
+    const bw = Math.min(18, (gw * 0.8) / maxCount);
     const grid = [0, 1, 2, 3, 4].map(i => {
       const yy = Y0 - (i * (Y0 - T)) / 4;
       return `<line x1="${X0}" x2="${X1}" y1="${yy}" y2="${yy}" stroke="#EEF1F7"></line>`
         + `<text x="${X0 - 8}" y="${yy + 4}" text-anchor="end" font-size="11" font-weight="700" fill="#1A1F36">${nf((maxCat * i) / 4, maxCat < 4 ? 1 : 0)}</text>`
         + `<text x="${X1 + 8}" y="${yy + 4}" text-anchor="start" font-size="11" font-weight="700" fill="#1A1F36">${nf((maxBr * i) / 4, maxBr < 4 ? 1 : 0)}</text>`;
     }).join('');
-    const axisTitle = (x, side) => `<text transform="translate(${x},${(T + Y0) / 2}) rotate(-90)" text-anchor="middle" font-size="11" font-weight="700" fill="#1A1F36">Investments in (Rs. in Mn)${side === 'r' ? '' : ''}</text>`;
-    const band = `<rect x="${X0 + gw * M.selStart}" y="${T - 8}" width="${gw * (n - M.selStart)}" height="${Y0 - T + 8}" fill="#FF8A3D" fill-opacity="0.07"></rect>`
-      + (M.selStart > 0 ? `<text x="${X0 + gw * M.selStart + 6}" y="${T - 12}" font-size="10" font-weight="800" fill="#E4702A">SELECTED PERIOD · ${esc(curLabel)}</text>` : '');
-    let cats = '', brands = '', labels = '';
+    const axisTitle = x => `<text transform="translate(${x},${(T + Y0) / 2}) rotate(-90)" text-anchor="middle" font-size="11" font-weight="700" fill="#1A1F36">Investments in (Rs. in Mn)</text>`;
+    const selFirst = periods.findIndex(p => p.inSel);
+    const band = part === 'm' && selFirst >= 0 ? `<rect x="${X0 + gw * selFirst}" y="${T - 8}" width="${gw * (n - selFirst)}" height="${Y0 - T + 8}" fill="#FF8A3D" fill-opacity="0.07"></rect>`
+      + (selFirst > 0 ? `<text x="${X0 + gw * selFirst + 6}" y="${T - 12}" font-size="10" font-weight="800" fill="#E4702A">SELECTED PERIOD · ${esc(curLabel)}</text>` : '') : '';
+    let cats = '', brands = '', labels = '', hatch = '';
     const showLabels = ui.labels;
-    M.months.forEach((key, i) => {
-      const cx = X0 + gw * (i + 0.5);
-      const v = M.cat[i], top = yc(v);
-      cats += `<rect x="${cx - catW / 2}" y="${top}" width="${catW}" height="${Math.max(0, Y0 - top)}" fill="url(#cchGreen)" data-tip="${esc(`Category · ${monLabel(key)}\nRs ${nf(v / 1000, 0)} Mn`)}"></rect>`;
-      if (showLabels && v > 0) { const t = nf(v / 1000, 0), w = t.length * 7 + 10; labels += `<rect x="${cx - w / 2}" y="${top - 18}" width="${w}" height="16" rx="3" fill="#8BD051"></rect><text x="${cx}" y="${top - 6}" text-anchor="middle" font-size="11" font-weight="800" fill="#111">${t}</text>`; }
-      shown.forEach((c, j) => {
-        const bv = c.monthly[i], bx = cx - groupW / 2 + j * bw, by = yb(bv);
-        const col = colors.get(c.name);
-        brands += `<rect x="${bx}" y="${by}" width="${bw - 1}" height="${Math.max(0, Y0 - by)}" fill="${col}" data-tip="${esc(`${c.name}${c.mine ? ' (mine)' : ''} · ${monLabel(key)}\nRs ${nf(bv / 1000, 0)} Mn`)}"></rect>`;
-        if (showLabels && bv > 0 && bw >= 8) { const t = nf(bv / 1000, 0), w = t.length * 6 + 8; labels += `<rect x="${bx + (bw - 1) / 2 - w / 2}" y="${by - 15}" width="${w}" height="14" rx="3" fill="${col}"></rect><text x="${bx + (bw - 1) / 2}" y="${by - 4.5}" text-anchor="middle" font-size="9.5" font-weight="800" fill="#fff">${t}</text>`; }
+    periods.forEach((p, i) => {
+      const cx = X0 + gw * (i + 0.5), note = p.complete ? '' : '\nIncomplete period';
+      const v = p.cat, top = yc(v);
+      if (v > 0) {
+        cats += `<rect x="${cx - catW / 2}" y="${top}" width="${catW}" height="${Math.max(0, Y0 - top)}" fill="url(#cchGreen)" data-tip="${esc(`Category · ${p.tipLabel}\nRs ${nf(v / 1000, 0)} Mn${note}`)}"></rect>`;
+        if (!p.complete) hatch += `<rect x="${cx - catW / 2}" y="${top}" width="${catW}" height="${Math.max(0, Y0 - top)}" fill="url(#cchHatch)" pointer-events="none"></rect>`;
+        if (showLabels) { const t = nf(v / 1000, 0), w = t.length * 7 + 10; labels += `<rect x="${cx - w / 2}" y="${top - 18}" width="${w}" height="16" rx="3" fill="#8BD051"></rect><text x="${cx}" y="${top - 6}" text-anchor="middle" font-size="11" font-weight="800" fill="#111">${t}</text>`; }
+      }
+      const here = shown.filter(c => p.vals[idxOf.get(c.name)] > 0), groupW = here.length * bw;
+      here.forEach((c, j) => {
+        const bv = p.vals[idxOf.get(c.name)], bx = cx - groupW / 2 + j * bw, by = yb(bv), col = colors.get(c.name);
+        brands += `<rect x="${bx}" y="${by}" width="${bw - 1}" height="${Math.max(0, Y0 - by)}" fill="${col}" data-tip="${esc(`${c.name}${c.mine ? ' (mine)' : ''} · ${p.tipLabel}\nRs ${nf(bv / 1000, 0)} Mn${note}`)}"></rect>`;
+        if (!p.complete) hatch += `<rect x="${bx}" y="${by}" width="${bw - 1}" height="${Math.max(0, Y0 - by)}" fill="url(#cchHatch)" pointer-events="none"></rect>`;
+        if (showLabels && bw >= 8) { const t = nf(bv / 1000, 0), w = t.length * 6 + 8; labels += `<rect x="${bx + (bw - 1) / 2 - w / 2}" y="${by - 15}" width="${w}" height="14" rx="3" fill="${col}"></rect><text x="${bx + (bw - 1) / 2}" y="${by - 4.5}" text-anchor="middle" font-size="9.5" font-weight="800" fill="#fff">${t}</text>`; }
       });
     });
-    const every = Math.ceil(n / Math.max(4, Math.floor((X1 - X0) / 62)));
-    const xl = M.months.map((key, i) => (i % every === 0 || i === n - 1 ? `<text x="${X0 + gw * (i + 0.5)}" y="${H - 8}" text-anchor="middle" font-size="11" font-weight="700" fill="#1A1F36">${monLabel(key).replace('-', " '")}</text>` : '')).join('');
-    box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="cchGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8BC34A" stop-opacity=".95"></stop><stop offset="1" stop-color="#E9F5D8" stop-opacity=".35"></stop></linearGradient></defs>${grid}${axisTitle(14)}${axisTitle(W - 12)}${band}${cats}${brands}${labels}<line x1="${X0}" x2="${X1}" y1="${Y0}" y2="${Y0}" stroke="#C7CEDF"></line>${xl}</svg>`;
+    const every = Math.ceil(n / Math.max(4, Math.floor((X1 - X0) / (part === 'm' ? 62 : 74))));
+    const xl = periods.map((p, i) => (i % every === 0 || i === n - 1 ? `<text x="${X0 + gw * (i + 0.5)}" y="${Y0 + 17}" text-anchor="middle" font-size="11" font-weight="700" fill="#1A1F36">${esc(p.label)}</text>${p.complete ? '' : `<text x="${X0 + gw * (i + 0.5)}" y="${Y0 + 30}" text-anchor="middle" font-size="9" font-weight="800" fill="#E4702A">Incomplete</text>`}` : '')).join('');
+    box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="cchGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8BC34A" stop-opacity=".95"></stop><stop offset="1" stop-color="#E9F5D8" stop-opacity=".35"></stop></linearGradient><pattern id="cchHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-opacity=".6" stroke-width="2"></line></pattern></defs>${grid}${axisTitle(14)}${axisTitle(W - 12)}${band}${cats}${brands}${hatch}${labels}<line x1="${X0}" x2="${X1}" y1="${Y0}" y2="${Y0}" stroke="#C7CEDF"></line>${xl}</svg>`;
+    void two; void M;
   }
+  $('catPartTgl').addEventListener('click', e => {
+    const b = e.target.closest('button[data-v]');
+    if (!b || !data) return;
+    ui.part = b.dataset.v;
+    renderChart(data, null);
+  });
   document.addEventListener('click', e => {
     const lg = e.target.closest('#cchLg .lg2[data-b]');
     if (lg && data) { const b = lg.dataset.b; if (hiddenBrands.has(b)) hiddenBrands.delete(b); else hiddenBrands.add(b); renderChart(data, null); return; }
     if (e.target.id === 'cchLabels' && data) { ui.labels = e.target.checked; renderChart(data, null); }
+    if (e.target.id === 'cchHide' && data) { ui.hideInc = e.target.checked; renderChart(data, null); }
   });
   function renderLegend(cur, yoy, prev) {
     $('catLegend').innerHTML = `
@@ -681,16 +734,18 @@
       // ----- slide: Category behaviour, month by month (a real combo chart on two axes) -----
       {
         const slide = pptx.addSlide();
-        const M = d.monthly, n = M.months.length;
-        const { pool, colors: cc } = chartPool(d);
+        const CD = chartData(d), { periods, pool, colors: cc, part } = CD;
         const shown = pool.filter(c => !hiddenBrands.has(c.name));
+        const pidx = new Map(pool.map((c, j) => [c.name, j]));
         chrome(slide, txt('catTitle2'), txt('catSub2'));
-        slide.addText('Category Behaviour – Month-On-Month', { x: 3.2, y: 1.5, w: 7, h: 0.35, align: 'center', fontFace: 'Calibri', fontSize: 16, bold: true, color: GREY, underline: { style: 'sng' }, margin: 0 });
-        const labels = M.months.map(k => monLabel(k).replace('-', " '"));
-        const maxCat = niceMax(Math.max(0, ...M.cat) / 1000), maxBr = niceMax(Math.max(0, ...shown.flatMap(c => c.monthly)) / 1000);
-        const catSeries = [{ name: 'Category total', labels, values: M.cat.map(v => Math.round(v / 1000)) }];
-        const brSeries = shown.map(c => ({ name: (c.mine ? '★ ' : '') + c.name, labels, values: c.monthly.map(v => Math.round(v / 1000)) }));
-        const common = { barDir: 'col', barGrouping: 'clustered', showValue: ui.labels, dataLabelFontSize: 8, dataLabelFontBold: true, dataLabelPosition: 'outEnd', dataLabelFormatCode: '#,##0', dataLabelColor: '111111' };
+        slide.addText(`Category Behaviour – ${PART_NAME[part]}`, { x: 3.2, y: 1.5, w: 7, h: 0.35, align: 'center', fontFace: 'Calibri', fontSize: 16, bold: true, color: GREY, underline: { style: 'sng' }, margin: 0 });
+        const labels = periods.map(p => p.label + (p.complete ? '' : ' *'));
+        const maxCat = niceMax(Math.max(0, ...periods.map(p => p.cat)) / 1000), maxBr = niceMax(Math.max(0, ...periods.flatMap(p => shown.map(c => p.vals[pidx.get(c.name)]))) / 1000);
+        const mnv = v => (v > 0 ? Math.round(v / 1000) : null);       // zero is left empty: no bar, no label
+        const catSeries = [{ name: 'Category total', labels, values: periods.map(p => mnv(p.cat)) }];
+        const brSeries = shown.map(c => ({ name: (c.mine ? '★ ' : '') + c.name, labels, values: periods.map(p => mnv(p.vals[pidx.get(c.name)])) }));
+        const common = { barDir: 'col', barGrouping: 'clustered', showValue: ui.labels, dataLabelFontSize: 8, dataLabelFontBold: true, dataLabelPosition: 'outEnd', dataLabelFormatCode: '#,##0;-#,##0;;', dataLabelColor: '111111' };
+        if (periods.some(p => !p.complete)) slide.addText('* incomplete period', { x: W - 3.3, y: 1.55, w: 2.7, h: 0.25, align: 'right', fontFace: 'Calibri', fontSize: 9, italic: true, color: 'E4702A', margin: 0 });
         slide.addChart([
           { type: pptx.charts.BAR, data: catSeries, options: { ...common, chartColors: ['A9D96C'], barGapWidthPct: 8 } },
           { type: pptx.charts.BAR, data: brSeries, options: { ...common, chartColors: shown.map(c => hex(cc.get(c.name))), barGapWidthPct: 70, secondaryValAxis: true, secondaryCatAxis: true } },
@@ -702,8 +757,8 @@
           ],
           catAxes: [{ catAxisLabelFontSize: 10, catAxisLabelFontBold: true }, { catAxisHidden: true }],
         });
-        slide.addNotes(`Month by month investment, Rs. Mn. Selected period ${L.cur} (${monLabel(d.ranges.cur[0])} to ${monLabel(d.ranges.cur[1])}). Left axis: category total. Right axis: mother brands.\n` +
-          M.months.map((k, i) => `${monLabel(k)}: category ${nf(M.cat[i] / 1000, 0)}; ` + shown.map(c => `${c.name} ${nf(c.monthly[i] / 1000, 0)}`).join(', ')).join('\n'));
+        slide.addNotes(`${PART_NAME[part]} investment, Rs. Mn. Selected period ${L.cur} (${monLabel(d.ranges.cur[0])} to ${monLabel(d.ranges.cur[1])}). Left axis: category total. Right axis: mother brands.\n` +
+          periods.map(p => `${p.tipLabel}${p.complete ? '' : ' (incomplete)'}: category ${nf(p.cat / 1000, 0)}; ` + shown.filter(c => p.vals[pidx.get(c.name)] > 0).map(c => `${c.name} ${nf(p.vals[pidx.get(c.name)] / 1000, 0)}`).join(', ')).join('\n'));
       }
 
       // ----- slides: sub categories (mix, contribution, tables) -----

@@ -64,8 +64,9 @@ function dashboard(ds, f) {
   const nMb = dicts.mb.length;
   const cur = new Float64Array(nMb), yoy = new Float64Array(nMb), prev = new Float64Array(nMb);
   const med = new Float64Array(nMb * 3);
-  // Month by month window for the chart: the selected months plus enough earlier months to show about 15.
-  const w0 = Math.max(ds.meta.minMon, m0 - Math.max(0, 15 - len)), nW = m1 - w0 + 1;
+  // Month by month history for the chart, from the first month in the file to the last selected month, so the
+  // dashboard can show months, quarters, half years or years.
+  const w0 = ds.meta.minMon, nW = m1 - w0 + 1;
   const catMon = new Float64Array(nW), mbMon = new Float64Array(nMb * nW);
   // Sub category x mother brand, for the sub category tables.
   const nSub = dicts.sub.length;
