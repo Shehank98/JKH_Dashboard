@@ -24,6 +24,9 @@
   const heatSide = { mx: 'cat' };                // heatmap: category or mine
   let mixMedium = 'TV';                          // channel mix: TV, Radio or Press
   let durMedium = 'All';
+  const trendUi = { flip: 'lines', part: 'yoy', side: 'cat', hideInc: false }; // trend card: lines or stacked bars
+  let yearType = 'CY';                           // CY = Jan-Dec, FY = Apr-Mar (read from localStorage below)
+  try { yearType = localStorage.getItem('orbitYearType') === 'FY' ? 'FY' : 'CY'; } catch (e) { /* storage blocked */ }
   let sosView = 'period';                        // SOS table: whole period or by month                         // duration mix: All (TV + Radio), TV or Radio
 
   // ---------- helpers ----------
@@ -541,6 +544,8 @@
   }
 
   function renderTrend(d) {
+    syncTrendUi();
+    if (trendUi.flip === 'bars') return renderBars(d);
     const months = d.months, n = months.length;
     const legendHtml = trendLegend(d);
     $('trend').innerHTML = `<div class="trendbox" id="trendBox"></div><div class="legend">${legendHtml}</div>`;
@@ -599,6 +604,112 @@
       ${dots}${callout}${hits}
       <g font-size="10.5" fill="#8A93AD" text-anchor="middle">${xl}</g></svg>`;
   }
+
+  // ---------- YOY / quarter / half-year stacked bars ----------
+  const MEDIA_NAMES = ['TV', 'Radio', 'Press'];
+  function syncTrendUi() {
+    const bars = trendUi.flip === 'bars';
+    document.querySelector('.tgl[data-trpart]').hidden = !bars;
+    document.querySelector('.tgl[data-trside]').hidden = !bars;
+    $('trHideWrap').hidden = !bars;
+    $('h-line').textContent = bars ? `Spend by Medium: ${{ yoy: 'Year on Year', q: 'Quarterly', h: 'Half-yearly' }[trendUi.part]}` : 'Monthly Spend Trend: Us vs Competitors';
+    const on = (sel, v) => document.querySelectorAll(sel + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+    on('.tgl[data-trflip]', trendUi.flip); on('.tgl[data-trpart]', trendUi.part); on('.tgl[data-trside]', trendUi.side);
+    $('trHide').checked = trendUi.hideInc;
+    if (bars) {
+      const fy = yearType === 'FY';
+      $('p-line').textContent = `LKR Mn · % of ${trendUi.side === 'mine' ? 'our' : 'category'} spend by medium · ${fy ? 'Financial year (Apr–Mar)' : 'Calendar year (Jan–Dec)'} · hatched = incomplete period`;
+    } else {
+      $('p-line').textContent = 'LKR Mn · smoothed curves · my advertiser emphasised · dotted line is the category average';
+    }
+  }
+  // Groups the months into years / quarters / halves for the chosen year type and marks the ones the range does not fully cover.
+  function groupPeriods(d) {
+    const fy = yearType === 'FY', part = trendUi.part, len = { yoy: 12, q: 3, h: 6 }[part];
+    const eff = { from: d.filters.from > overview.minDate ? d.filters.from : overview.minDate, to: d.filters.to < overview.maxDate ? d.filters.to : overview.maxDate };
+    const groups = new Map();
+    d.months.forEach((m, i) => {
+      const off = fy ? (MON.indexOf(m.label) + 9) % 12 : MON.indexOf(m.label); // months since the year started
+      const yr = fy ? (MON.indexOf(m.label) >= 3 ? m.year : m.year - 1) : m.year;
+      const idx = Math.floor(off / len), start = yr * 12 + (fy ? 3 : 0) + idx * len;
+      if (!groups.has(start)) groups.set(start, { start, yr, idx, idxs: [] });
+      groups.get(start).idxs.push(i);
+    });
+    const iso = (y, mo) => `${y}-${String(mo + 1).padStart(2, '0')}-01`;
+    const endIso = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).toISOString().slice(0, 10);
+    return [...groups.values()].sort((a, b) => a.start - b.start).map(g => {
+      const y0 = Math.floor(g.start / 12), m0 = g.start % 12, last = g.start + len - 1;
+      const complete = iso(y0, m0) >= eff.from && endIso(Math.floor(last / 12), last % 12) <= eff.to;
+      const yrLabel = fy ? `${String(g.yr).slice(2)}/${String(g.yr + 1).slice(2)}` : String(g.yr);
+      const label = part === 'yoy' ? (fy ? 'FY ' : '') + yrLabel : `${part === 'q' ? 'Q' : 'H'}${g.idx + 1} ${fy ? 'FY' : ''}${yrLabel}`;
+      const src = trendUi.side === 'mine' ? d.trend.mediumMine : d.trend.mediumCat;
+      const med = [0, 0, 0];
+      g.idxs.forEach(i => src[i].forEach((v, k) => { med[k] += v; }));
+      return { label, complete, med, total: med[0] + med[1] + med[2], monthsIn: g.idxs.length, key: g.idxs.map(i => d.months[i].key) };
+    });
+  }
+  function renderBars(d) {
+    let periods = groupPeriods(d);
+    const hidden = periods.filter(p => !p.complete).length;
+    if (trendUi.hideInc) periods = periods.filter(p => p.complete);
+    const mine = trendUi.side === 'mine', pal = mine ? C.oTints : C.medium;
+    const legendHtml = MEDIA_NAMES.map((nm, k) => `<div class="lg"><span class="sw" style="background:${pal[k]};height:10px;width:14px;border-radius:2px"></span>${nm}</div>`).join('')
+      + `<div class="lg"><span class="sw" style="background:repeating-linear-gradient(45deg,#fff 0 2px,#8A93AD 2px 3px);height:10px;width:14px;border-radius:2px;border:1px solid #C7CEDF"></span>Incomplete period</div>`;
+    $('trend').innerHTML = `<div class="trendbox" id="trendBox"></div><div class="legend">${legendHtml}</div>`;
+    const box = $('trendBox'), W = Math.max(300, box.clientWidth), H = Math.max(120, box.clientHeight);
+    if (!periods.length) {
+      box.innerHTML = `<div class="empty" style="padding:30px 10px;text-align:center;color:#8A93AD;font-size:12px">No complete ${{ yoy: 'years', q: 'quarters', h: 'half-years' }[trendUi.part]} in this date range${hidden ? ` (${hidden} incomplete hidden)` : ''}. Widen the dates or untick “Hide incomplete periods”.</div>`;
+      return;
+    }
+    const X0 = 40, X1 = W - 12, Y0 = H - 34, Y1 = 34;
+    const max = niceMax(Math.max(0, ...periods.map(p => p.total / 1e6)));
+    const y = v => Y0 - (v / 1e6 / max) * (Y0 - Y1);
+    const slot = (X1 - X0) / periods.length, bw = Math.min(64, slot * 0.62);
+    const grid = [0, 1, 2, 3, 4].map(k => {
+      const yy = Y0 - (k * (Y0 - Y1)) / 4, val = (max * k) / 4;
+      return `<line x1="${X0}" y1="${yy}" x2="${W - 8}" y2="${yy}" stroke="#EEF1F7"></line><text x="${X0 - 8}" y="${yy + 3.5}" text-anchor="end">${nf(val, max < 4 ? 1 : 0)}</text>`;
+    }).join('');
+    const body = periods.map((p, i) => {
+      const cx = X0 + slot * (i + 0.5), bx = cx - bw / 2;
+      let acc = 0, labels = '';
+      const segs = p.med.map((v, k) => {
+        if (v <= 0) return '';
+        const y1 = y(acc), y2 = y(acc + v); acc += v;
+        const h = y1 - y2, pc = p.total ? (v / p.total) * 100 : 0;
+        const lab = h >= 13 && bw >= 30 ? `<text x="${cx}" y="${y2 + h / 2 + 3.5}" font-size="9.5" font-weight="700" fill="${textOn(pal[k])}" text-anchor="middle">${nf(pc, 0)}%</text>` : '';
+        labels += lab;
+        return `<rect x="${bx}" y="${y2}" width="${bw}" height="${h}" fill="${pal[k]}"></rect>`;
+      }).join('');
+      const top = y(p.total);
+      const hatch = p.complete ? '' : `<rect x="${bx}" y="${top}" width="${bw}" height="${Y0 - top}" fill="url(#incHatch)" stroke="#8A93AD" stroke-dasharray="3 2"></rect>`;
+      const tip = [`${p.label}${p.complete ? '' : ' (incomplete: ' + p.monthsIn + ' month' + (p.monthsIn === 1 ? '' : 's') + ' of data)'}`, `${mine ? 'Our' : 'Category'} total: ${mn(p.total)}`]
+        .concat(p.med.map((v, k) => `${MEDIA_NAMES[k]}: ${mn(v)} · ${p.total ? nf((v / p.total) * 100, 1) : '0.0'}%`)).join('\n');
+      const lbl = `<text x="${cx}" y="${Y0 + 14}" font-size="10.5" fill="#4A5570" text-anchor="middle" font-weight="600">${esc(p.label)}</text>`
+        + (p.complete ? '' : `<text x="${cx}" y="${Y0 + 26}" font-size="8.5" fill="#E4702A" text-anchor="middle" font-weight="700">Incomplete</text>`);
+      const tot = `<text x="${cx}" y="${top - 6}" font-size="10.5" font-weight="800" fill="#1A1F36" text-anchor="middle">${nf(p.total / 1e6, 1)}</text>`;
+      return `<g${tipA(tip)}>${segs}${hatch}${labels}${tot}${lbl}<rect x="${cx - slot / 2}" y="${Y1 - 14}" width="${slot}" height="${Y0 - Y1 + 14}" fill="#2F5DBF" fill-opacity="0"></rect></g>`;
+    }).join('');
+    box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      <defs><pattern id="incHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-opacity="0.55" stroke-width="2"></line></pattern></defs>
+      <g font-size="10" fill="#9AA3BC" stroke-width="1">${grid}</g>${body}</svg>`;
+  }
+  document.querySelectorAll('.tgl[data-trflip],.tgl[data-trpart],.tgl[data-trside]').forEach(t => t.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || !data) return;
+    const k = t.hasAttribute('data-trflip') ? 'flip' : t.hasAttribute('data-trpart') ? 'part' : 'side';
+    trendUi[k] = b.dataset.v;
+    renderTrend(data);
+  }));
+  $('trHide').addEventListener('change', e => { trendUi.hideInc = e.target.checked; if (data) renderTrend(data); });
+  $('fYearType').addEventListener('click', e => {
+    const b = e.target.closest('.seg');
+    if (!b) return;
+    yearType = b.dataset.v === 'FY' ? 'FY' : 'CY';
+    try { localStorage.setItem('orbitYearType', yearType); } catch (err) { /* storage blocked */ }
+    [...$('fYearType').children].forEach(x => x.classList.toggle('on', x === b));
+    if (data) renderTrend(data);
+  });
+  [...$('fYearType').children].forEach(x => x.classList.toggle('on', x.dataset.v === yearType));
   function trendLegend(d) {
     const off = k => (hiddenSeries.has(k) ? ' off' : '');
     const lgA = k => ` data-series="${esc(k)}" title="Click to show or hide"`;

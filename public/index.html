@@ -302,6 +302,8 @@ tr[data-detail]:hover td{background:#F6F8FC}
 .tgl{display:flex;background:#F0F3F9;border-radius:7px;padding:2px;flex-shrink:0}
 .tgl button{border:none;background:none;font-size:10px;font-weight:700;color:#8A93AD;padding:4px 9px;border-radius:5px;cursor:pointer;white-space:nowrap}
 .tgl button.on{background:#fff;color:#1A1F36;box-shadow:0 1px 2px rgba(20,26,46,.12)}
+.tick.trtick{margin:0 0 4px;padding:0;background:none;border:none;color:#4A5570;font-size:10px;align-items:center;flex-shrink:0}
+.tgl[hidden],.trtick[hidden]{display:none}
 .tgl.sm button{font-size:9px;padding:3px 7px}
 .tgl.sm button.on.o{color:#E4702A}
 .heatbar{display:flex;align-items:center;gap:8px;margin-top:8px;flex-shrink:0}
@@ -388,6 +390,11 @@ tr.me .sharebar{background:#FF8A3D}
         <div class="sech"><span class="n">1</span> Period and category</div>
         <div class="flabel">Date range</div>
         <div class="dateRow"><input class="inp" type="date" id="fFrom" aria-label="From date"><input class="inp" type="date" id="fTo" aria-label="To date"></div>
+        <div class="flabel">Year type <span class="cnt">for YOY / Q / H bars</span></div>
+        <div class="segbar" id="fYearType">
+          <button class="seg on" data-v="CY">Calendar (Jan–Dec)</button>
+          <button class="seg" data-v="FY">Financial (Apr–Mar)</button>
+        </div>
         <div class="flabel">Product group</div>
         <select class="inp" id="fPg"></select>
       </div>
@@ -516,8 +523,12 @@ tr.me .sharebar{background:#FF8A3D}
     <div class="fill" id="donut"></div>
   </div>
   <div class="card" id="cardTrend">
-    <h3 id="h-line">Monthly Spend Trend: Us vs Competitors</h3>
+    <div class="chead"><div class="ctitle"><h3 id="h-line">Monthly Spend Trend: Us vs Competitors</h3></div>
+      <div class="tgl sm" data-trpart hidden><button data-v="yoy" class="on">YOY</button><button data-v="q">Q</button><button data-v="h">H</button></div>
+      <div class="tgl sm" data-trside hidden><button data-v="cat" class="on">Category</button><button data-v="mine" class="o">Us</button></div>
+      <div class="tgl" data-trflip title="Flip between the monthly lines and the stacked medium bars"><button data-v="lines" class="on">Lines</button><button data-v="bars">Bars</button></div></div>
     <p class="sub" id="p-line">LKR Mn · smoothed curves · my advertiser emphasised · dotted line is the category average</p>
+    <label class="tick trtick" id="trHideWrap" hidden><input type="checkbox" id="trHide"><span>Hide incomplete periods</span></label>
     <div class="fill" id="trend"></div>
   </div>
   <div class="card" id="cardDrill">

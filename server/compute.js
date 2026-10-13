@@ -104,6 +104,7 @@ function dashboard(ds, f) {
   const monAdv = new Float64Array(nM * nAdv);
   const monCat = new Float64Array(nM), monMine = new Float64Array(nM);
   const medCat = [0, 0, 0], medMine = [0, 0, 0];
+  const monMedCat = new Float64Array(nM * 3), monMedMine = new Float64Array(nM * 3);
   const chCat = new Float64Array(nM * nCh), chMine = new Float64Array(nM * nCh), chTot = new Float64Array(nCh);
   const NB = D.DUR_BUCKETS.length;
   // Duration counts and ACD sums per medium (0 = TV, 1 = Radio); ACD = sum of raw Dur / ads.
@@ -143,6 +144,7 @@ function dashboard(ds, f) {
     monAdv[mi * nAdv + a] += v;
     monCat[mi] += v;
     medCat[md] += v;
+    monMedCat[mi * 3 + md] += v;
     chCat[mi * nCh + c] += v; chTot[c] += v;
     const sponsor = excluded[theme[i]] === 1;
     const raw = durRaw ? D.durSecondsOf(durRaw[i], sponsor) : NaN;
@@ -160,6 +162,7 @@ function dashboard(ds, f) {
       mineSpend += v; mineSpots++;
       monMine[mi] += v;
       medMine[md] += v;
+      monMedMine[mi * 3 + md] += v;
       chMine[mi * nCh + c] += v;
     }
     if (skipCampaign && skipCampaign[theme[i]]) continue;
@@ -187,6 +190,9 @@ function dashboard(ds, f) {
   const trend = {
     mine: Array.from(monMine),
     categoryTotal: Array.from(monCat),
+    // Spend per month split by medium [TV, Radio, Press], for the stacked YOY / quarter / half-year bars.
+    mediumCat: months.map((_, k) => [monMedCat[k * 3], monMedCat[k * 3 + 1], monMedCat[k * 3 + 2]]),
+    mediumMine: months.map((_, k) => [monMedMine[k * 3], monMedMine[k * 3 + 1], monMedMine[k * 3 + 2]]),
     competitors: compSorted.map(a => ({ name: dicts.adv[a], values: months.map((_, k) => monAdv[k * nAdv + a]) })),
     categoryAvg: months.map((_, k) => {
       let active = 0;
