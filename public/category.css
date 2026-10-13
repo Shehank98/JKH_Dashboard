@@ -292,3 +292,21 @@ body.mode-cat .modebtn:hover{box-shadow:0 4px 12px rgba(47,93,191,.45)}
   #catOne .ci-t,#catOne .cch-t{display:none}
   #catOne .cch-lg .opt2{display:none}
 }
+
+/* Left side: one full-height card; a small tab on its edge slides the monthly chart in */
+.ccolL{flex:0 0 62%;max-width:62%;display:flex;flex-direction:column;min-width:0}
+.ccolL .slidepanel{flex:1 1 0;overflow:hidden;padding:0}
+.slider{display:flex;width:200%;flex:1;min-height:0;transition:transform .5s cubic-bezier(.3,.8,.2,1)}
+.slider.m{transform:translateX(-50%)}
+.sview{flex:0 0 50%;min-width:0;min-height:0;display:flex;flex-direction:column;gap:4px;box-sizing:border-box;padding:8px 12px 6px 36px}
+.cpt.label{cursor:default}
+.slidetab{position:absolute;left:0;top:50%;transform:translateY(-50%);width:26px;height:124px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:1px solid #DDE3EF;border-left:none;border-radius:0 12px 12px 0;background:#fff;box-shadow:3px 0 8px rgba(20,26,46,.1);color:#1A1F36;cursor:pointer;z-index:4;padding:0;font-family:inherit;transition:background .2s,box-shadow .2s}
+.slidetab:hover{background:#FFF6EE;box-shadow:4px 0 12px rgba(228,112,42,.25)}
+.slidetab .st-arrow{font-size:20px;line-height:1;font-weight:700;color:#E4702A;animation:tabNudge 1.8s ease-in-out infinite}
+.slidetab .st-text{writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#4A5570;white-space:nowrap}
+.slidetab.on .st-arrow{animation-name:tabNudgeBack}
+@keyframes tabNudge{0%,100%{transform:translateX(0)}50%{transform:translateX(3px)}}
+@keyframes tabNudgeBack{0%,100%{transform:translateX(0)}50%{transform:translateX(-3px)}}
+/* View-only (shared link): the filters and data cannot be changed, everything else can be clicked */
+body.ro-cat #catFilterBtn,body.ro-cat .ctab[data-pane=cpFilters],body.ro-cat #cpFilters,body.ro-cat #cDfoot{display:none!important}
+.chip .unlock{border:none;background:none;color:#B4540F;font:inherit;font-weight:800;cursor:pointer;margin-left:6px;padding:0;text-decoration:underline}

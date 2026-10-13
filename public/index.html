@@ -573,6 +573,7 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
   <div class="chips spot-only" id="chips"></div>
   <div class="tright" id="tright">
+    <button class="fbtn light cat-only" id="catShareBtn" title="Copy a link that opens this view with the same filters">Share</button>
     <button class="fbtn light cat-only" id="catExportBtn">Export ▾</button>
     <div class="menu cat-only" id="catExportMenu">
       <button data-x="jpg"><b>JPG images (ZIP)</b><span>Each section (cards, month by month, sub categories) as its own JPG</span></button>
@@ -676,27 +677,34 @@ tr.me .sharebar{background:#FF8A3D}
     </section>
     <div class="cmain">
       <div class="ccolL">
-        <section class="cpanel" id="catS0">
-          <div class="cph">
-            <h2 class="cedit cpt" id="catTitle0" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2>
-            <p id="catSub0" hidden></p>
-            <label class="opt2" id="catCiHideWrap"><input type="checkbox" id="catCiHide">Hide incomplete</label>
-            <div class="tgl" id="catCiTgl" title="Group by year, half year or quarter (follows Calendar / Financial year)"><button data-v="y" class="on">Years</button><button data-v="h">Halves</button><button data-v="q">Quarters</button></div>
-            <button type="button" class="flipbtn" id="catCiFlip" aria-label="Flip between category and sub category investment" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-15.5-6.2L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 15.5 6.2L21 16"/><path d="M21 21v-5h-5"/></svg><span>Sub categories</span></button>
+        <section class="cpanel slidepanel" id="catLeft">
+          <button type="button" class="slidetab" id="catSlide" aria-label="Show the monthly investment by brand chart" aria-pressed="false" title="Slide between category investment and monthly investment by brand"><span class="st-arrow">›</span><span class="st-text">Monthly by brand</span></button>
+          <div class="slider" id="catSlider">
+            <div class="sview" id="catS0">
+              <div class="cph">
+                <span class="cpt label">Category investment</span>
+                <h2 class="cedit" id="catTitle0" contenteditable="true" spellcheck="false" hidden></h2>
+                <p id="catSub0" hidden></p>
+                <label class="opt2" id="catCiHideWrap"><input type="checkbox" id="catCiHide">Hide incomplete</label>
+                <div class="tgl" id="catCiTgl" title="Group by year, half year or quarter (follows Calendar / Financial year)"><button data-v="y" class="on">Years</button><button data-v="h">Halves</button><button data-v="q">Quarters</button></div>
+                <button type="button" class="flipbtn" id="catCiFlip" aria-label="Flip between category and sub category investment" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-15.5-6.2L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 15.5 6.2L21 16"/><path d="M21 21v-5h-5"/></svg><span>Sub categories</span></button>
+              </div>
+              <div class="flipbox" id="catCiBox">
+                <div class="face f" id="ciFront"></div>
+                <div class="face b" id="ciBack"></div>
+              </div>
+              <div class="ci-notes" id="catCiNotes" contenteditable="true" spellcheck="false" title="Click to edit the notes"></div>
+            </div>
+            <div class="sview" id="catS2">
+              <div class="cph">
+                <span class="cpt label">Monthly investment by brand</span>
+                <h2 class="cedit" id="catTitle2" contenteditable="true" spellcheck="false" hidden></h2>
+                <p id="catSub2" hidden></p>
+                <div class="tgl" id="catPartTgl" title="Group the chart by month, quarter, half year or year (follows Calendar / Financial year)"><button data-v="m" class="on">Months</button><button data-v="q">Quarters</button><button data-v="h">Halves</button><button data-v="y">Years</button></div>
+              </div>
+              <div class="cchart" id="catChart"></div>
+            </div>
           </div>
-          <div class="flipbox" id="catCiBox">
-            <div class="face f" id="ciFront"></div>
-            <div class="face b" id="ciBack"></div>
-          </div>
-          <div class="ci-notes" id="catCiNotes" contenteditable="true" spellcheck="false" title="Click to edit the notes"></div>
-        </section>
-        <section class="cpanel" id="catS2">
-          <div class="cph">
-            <h2 class="cedit cpt" id="catTitle2" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2>
-            <p id="catSub2" hidden></p>
-            <div class="tgl" id="catPartTgl" title="Group the chart by month, quarter, half year or year (follows Calendar / Financial year)"><button data-v="m" class="on">Months</button><button data-v="q">Quarters</button><button data-v="h">Halves</button><button data-v="y">Years</button></div>
-          </div>
-          <div class="cchart" id="catChart"></div>
         </section>
       </div>
       <div class="ccolR">

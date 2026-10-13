@@ -73,7 +73,14 @@
   // ---------- persistence ----------
   const KEY = 'cas-cat-filters', MODE = 'orbit-mode';
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ } };
-  const readSaved = () => { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } };
+  // A shared link (#cat=...) carries the filters and the view, never the data. It opens view-only: the filters
+  // cannot be changed, everything else can be clicked. (The person opening it loads the same file in Data file.)
+  let shared = null, sharedApplied = false;
+  try { if (location.hash.startsWith('#cat=')) shared = JSON.parse(decodeURIComponent(location.hash.slice(5))); } catch (e) { shared = null; }
+  const readSaved = () => {
+    if (shared && shared.state) return shared.state;
+    try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; }
+  };
 
   // ---------- data file tab ----------
   function renderFile(ds) {
@@ -147,7 +154,9 @@
   // ---------- filters ----------
   function showEmpty() {
     $('catOvTitle').textContent = 'Load your category file';
-    $('catOvText').textContent = 'Open the filter drawer, choose Data file and pick your category file (Month, Product Group, Mother Brand, Advertiser, Brand, Tv / Radio / Press in 000Rs). It is read on this computer only.';
+    const ro = document.body.classList.contains('ro-cat');
+    $('catOvText').textContent = ro ? 'This is a shared view. Open Data file and choose the same category file to see it with the shared filters. The file is read on this computer only.' : 'Open the filter drawer, choose Data file and pick your category file (Month, Product Group, Mother Brand, Advertiser, Brand, Tv / Radio / Press in 000Rs). It is read on this computer only.';
+    $('catOverlay').querySelector('label').textContent = ro ? '☰ Load data file' : '☰ Open Filters';
     $('catOverlay').classList.add('on');
     $('viewCat').classList.add('nodata');
     for (const id of ['catTitle', 'catSub', 'catTot', 'catTotLabel', 'catTitle2', 'catSub2', 'catTitle3', 'catSub3', 'catTitle0', 'catSub0']) $(id).textContent = '';
@@ -165,7 +174,8 @@
   }
   async function loadOverview(fresh) {
     overview = await engine.call('catOverview');
-    const saved = fresh ? null : readSaved();
+    const useShared = !!(shared && shared.state && !sharedApplied);
+    const saved = (fresh && !useShared) ? null : readSaved();
     monthOptions();
     $('cPg').innerHTML = overview.productGroups.map(g => `<option>${esc(g.name)}</option>`).join('');
     const groups = overview.productGroups.map(g => g.name);
@@ -173,8 +183,16 @@
     else Object.assign(state, { pg: groups[0], sub: '', mine: [], comps: [], top: 10 });
     // Keep dates inside the data; a new file starts on its latest quarter.
     const inside = k => k && k >= overview.minMonth && k <= overview.maxMonth;
-    if (!(inside(state.from) && inside(state.to) && state.from <= state.to) || fresh) { [state.from, state.to] = latest(3); }
-    await loadOptions(fresh || !(saved && saved.mine && saved.mine.length));
+    if (!(inside(state.from) && inside(state.to) && state.from <= state.to) || (fresh && !useShared)) { [state.from, state.to] = latest(3); }
+    if (useShared) {
+      sharedApplied = true;
+      const u = shared.ui || {};
+      if (u.part) ui.part = u.part;
+      if (u.ciPart) ci.part = u.ciPart;
+      ci.hideInc = !!u.hideInc;
+      setSlide(!!u.slide, true);
+    }
+    await loadOptions((fresh && !useShared) || !(saved && saved.mine && saved.mine.length));
     $('cSubWrap').style.display = overview.hasSub ? '' : 'none';
     writeForm();
     await refresh();
@@ -300,6 +318,7 @@
     if (f.mine && f.mine.length) chips.push(`<span class="chip o">Mine: ${esc(f.mine.length === 1 ? f.mine[0] : f.mine.length + ' advertisers')}</span>`);
     if (f.comps && f.comps.length) chips.push(`<span class="chip">${f.comps.length} competitor${f.comps.length === 1 ? '' : 's'}</span>`);
     chips.push(`<span class="chip">${yt === 'FY' ? 'Financial year (Apr–Mar)' : 'Calendar year'}</span>`);
+    if (document.body.classList.contains('ro-cat')) chips.push('<span class="chip o">View only<button type="button" class="unlock" id="catUnlock">Edit</button></span>');
     $('catChips').innerHTML = chips.join('');
     renderCi(d);
     renderChart(d, cur);
@@ -567,6 +586,22 @@
     if (sc) { try { openDetail(JSON.parse(sc.dataset.scope)); } catch (err) { /* bad scope */ } }
   });
 
+
+  // The small tab on the left card slides between Category investment and Monthly investment by brand.
+  let slideM = false;
+  function setSlide(m, instant) {
+    slideM = m;
+    const sl = $('catSlider'), tab = $('catSlide');
+    if (instant) sl.style.transition = 'none';
+    sl.classList.toggle('m', m);
+    if (instant) { void sl.offsetWidth; sl.style.transition = ''; }
+    tab.classList.toggle('on', m);
+    tab.setAttribute('aria-pressed', String(m));
+    tab.querySelector('.st-arrow').textContent = m ? '‹' : '›';
+    tab.querySelector('.st-text').textContent = m ? 'Category investment' : 'Monthly by brand';
+    tab.setAttribute('aria-label', m ? 'Show the category investment chart' : 'Show the monthly investment by brand chart');
+  }
+  $('catSlide').addEventListener('click', () => setSlide(!slideM));
 
   // Card flips: the panel turns edge-on, swaps faces, and turns back (no lasting 3D, so exports capture cleanly).
   const flips = { ci: false, br: false };
@@ -860,6 +895,20 @@
     return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${grid}${bars}${hasY ? `<path d="${line}" fill="none" stroke="#8A93AD" stroke-width="1.8" stroke-dasharray="5 4"></path>` : ''}</svg>`;
   }
 
+  // ---------- share ----------
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#catUnlock')) return;
+    document.body.classList.remove('ro-cat');
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (err) { /* ignore */ }
+    if (shared) shared.ro = false;
+    if (data) render();
+  });
+  $('catShareBtn').addEventListener('click', async () => {
+    const payload = { state, ro: 1, ui: { part: ui.part, ciPart: ci.part, hideInc: ci.hideInc, slide: slideM } };
+    const url = location.origin + location.pathname + '#cat=' + encodeURIComponent(JSON.stringify(payload));
+    try { await navigator.clipboard.writeText(url); toast('View-only link with the current filters copied'); } catch (e) { prompt('Copy this link', url); }
+  });
+
   // ---------- export ----------
   const menu = $('catExportMenu');
   $('catExportBtn').addEventListener('click', e => { e.stopPropagation(); menu.classList.toggle('on'); });
@@ -882,7 +931,7 @@
   // The whole screen, then each panel as its own JPG (both sides of the flip panels), in a ZIP.
   async function exportJpg() {
     toast('Preparing JPG images');
-    const root = $('viewCat'), savedCi = flips.ci, savedBr = flips.br;
+    const root = $('viewCat'), savedCi = flips.ci, savedBr = flips.br, savedSlide = slideM;
     const grid = $('catGrid'), s3 = $('catS3'), subs = $('catSubs');
     try {
       await Promise.all([loadScript('vendor/html-to-image/html-to-image.js'), loadScript('vendor/jszip/jszip.min.js')]);
@@ -894,7 +943,11 @@
         zip.file(`${name}.jpg`, url.split(',')[1], { base64: true });
       };
       setFlip('ci', false, true); setFlip('br', false, true); await settle();
-      await shot('00_Full_screen', $('catOne'));
+      setSlide(false, true); await settle();
+      await shot('00_Full_screen_category_investment', $('catOne'));
+      setSlide(true, true); await settle();
+      await shot('00_Full_screen_monthly_by_brand', $('catOne'));
+      setSlide(false, true); await settle();
       // Every card (the strip wraps into rows for this picture).
       grid.style.cssText += ';flex-wrap:wrap;overflow:visible;height:auto'; await settle();
       await shot('01_Cards', $('catS1'));
@@ -916,7 +969,7 @@
       toast('JPG images downloaded');
     } catch (e) { toast('Export failed: ' + e.message); } finally {
       root.classList.remove('exporting');
-      setFlip('ci', savedCi, true); setFlip('br', savedBr, true);
+      setFlip('ci', savedCi, true); setFlip('br', savedBr, true); setSlide(savedSlide, true);
       if (data) { updateStrip(); renderChart(data, null); renderCi(data); }
     }
   }
@@ -924,7 +977,14 @@
   async function exportPpt() {
     toast('Preparing PowerPoint');
     try {
-      await loadScript('vendor/pptxgenjs/pptxgen.bundle.js');
+      await Promise.all([loadScript('vendor/pptxgenjs/pptxgen.bundle.js'), loadScript('vendor/html-to-image/html-to-image.js')]);
+      // A picture of the screen as it is now (current filters), added after the editable slides.
+      $('catDrawerToggle').checked = false;
+      await new Promise(r => setTimeout(r, 320));
+      const one = $('catOne'), viewW = one.offsetWidth, viewH = one.offsetHeight;
+      $('viewCat').classList.add('exporting');
+      const viewUrl = await window.htmlToImage.toJpeg(one, { quality: 0.92, pixelRatio: 2, backgroundColor: '#F4F6FA', width: viewW, height: viewH, style: { transform: 'none' } })
+        .finally(() => $('viewCat').classList.remove('exporting'));
       const d = data, L = labelsOf(d), f = d.filters;
       const pptx = new window.PptxGenJS();
       pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 in
@@ -1148,6 +1208,12 @@
         T.forEach((t, i) => place(t, i, (i === 0 || (i >= 3 && i % 2 === 1)) ? 1 : 0));
         if (!T.length) slide.addText('No spend found for these filters.', { x: 0.55, y: 2, w: 8, h: 0.4, fontFace: 'Calibri', fontSize: 14, color: GREY });
       }
+      {
+        const slide = pptx.addSlide();
+        chrome(slide, 'Dashboard view with the current filters', `${f.pg}${f.sub ? ' · ' + f.sub : ''} · ${L.cur} · ${state.yearType === 'FY' ? 'Financial year' : 'Calendar year'} (picture of the screen)`);
+        const bw = W - 1.1, bh = H - 1.75, r = Math.min(bw / viewW, bh / viewH), w2 = viewW * r, h2 = viewH * r;
+        slide.addImage({ data: viewUrl.replace(/^data:/, ''), x: 0.55 + (bw - w2) / 2, y: 1.55, w: w2, h: h2 });
+      }
       const out = await pptx.write({ outputType: 'blob' });
       download(out, fileBase() + '.pptx');
       toast('PowerPoint downloaded');
@@ -1182,12 +1248,13 @@
   // ---------- boot (after the data engine knows who is signed in) ----------
   async function boot() {
     try {
+      if (shared && shared.ro) document.body.classList.add('ro-cat');
       const s = await engine.call('catInit');
       renderFile(s.dataset);
       started = true;
       if (s.dataset) await loadOverview(false); else { showEmpty(); }
-      let mode = null;
-      try { mode = localStorage.getItem(MODE); } catch (e) { /* storage unavailable */ }
+      let mode = shared ? 'cat' : null;
+      if (!shared) { try { mode = localStorage.getItem(MODE); } catch (e) { /* storage unavailable */ } }
       if (mode === 'cat') { document.body.classList.add('mode-cat'); applyModeText(); ensureStarted(); }
     } catch (e) { toast('Category data: ' + e.message); }
   }
