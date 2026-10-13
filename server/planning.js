@@ -139,6 +139,7 @@ function planning(ds, f, meta = {}) {
       ['Channel', f.channel || 'All channels'],
       ['Daypart', f.daypart || 'All dayparts'],
       ['Ad type', adTypeLabel],
+      ['Year type', f.yearType === 'FY' ? 'Financial year (Apr–Mar)' : 'Calendar year (Jan–Dec)'],
       ['Tag (Advt_Theme)', f.tagCommercial ? 'Counted as a commercial' : 'Counted as a Value Addition'],
       ['My advertiser(s)', (f.mine || []).join(', ') || 'None selected'],
       ['Competitors', (f.comps || []).join(', ') || 'None selected'],

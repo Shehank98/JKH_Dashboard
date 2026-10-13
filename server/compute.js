@@ -88,6 +88,10 @@ function resolve(ds, f) {
   };
 }
 
+// Calendar year y is Jan-Dec y; financial year y is 1 Apr y to 31 Mar y+1.
+const yearBounds = (y, fy) => (fy ? { from: `${y}-04-01`, to: `${y + 1}-03-31` } : { from: `${y}-01-01`, to: `${y}-12-31` });
+const yearLabel = (y, fy) => (fy ? `FY ${String(y).slice(2)}/${String(y + 1).slice(2)}` : String(y));
+
 function dashboard(ds, f) {
   const { dicts, cols } = ds;
   const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
@@ -294,8 +298,12 @@ function dashboard(ds, f) {
   }
   const restCount = activeAdv - mineIds.filter(a => advSpend[a] > 0).length - compSorted.filter(a => advSpend[a] > 0).length;
   // Year by year over the whole dataset (the date range is ignored; every other filter applies).
-  const y0 = Math.floor(new Date(ds.meta.minDay * 86400000).getUTCFullYear());
-  const y1 = Math.floor(new Date(ds.meta.maxDay * 86400000).getUTCFullYear());
+  // Calendar years run Jan-Dec; financial years (f.yearType === 'FY') run Apr-Mar and are named by the year they start in.
+  const fyMode = f.yearType === 'FY';
+  const yOf = mIdx => Math.floor((mIdx - (fyMode ? 3 : 0)) / 12);
+  const dMin = new Date(ds.meta.minDay * 86400000), dMax = new Date(ds.meta.maxDay * 86400000);
+  const y0 = yOf(dMin.getUTCFullYear() * 12 + dMin.getUTCMonth());
+  const y1 = yOf(dMax.getUTCFullYear() * 12 + dMax.getUTCMonth());
   const nY = y1 - y0 + 1;
   const yCat = new Float64Array(nY), yMine = new Float64Array(nY), yComp = compSorted.map(() => new Float64Array(nY));
   const compIndex = new Int32Array(nAdv).fill(-1);
@@ -307,16 +315,16 @@ function dashboard(ds, f) {
     if (chId >= 0 && c !== chId) continue;
     if (dpId >= 0 && dp[i] !== dpId) continue;
     if (adType && (excluded[theme[i]] ? 2 : 1) !== adType) continue;
-    const y = Math.floor(mon[i] / 12) - y0, a = adv[i], v = cost[i];
+    const y = yOf(mon[i]) - y0, a = adv[i], v = cost[i];
     yCat[y] += v;
     if (role[a] === 1) yMine[y] += v;
     else if (compIndex[a] >= 0) yComp[compIndex[a]][y] += v;
   }
   const yShare = arr => Array.from(arr, (v, k) => (yCat[k] ? (v / yCat[k]) * 100 : null));
   const years = Array.from({ length: nY }, (_, k) => {
-    const y = y0 + k;
-    const first = Math.max(ds.meta.minDay, toDay(`${y}-01-01`)), last = Math.min(ds.meta.maxDay, toDay(`${y}-12-31`));
-    return { year: y, from: toIso(first), to: toIso(last), partial: toIso(first).slice(5) !== '01-01' || toIso(last).slice(5) !== '12-31' };
+    const y = y0 + k, b = yearBounds(y, fyMode);
+    const first = Math.max(ds.meta.minDay, toDay(b.from)), last = Math.min(ds.meta.maxDay, toDay(b.to));
+    return { year: y, fy: fyMode, label: yearLabel(y, fyMode), from: toIso(first), to: toIso(last), partial: toIso(first) !== b.from || toIso(last) !== b.to };
   });
   if (mineIds.length) sosRows[0].yearly = yShare(yMine);
   compSorted.forEach((a, j) => { sosRows[(mineIds.length ? 1 : 0) + j].yearly = yShare(yComp[j]); });
@@ -361,9 +369,10 @@ function detail(ds, f, scope = {}) {
   let { from, to } = base;
   // A year cell of the SOS table covers that whole year of data, whatever the dashboard dates are.
   if (scope.year) {
-    from = Math.max(ds.meta.minDay, toDay(`${scope.year}-01-01`));
-    to = Math.min(ds.meta.maxDay, toDay(`${scope.year}-12-31`));
-    if (!(to >= from)) throw new Error('No data in ' + scope.year);
+    const b = yearBounds(scope.year, !!scope.fy);
+    from = Math.max(ds.meta.minDay, toDay(b.from));
+    to = Math.min(ds.meta.maxDay, toDay(b.to));
+    if (!(to >= from)) throw new Error('No data in ' + yearLabel(scope.year, !!scope.fy));
   }
   const excluded = excludedThemes(ds, !!f.tagCommercial);
   let mon = -1;

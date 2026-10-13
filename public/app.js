@@ -7,7 +7,7 @@
   const C = {
     orange: '#FF8A3D', deep: '#E4702A', oTints: ['#FF8A3D', '#FFA766', '#FFC599', '#FFDCC0'],
     blues: ['#2F5DBF', '#5B8DEF', '#8FB2F5', '#BFD3F6'],
-    medium: ['#2F5DBF', '#5B8DEF', '#A8C2F2'],
+    medium: ['#2F5DBF', '#FF8A3D', '#1FA97A'],       // TV blue, Radio orange, Press green: three clearly different hues
     compLines: ['#5B8DEF', '#9AA6C4', '#C7CEDF', '#2F5DBF', '#8FB2F5', '#B4BCD0', '#1E3F8A', '#A8C2F2', '#BFD3F6'],
     // Light to dark as the ads get longer: 5s, 15s, 20s, 30s, 30s+
     durMine: ['#FFD2AE', '#FFAA6E', '#FF8A3D', '#D9661F', '#9E4510'], durComp: ['#BFD3F6', '#7FA5EE', '#4474D6', '#1E3F8A', '#0D2257'],
@@ -17,7 +17,7 @@
   let overview = null;      // product groups, date bounds
   let options = { advertisers: [], channels: [] };
   let data = null;          // last dashboard response
-  const state = { from: '', to: '', pg: '', mine: [], comps: [], medium: 'All', channel: '', daypart: '', adType: 'All', tagCommercial: false };
+  const state = { from: '', to: '', pg: '', mine: [], comps: [], medium: 'All', channel: '', daypart: '', adType: 'All', tagCommercial: false, yearType: 'CY' };
   let pendingFile = null;
   const hiddenSeries = new Set();                // trend lines switched off from the legend
   const mixView = { mx: 'bars' };                // channel mix: Top 5 bars or heatmap
@@ -25,8 +25,7 @@
   let mixMedium = 'TV';                          // channel mix: TV, Radio or Press
   let durMedium = 'All';
   const trendUi = { flip: 'lines', part: 'yoy', side: 'cat', hideInc: false }; // trend card: lines or stacked bars
-  let yearType = 'CY';                           // CY = Jan-Dec, FY = Apr-Mar (read from localStorage below)
-  try { yearType = localStorage.getItem('orbitYearType') === 'FY' ? 'FY' : 'CY'; } catch (e) { /* storage blocked */ }
+  let sosFlip = 'table';                         // SOS By year / By month: table or chart
   let sosView = 'period';                        // SOS table: whole period or by month                         // duration mix: All (TV + Radio), TV or Radio
 
   // ---------- helpers ----------
@@ -264,6 +263,7 @@
     $('fDaypart').value = state.daypart || '';
     [...$('fMedium').children].forEach(b => b.classList.toggle('on', b.dataset.v === state.medium));
     [...$('fAdType').children].forEach(b => b.classList.toggle('on', b.dataset.v === (state.adType || 'All')));
+    [...$('fYearType').children].forEach(b => b.classList.toggle('on', b.dataset.v === (state.yearType || 'CY')));
     writeTag();
     renderAdvLists();
     renderChannelSelect();
@@ -389,6 +389,7 @@
     if (f.adType === 'Commercial') chips.push('<span class="chip">Commercials only</span>');
     if (f.adType === 'Sponsorship') chips.push('<span class="chip s">Value Additions only</span>');
     if (f.tagCommercial) chips.push('<span class="chip">Tag = commercial</span>');
+    if (f.yearType === 'FY') chips.push('<span class="chip">Financial year (Apr–Mar)</span>');
     if (f.channel) chips.push(`<span class="chip">${esc(f.channel)}</span>`);
     if (f.daypart) chips.push(`<span class="chip">${esc(dpLabel(f.daypart))}</span>`);
     const busy = $('busyChip');
@@ -420,6 +421,8 @@
     if (!rows.length) { $('sosTable').innerHTML = '<div class="nodata">Pick your advertiser and competitors in Filters</div>'; return; }
     const scopeOf = (r, extra) => (r.mine ? { title: r.name + ' (mine)', mine: true, ...extra } : r.others ? { title: 'All advertisers', ...extra } : { title: r.name, advertiser: r.name, ...extra });
     const cls = r => (r.mine ? 'row me' : r.others ? 'row oth' : 'row');
+    $('sosFlip').hidden = sosView === 'period';
+    if (sosView !== 'period' && sosFlip === 'chart') return renderSosChart(d, rows.filter(r => !r.others), scopeOf);
     if (sosView === 'year') {
       const Y = S.years;
       const max = Math.max(1, ...rows.filter(r => !r.others).flatMap(r => r.yearly.filter(v => v != null)));
@@ -430,17 +433,17 @@
         return `background:rgba(${rgb},${t.toFixed(2)});color:${t > 0.55 ? '#fff' : '#1A1F36'}`;
       };
       const span = y => (y.partial ? `${fmtDate(y.from).slice(3)} to ${fmtDate(y.to).slice(3)}` : 'Full year');
-      const head = `<tr><th class="an">Advertiser</th>${Y.map(y => `<th title="${esc(span(y))}">${y.year}${y.partial ? '*' : ''}</th>`).join('')}</tr>`;
+      const head = `<tr><th class="an">Advertiser</th>${Y.map(y => `<th title="${esc(span(y))}">${esc(y.label)}${y.partial ? '*' : ''}</th>`).join('')}</tr>`;
       const body = rows.map(r => `<tr class="${cls(r)}">
         <td class="an" title="${esc(r.name)}"${detA(scopeOf(r, { tab: r.others ? 'adv' : 'mon' }))}>${esc(r.name)}</td>
         ${r.yearly.map((v, k) => {
           const y = Y[k];
-          return `<td class="c" style="${shade(r, v)}"${tipA(`${r.name} · ${y.year}\nSOS ${v == null ? 'n/a' : pctS(v)} · ${span(y)}\nClick for details`)}${detA(scopeOf(r, { title: `${r.others ? 'All advertisers' : r.name} · ${y.year}`, year: y.year, tab: r.others ? 'adv' : 'mon' }))}>${v == null ? 'n/a' : pctS(v)}</td>`;
+          return `<td class="c" style="${shade(r, v)}"${tipA(`${r.name} · ${y.label}\nSOS ${v == null ? 'n/a' : pctS(v)} · ${span(y)}\nClick for details`)}${detA(scopeOf(r, { title: `${r.others ? 'All advertisers' : r.name} · ${y.label}`, year: y.year, fy: y.fy, tab: r.others ? 'adv' : 'mon' }))}>${v == null ? 'n/a' : pctS(v)}</td>`;
         }).join('')}</tr>`).join('');
       const partial = Y.filter(y => y.partial);
       $('sosTable').innerHTML = `<div class="sost sosm"><table><tbody>${head}${body}</tbody></table></div>
-        ${partial.length ? `<div class="hint" style="color:#8A93AD;margin:6px 2px 0">* ${partial.map(y => `${y.year}: ${span(y)}`).join(' · ')} (data available)</div>` : ''}`;
-      $('p-sos').textContent = 'SOS % of each year in the full data · ignores the date range · click a cell for details';
+        ${partial.length ? `<div class="hint" style="color:#8A93AD;margin:6px 2px 0">* ${partial.map(y => `${y.label}: ${span(y)}`).join(' · ')} (data available)</div>` : ''}`;
+      $('p-sos').textContent = `SOS % of each ${data.filters.yearType === 'FY' ? 'financial year (Apr–Mar)' : 'calendar year'} in the full data · ignores the date range · click a cell for details`;
       return;
     }
     if (sosView === 'month') {
@@ -479,6 +482,66 @@
       </tbody></table></div>`;
     $('p-sos').textContent = 'Selected period · my advertiser vs competitors · click a row for details';
   }
+
+  // Share of spend as a chart: By year = grouped bars (one cluster per year), By month = one line per advertiser.
+  const SOS_COLORS = ['#2F5DBF', '#1FA97A', '#8E5BD9', '#E0B000', '#D6456B', '#1AA3C7', '#7A8CA8', '#6B8E23', '#B5651D'];
+  function renderSosChart(d, rows, scopeOf) {
+    const colorOf = new Map();
+    let ci = 0;
+    rows.forEach(r => colorOf.set(r, r.mine ? C.orange : SOS_COLORS[ci++ % SOS_COLORS.length]));
+    const byYear = sosView === 'year', Y = d.sos.years;
+    const legend = rows.map(r => `<div class="lg"><span class="sw" style="background:${colorOf.get(r)};height:${byYear ? 10 : 3}px;width:${byYear ? 12 : 18}px"></span>${r.mine ? '<strong>' + esc(r.name) + ' (mine)</strong>' : esc(r.name)}</div>`).join('');
+    $('sosTable').innerHTML = `<div class="trendbox" id="sosBox"></div><div class="legend">${legend}</div>`;
+    const box = $('sosBox'), W = Math.max(300, box.clientWidth), H = Math.max(140, box.clientHeight);
+    const cats = byYear ? Y.map(y => ({ label: y.label + (y.partial ? '*' : '') })) : d.months.map(m => ({ label: monthLabel(m, d.months) }));
+    const val = (r, k) => (byYear ? r.yearly[k] : r.monthly[k]);
+    const n = cats.length;
+    const X0 = 40, X1 = W - 10, Y0 = H - 22, Y1 = 14;
+    const max = niceMax(Math.max(1, ...rows.flatMap(r => Array.from({ length: n }, (_, k) => val(r, k) || 0))));
+    const y = v => Y0 - (v / max) * (Y0 - Y1);
+    const grid = [0, 1, 2, 3, 4].map(k => {
+      const yy = Y0 - (k * (Y0 - Y1)) / 4;
+      return `<line x1="${X0}" y1="${yy}" x2="${W - 6}" y2="${yy}" stroke="#EEF1F7"></line><text x="${X0 - 6}" y="${yy + 3.5}" text-anchor="end">${nf((max * k) / 4, max < 4 ? 1 : 0)}%</text>`;
+    }).join('');
+    const slot = (X1 - X0) / n;
+    const every = Math.ceil(n / Math.max(4, Math.floor((X1 - X0) / 52)));
+    const xl = cats.map((c, k) => (k % every === 0 || k === n - 1 ? `<text x="${X0 + slot * (k + 0.5)}" y="${H - 6}" text-anchor="middle">${esc(c.label)}</text>` : '')).join('');
+    let body = '';
+    if (byYear) {
+      const gw = slot * 0.8, bw = gw / rows.length;
+      rows.forEach((r, j) => {
+        Y.forEach((yr, k) => {
+          const v = r.yearly[k];
+          if (v == null) return;
+          const bx = X0 + slot * k + (slot - gw) / 2 + j * bw, top = y(v);
+          const lab = bw >= 20 ? `<text x="${bx + bw / 2}" y="${top - 3}" font-size="8.5" font-weight="700" fill="#4A5570" text-anchor="middle">${nf(v, 0)}</text>` : '';
+          body += `<rect x="${bx + 0.5}" y="${top}" width="${Math.max(1, bw - 1)}" height="${Y0 - top}" rx="2" fill="${colorOf.get(r)}"${tipA(`${r.name} · ${yr.label}\nSOS ${pctS(v)}\nClick for details`)}${detA(scopeOf(r, { title: `${r.name} · ${yr.label}`, year: yr.year, fy: yr.fy, tab: 'mon' }))}></rect>${lab}`;
+        });
+      });
+    } else {
+      rows.forEach(r => {
+        const pts = cats.map((_, k) => (val(r, k) == null ? null : [X0 + slot * (k + 0.5), y(val(r, k))]));
+        const path = pts.map((q, k) => (q ? `${pts[k - 1] ? 'L' : 'M'}${q[0].toFixed(1)},${q[1].toFixed(1)}` : '')).join('');
+        body += `<path d="${path}" fill="none" stroke="${colorOf.get(r)}" stroke-width="${r.mine ? 3 : 2}" stroke-linejoin="round" stroke-linecap="round"></path>`;
+        pts.forEach((q, k) => {
+          if (!q) return;
+          const m = d.months[k];
+          body += `<circle cx="${q[0]}" cy="${q[1]}" r="${n > 18 ? 2.5 : 3.5}" fill="${colorOf.get(r)}"${tipA(`${r.name} · ${m.label} ${m.year}\nSOS ${pctS(val(r, k))}\nClick for details`)}${detA(scopeOf(r, { title: `${r.name} · ${m.label} ${m.year}`, month: m.key, tab: 'ch' }))}></circle>`;
+        });
+      });
+    }
+    box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><g font-size="10" fill="#9AA3BC">${grid}</g>${body}<g font-size="10" fill="#8A93AD">${xl}</g></svg>`;
+    $('p-sos').textContent = byYear
+      ? `SOS % of each ${d.filters.yearType === 'FY' ? 'financial' : 'calendar'} year, clustered by advertiser · ignores the date range${Y.some(y => y.partial) ? ' · * partial year' : ''}`
+      : 'SOS % of each month · one line per advertiser · click a point for details';
+  }
+  document.querySelector('.tgl[data-sosflip]').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || !data) return;
+    sosFlip = b.dataset.v;
+    [...b.parentNode.children].forEach(x => x.classList.toggle('on', x === b));
+    renderSos(data);
+  });
   document.querySelector('.tgl[data-sosview]').addEventListener('click', e => {
     const b = e.target.closest('button');
     if (!b || !data) return;
@@ -617,7 +680,7 @@
     on('.tgl[data-trflip]', trendUi.flip); on('.tgl[data-trpart]', trendUi.part); on('.tgl[data-trside]', trendUi.side);
     $('trHide').checked = trendUi.hideInc;
     if (bars) {
-      const fy = yearType === 'FY';
+      const fy = state.yearType === 'FY';
       $('p-line').textContent = `LKR Mn · % of ${trendUi.side === 'mine' ? 'our' : 'category'} spend by medium · ${fy ? 'Financial year (Apr–Mar)' : 'Calendar year (Jan–Dec)'} · hatched = incomplete period`;
     } else {
       $('p-line').textContent = 'LKR Mn · smoothed curves · my advertiser emphasised · dotted line is the category average';
@@ -625,7 +688,7 @@
   }
   // Groups the months into years / quarters / halves for the chosen year type and marks the ones the range does not fully cover.
   function groupPeriods(d) {
-    const fy = yearType === 'FY', part = trendUi.part, len = { yoy: 12, q: 3, h: 6 }[part];
+    const fy = state.yearType === 'FY', part = trendUi.part, len = { yoy: 12, q: 3, h: 6 }[part];
     const eff = { from: d.filters.from > overview.minDate ? d.filters.from : overview.minDate, to: d.filters.to < overview.maxDate ? d.filters.to : overview.maxDate };
     const groups = new Map();
     d.months.forEach((m, i) => {
@@ -641,18 +704,20 @@
       const y0 = Math.floor(g.start / 12), m0 = g.start % 12, last = g.start + len - 1;
       const complete = iso(y0, m0) >= eff.from && endIso(Math.floor(last / 12), last % 12) <= eff.to;
       const yrLabel = fy ? `${String(g.yr).slice(2)}/${String(g.yr + 1).slice(2)}` : String(g.yr);
-      const label = part === 'yoy' ? (fy ? 'FY ' : '') + yrLabel : `${part === 'q' ? 'Q' : 'H'}${g.idx + 1} ${fy ? 'FY' : ''}${yrLabel}`;
+      const grp = (fy ? 'FY ' : '') + yrLabel;
+      const sub = part === 'yoy' ? grp : `${part === 'q' ? 'Q' : 'H'}${g.idx + 1}`;
+      const label = part === 'yoy' ? grp : `${sub} ${grp}`;
       const src = trendUi.side === 'mine' ? d.trend.mediumMine : d.trend.mediumCat;
       const med = [0, 0, 0];
       g.idxs.forEach(i => src[i].forEach((v, k) => { med[k] += v; }));
-      return { label, complete, med, total: med[0] + med[1] + med[2], monthsIn: g.idxs.length, key: g.idxs.map(i => d.months[i].key) };
+      return { label, sub, grp, complete, med, total: med[0] + med[1] + med[2], monthsIn: g.idxs.length, key: g.idxs.map(i => d.months[i].key) };
     });
   }
   function renderBars(d) {
     let periods = groupPeriods(d);
     const hidden = periods.filter(p => !p.complete).length;
     if (trendUi.hideInc) periods = periods.filter(p => p.complete);
-    const mine = trendUi.side === 'mine', pal = mine ? C.oTints : C.medium;
+    const mine = trendUi.side === 'mine', pal = C.medium;
     const legendHtml = MEDIA_NAMES.map((nm, k) => `<div class="lg"><span class="sw" style="background:${pal[k]};height:10px;width:14px;border-radius:2px"></span>${nm}</div>`).join('')
       + `<div class="lg"><span class="sw" style="background:repeating-linear-gradient(45deg,#fff 0 2px,#8A93AD 2px 3px);height:10px;width:14px;border-radius:2px;border:1px solid #C7CEDF"></span>Incomplete period</div>`;
     $('trend').innerHTML = `<div class="trendbox" id="trendBox"></div><div class="legend">${legendHtml}</div>`;
@@ -661,10 +726,11 @@
       box.innerHTML = `<div class="empty" style="padding:30px 10px;text-align:center;color:#8A93AD;font-size:12px">No complete ${{ yoy: 'years', q: 'quarters', h: 'half-years' }[trendUi.part]} in this date range${hidden ? ` (${hidden} incomplete hidden)` : ''}. Widen the dates or untick “Hide incomplete periods”.</div>`;
       return;
     }
-    const X0 = 40, X1 = W - 12, Y0 = H - 34, Y1 = 34;
+    const two = trendUi.part !== 'yoy';        // quarters / halves: short label under each bar, the year once as a group heading
+    const X0 = 40, X1 = W - 12, Y0 = H - (two ? 50 : 34), Y1 = 34;
     const max = niceMax(Math.max(0, ...periods.map(p => p.total / 1e6)));
     const y = v => Y0 - (v / 1e6 / max) * (Y0 - Y1);
-    const slot = (X1 - X0) / periods.length, bw = Math.min(64, slot * 0.62);
+    const slot = (X1 - X0) / periods.length, bw = Math.min(64, Math.max(6, slot * (two ? 0.7 : 0.62))), tight = slot < 40;
     const grid = [0, 1, 2, 3, 4].map(k => {
       const yy = Y0 - (k * (Y0 - Y1)) / 4, val = (max * k) / 4;
       return `<line x1="${X0}" y1="${yy}" x2="${W - 8}" y2="${yy}" stroke="#EEF1F7"></line><text x="${X0 - 8}" y="${yy + 3.5}" text-anchor="end">${nf(val, max < 4 ? 1 : 0)}</text>`;
@@ -676,7 +742,7 @@
         if (v <= 0) return '';
         const y1 = y(acc), y2 = y(acc + v); acc += v;
         const h = y1 - y2, pc = p.total ? (v / p.total) * 100 : 0;
-        const lab = h >= 13 && bw >= 30 ? `<text x="${cx}" y="${y2 + h / 2 + 3.5}" font-size="9.5" font-weight="700" fill="${textOn(pal[k])}" text-anchor="middle">${nf(pc, 0)}%</text>` : '';
+        const lab = h >= 13 && bw >= 24 ? `<text x="${cx}" y="${y2 + h / 2 + 3.5}" font-size="${bw >= 36 ? 9.5 : 8.5}" font-weight="700" fill="${textOn(pal[k])}" text-anchor="middle">${nf(pc, 0)}%</text>` : '';
         labels += lab;
         return `<rect x="${bx}" y="${y2}" width="${bw}" height="${h}" fill="${pal[k]}"></rect>`;
       }).join('');
@@ -684,14 +750,26 @@
       const hatch = p.complete ? '' : `<rect x="${bx}" y="${top}" width="${bw}" height="${Y0 - top}" fill="url(#incHatch)" stroke="#8A93AD" stroke-dasharray="3 2"></rect>`;
       const tip = [`${p.label}${p.complete ? '' : ' (incomplete: ' + p.monthsIn + ' month' + (p.monthsIn === 1 ? '' : 's') + ' of data)'}`, `${mine ? 'Our' : 'Category'} total: ${mn(p.total)}`]
         .concat(p.med.map((v, k) => `${MEDIA_NAMES[k]}: ${mn(v)} · ${p.total ? nf((v / p.total) * 100, 1) : '0.0'}%`)).join('\n');
-      const lbl = `<text x="${cx}" y="${Y0 + 14}" font-size="10.5" fill="#4A5570" text-anchor="middle" font-weight="600">${esc(p.label)}</text>`
-        + (p.complete ? '' : `<text x="${cx}" y="${Y0 + 26}" font-size="8.5" fill="#E4702A" text-anchor="middle" font-weight="700">Incomplete</text>`);
-      const tot = `<text x="${cx}" y="${top - 6}" font-size="10.5" font-weight="800" fill="#1A1F36" text-anchor="middle">${nf(p.total / 1e6, 1)}</text>`;
+      const lbl = `<text x="${cx}" y="${Y0 + 14}" font-size="${tight ? 9.5 : 10.5}" fill="#4A5570" text-anchor="middle" font-weight="600">${esc(two ? p.sub : p.label)}${p.complete || !tight ? '' : '*'}</text>`
+        + (p.complete || tight ? '' : `<text x="${cx}" y="${Y0 + 25}" font-size="8.5" fill="#E4702A" text-anchor="middle" font-weight="700">Incomplete</text>`);
+      const tot = `<text x="${cx}" y="${top - 6}" font-size="${tight ? 8.5 : 10.5}" font-weight="800" fill="#1A1F36" text-anchor="middle">${nf(p.total / 1e6, tight ? 0 : 1)}</text>`;
       return `<g${tipA(tip)}>${segs}${hatch}${labels}${tot}${lbl}<rect x="${cx - slot / 2}" y="${Y1 - 14}" width="${slot}" height="${Y0 - Y1 + 14}" fill="#2F5DBF" fill-opacity="0"></rect></g>`;
     }).join('');
+    let groupsSvg = '';
+    if (two) {
+      for (let i = 0; i < periods.length;) {
+        let j = i;
+        while (j + 1 < periods.length && periods[j + 1].grp === periods[i].grp) j++;
+        const xa = X0 + slot * i, xb = X0 + slot * (j + 1);
+        groupsSvg += `<line x1="${xa + 3}" y1="${Y0 + 33}" x2="${xb - 3}" y2="${Y0 + 33}" stroke="#C7CEDF" stroke-width="1.5"></line>`
+          + `<text x="${(xa + xb) / 2}" y="${Y0 + 45}" font-size="10" font-weight="700" fill="#1A1F36" text-anchor="middle">${esc(periods[i].grp)}</text>`;
+        if (i > 0) groupsSvg += `<line x1="${xa}" y1="${Y1 - 6}" x2="${xa}" y2="${Y0 + 33}" stroke="#E3E8F2" stroke-dasharray="3 3"></line>`;
+        i = j + 1;
+      }
+    }
     box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
       <defs><pattern id="incHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-opacity="0.55" stroke-width="2"></line></pattern></defs>
-      <g font-size="10" fill="#9AA3BC" stroke-width="1">${grid}</g>${body}</svg>`;
+      <g font-size="10" fill="#9AA3BC" stroke-width="1">${grid}</g>${groupsSvg}${body}</svg>`;
   }
   document.querySelectorAll('.tgl[data-trflip],.tgl[data-trpart],.tgl[data-trside]').forEach(t => t.addEventListener('click', e => {
     const b = e.target.closest('button');
@@ -704,12 +782,10 @@
   $('fYearType').addEventListener('click', e => {
     const b = e.target.closest('.seg');
     if (!b) return;
-    yearType = b.dataset.v === 'FY' ? 'FY' : 'CY';
-    try { localStorage.setItem('orbitYearType', yearType); } catch (err) { /* storage blocked */ }
+    state.yearType = b.dataset.v === 'FY' ? 'FY' : 'CY';
     [...$('fYearType').children].forEach(x => x.classList.toggle('on', x === b));
-    if (data) renderTrend(data);
+    if (data) refresh(); // the year-by-year SOS table, drill-downs and exports regroup on the server
   });
-  [...$('fYearType').children].forEach(x => x.classList.toggle('on', x.dataset.v === yearType));
   function trendLegend(d) {
     const off = k => (hiddenSeries.has(k) ? ' off' : '');
     const lgA = k => ` data-series="${esc(k)}" title="Click to show or hide"`;
@@ -972,7 +1048,7 @@
   const scopeText = sc => {
     const parts = [];
     if (sc.month) { const [y, m] = sc.month.split('-'); parts.push(`${MON[+m - 1]} ${y}`); }
-    else if (sc.year) parts.push(`${sc.year} (full year of data)`);
+    else if (sc.year) parts.push(`${sc.fy ? 'FY ' + String(sc.year).slice(2) + '/' + String(sc.year + 1).slice(2) : sc.year} (full year of data)`);
     else if (sc.from) parts.push(`${fmtDate(sc.from)} to ${fmtDate(sc.to)}`);
     else parts.push(`${fmtDate(data.filters.from)} to ${fmtDate(data.filters.to)}`);
     parts.push(data.filters.pg);
@@ -992,8 +1068,8 @@
 
   // The filters behind what is on screen (the drawer may hold unapplied edits).
   function appliedFilters() {
-    const { from, to, pg, mine, comps, medium, channel, daypart, adType, tagCommercial } = data.filters;
-    return { from, to, pg, mine: mine.slice(), comps: comps.slice(), medium, channel, daypart, adType: adType || 'All', tagCommercial: !!tagCommercial };
+    const { from, to, pg, mine, comps, medium, channel, daypart, adType, tagCommercial, yearType } = data.filters;
+    return { from, to, pg, mine: mine.slice(), comps: comps.slice(), medium, channel, daypart, adType: adType || 'All', tagCommercial: !!tagCommercial, yearType: yearType === 'FY' ? 'FY' : 'CY' };
   }
 
   async function openDetail(scope, fresh) {
@@ -1041,7 +1117,7 @@
     const sc = detailStack[detailStack.length - 1];
     Object.assign(state, appliedFilters());
     if (b.dataset.act === 'month' && sc.year) {
-      const fy = `${sc.year}-01-01`, ly = `${sc.year}-12-31`;
+      const fy = sc.fy ? `${sc.year}-04-01` : `${sc.year}-01-01`, ly = sc.fy ? `${sc.year + 1}-03-31` : `${sc.year}-12-31`;
       state.from = fy < overview.minDate ? overview.minDate : fy;
       state.to = ly > overview.maxDate ? overview.maxDate : ly;
     } else if (b.dataset.act === 'month' && sc.from) {
@@ -1335,7 +1411,7 @@
     const d = data, q = v => `"${String(v).replace(/"/g, '""')}"`;
     const lines = [
       ['Ogilvy Orbit – Chub'], ['Period', `${fmtDate(d.filters.from)} to ${fmtDate(d.filters.to)}`], ['Product group', d.filters.pg],
-      ['Medium', d.filters.medium], ['Ad type', { Sponsorship: 'Value Additions', Commercial: 'Commercials' }[d.filters.adType] || 'All'], ['Tag counted as', d.filters.tagCommercial ? 'Commercial' : 'Value Addition'], ['Channel', d.filters.channel || 'All'], ['Daypart', d.filters.daypart || 'All'], ['Spend basis', 'Rate card (LKR)'], [],
+      ['Medium', d.filters.medium], ['Year type', d.filters.yearType === 'FY' ? 'Financial year (Apr–Mar)' : 'Calendar year (Jan–Dec)'], ['Ad type', { Sponsorship: 'Value Additions', Commercial: 'Commercials' }[d.filters.adType] || 'All'], ['Tag counted as', d.filters.tagCommercial ? 'Commercial' : 'Value Addition'], ['Channel', d.filters.channel || 'All'], ['Daypart', d.filters.daypart || 'All'], ['Spend basis', 'Rate card (LKR)'], [],
       ['KPI', 'Value'], ['Category spend', d.kpi.catSpend], ['My spend', d.kpi.mineSpend], ['Share of spend %', d.kpi.sos.toFixed(2)],
       ['Rank', d.kpi.rank ? `${d.kpi.rank} of ${d.kpi.rankOf}` : ''], ['Category spots', d.kpi.catSpots], ['My spots', d.kpi.mineSpots], [],
       ['Month', d.mineLabel + ' (mine)'].concat(d.trend.competitors.map(c => c.name), ['Category avg per advertiser', 'Category total', 'Top spender', 'Lead campaign', 'Campaign advertiser']),

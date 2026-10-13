@@ -304,6 +304,8 @@ tr[data-detail]:hover td{background:#F6F8FC}
 .tgl button.on{background:#fff;color:#1A1F36;box-shadow:0 1px 2px rgba(20,26,46,.12)}
 .tick.trtick{margin:0 0 4px;padding:0;background:none;border:none;color:#4A5570;font-size:10px;align-items:center;flex-shrink:0}
 .tgl[hidden],.trtick[hidden]{display:none}
+.sosflip{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px;flex-shrink:0;font-size:10px;font-weight:700;color:#8A93AD}
+.sosflip[hidden]{display:none}
 .tgl.sm button{font-size:9px;padding:3px 7px}
 .tgl.sm button.on.o{color:#E4702A}
 .heatbar{display:flex;align-items:center;gap:8px;margin-top:8px;flex-shrink:0}
@@ -544,6 +546,7 @@ tr.me .sharebar{background:#FF8A3D}
       <div class="tgl" data-sosview><button data-v="period" class="on">Period</button><button data-v="year">By year</button><button data-v="month">By month</button></div></div>
     <p class="sub" id="p-sos">Selected period · my advertiser vs competitors · click a row for details</p>
     <div class="fill" id="sosTable"></div>
+    <div class="sosflip" id="sosFlip" hidden><span>View as</span><div class="tgl" data-sosflip><button data-v="table" class="on">Table</button><button data-v="chart">Chart</button></div></div>
   </div>
   <div class="card" id="cardMix">
     <div class="chead"><div class="ctitle"><h3 id="h-mix">Channel Mix</h3></div>
