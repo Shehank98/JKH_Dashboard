@@ -411,9 +411,9 @@
     const two = false, L = 58, R = 58, T = 26, B = part !== 'm' && incomplete ? 40 : 28, X0 = L, X1 = W - R, Y0 = H - B;
     const idxOf = new Map(pool.map((c, j) => [c.name, j]));
     const shown = pool.filter(c => !hiddenBrands.has(c.name));
-    const maxCat = niceMax(Math.max(0, ...periods.map(p => p.cat)) / 1000);
-    const maxBr = niceMax(Math.max(0, ...periods.flatMap(p => shown.map(c => p.vals[idxOf.get(c.name)]))) / 1000);
-    const yc = v => Y0 - (v / 1000 / maxCat) * (Y0 - T), yb = v => Y0 - (v / 1000 / maxBr) * (Y0 - T);
+    // One scale for the category and the brands, so a brand can never look bigger than the category it belongs to.
+    const maxCat = niceMax(Math.max(0, ...periods.map(p => p.cat), ...periods.flatMap(p => shown.map(c => p.vals[idxOf.get(c.name)]))) / 1000), maxBr = maxCat;
+    const yc = v => Y0 - (v / 1000 / maxCat) * (Y0 - T), yb = yc;
     const gw = (X1 - X0) / n, catW = Math.min(gw * 0.86, 130);
     // Only brands with spend get a bar, so a period with fewer brands is not left with gaps.
     const maxCount = Math.max(1, ...periods.map(p => shown.filter(c => p.vals[idxOf.get(c.name)] > 0).length));
@@ -1003,7 +1003,7 @@
         chrome(slide, txt('catTitle2'), txt('catSub2'));
         slide.addText(`Category Behaviour – ${PART_NAME[part]}`, { x: 3.2, y: 1.5, w: 7, h: 0.35, align: 'center', fontFace: 'Calibri', fontSize: 16, bold: true, color: GREY, underline: { style: 'sng' }, margin: 0 });
         const labels = periods.map(p => p.label + (p.complete ? '' : ' *'));
-        const maxCat = niceMax(Math.max(0, ...periods.map(p => p.cat)) / 1000), maxBr = niceMax(Math.max(0, ...periods.flatMap(p => shown.map(c => p.vals[pidx.get(c.name)]))) / 1000);
+        const maxCat = niceMax(Math.max(0, ...periods.map(p => p.cat), ...periods.flatMap(p => shown.map(c => p.vals[pidx.get(c.name)]))) / 1000), maxBr = maxCat;   // one scale on both axes
         const mnv = v => (v > 0 ? Math.round(v / 1000) : null);       // zero is left empty: no bar, no label
         const catSeries = [{ name: 'Category total', labels, values: periods.map(p => mnv(p.cat)) }];
         const brSeries = shown.map(c => ({ name: (c.mine ? '★ ' : '') + c.name, labels, values: periods.map(p => mnv(p.vals[pidx.get(c.name)])) }));
