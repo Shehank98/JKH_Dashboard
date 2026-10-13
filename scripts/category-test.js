@@ -66,7 +66,7 @@ const C = require('../server/category');
   assert.ok(Math.abs(d.contribution.reduce((a, c) => a + c.part, 0) - 100) < 1e-6, 'contributions add up to 100% of the net change');
   const sh = C.detail(ds, F, { sub: 'Shampoo' });
   assert.ok(Math.abs(sh.cur - d.tables.find(t => t.name === 'Shampoo').cur) < 1e-6);
-  assert.ok(sh.mothers.length > 1 && sh.kind === 'sub');
+  assert.ok(sh.mothers.length > 1 && sh.name === 'Shampoo');
   // Competitor filter keeps only picked advertisers' brands plus ours.
   const comp = C.dashboard(ds, { ...F, comps: ['Marico Lanka'] });
   assert.ok(comp.cards.every(c => c.mine || c.name === 'Parachute'));
@@ -77,6 +77,25 @@ const C = require('../server/category');
   const early = C.dashboard(ds, { ...F, from: '2022-01', to: '2022-03' });
   assert.strictEqual(early.hasYoy, false);
   assert.strictEqual(early.cards[0].growth, null);
+  // Drill-down scopes: a period, a medium, an advertiser, a brand, a set (the folded Others row) and combinations.
+  const lastKey = d.monthly.months[d.monthly.months.length - 1], lastIdx = d.monthly.months.length - 1;
+  const whole = C.detail(ds, F, { all: true });
+  assert.ok(Math.abs(whole.cur - d.total.cur) < 1e-6 && Math.abs(whole.catCur - d.total.cur) < 1e-6);
+  const oneMonth = C.detail(ds, F, { all: true, from: lastKey, to: lastKey });
+  assert.ok(Math.abs(oneMonth.cur - d.monthly.cat[lastIdx]) < 1e-6 && oneMonth.months === 1 && oneMonth.from === lastKey);
+  const tvOnly = C.detail(ds, F, { all: true, medium: 'TV' });
+  assert.ok(Math.abs(tvOnly.cur - d.history.tv.slice(d.monthly.selStart).reduce((a, b) => a + b, 0)) < 1e-6, 'medium scope');
+  assert.ok(tvOnly.catCur === tvOnly.cur, 'share of category is within the same medium');
+  const adv = C.detail(ds, F, { adv: 'Unilever Sri Lanka' });
+  assert.ok(Math.abs(adv.cur - d.cards.filter(c => c.mine).reduce((a, c) => a + c.cur, 0)) < 1e-6, 'advertiser scope');
+  const br = C.detail(ds, F, { mb: 'Sunsilk' }).brands[0];
+  assert.ok(Math.abs(C.detail(ds, F, { brand: br.name }).cur - br.cur) < 1e-6, 'brand scope');
+  const combo = C.detail(ds, F, { mb: 'Sunsilk', sub: 'Shampoo', medium: 'Press', from: '2026-08', to: '2026-09' });
+  assert.ok(combo.cur > 0 && combo.months === 2 && combo.monthly.every(m => m.tv === 0 && m.radio === 0));
+  const tight = C.dashboard(ds, { ...F, top: 5 });
+  const othersRow = d.tables.flatMap(t => t.rows.map(r => ({ t, r }))).find(x => x.r.others);
+  if (othersRow) assert.ok(Math.abs(C.detail(ds, F, { mbs: othersRow.r.names, sub: othersRow.t.name }).cur - othersRow.r.cur) < 1e-6, 'Others row drill-down');
+  assert.ok(tight.cards.length >= 5);
   // Without sub categories there is one table of mother brands and no mix or contribution.
   const plain = new Blob([buf.toString().split('\n').map(l => l.replace(/^([^,]*,[^,]*,[^,]*,[^,]*,[^,]*,)[^,]*,/, '$1')).join('\n')]);
   plain.name = 'plain.csv';

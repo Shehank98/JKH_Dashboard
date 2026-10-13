@@ -338,10 +338,10 @@
         <div class="cc-h"><div class="cc-av">${esc(initials(c.name))}</div><div class="cc-n" title="${esc(c.name)}">${esc(c.name)}</div></div>
         <div class="cc-m"><div><div class="cc-l">${esc(cur)}</div><div class="cc-v">${mnTxt(c.cur)}</div></div>
           <div class="cc-g"><div class="cc-l">Y-o-Y growth</div><div class="cc-gv ${gcls}">${gtxt}</div></div></div>
-        <div class="cc-b"><div data-tip="${esc(`Same period last year: ${yoy}\n${c.name}: ${c.yoy == null || c.yoy <= 0 ? 'no spend' : mnTxt(c.yoy)}`)}"><i>Last year</i><span>${esc(yoy)}</span><b>${box(c.yoy)}</b></div><div data-tip="${esc(`Previous period: ${prev}\n${c.name}: ${c.prev == null || c.prev <= 0 ? 'no spend' : mnTxt(c.prev)}`)}"><i>Previous</i><span>${esc(prev)}</span><b>${box(c.prev)}</b></div></div>
+        <div class="cc-b"><div data-per="yoy" data-label="${esc(yoy)}" data-tip="${esc(`Same period last year: ${yoy}\nClick for details`)}"><i>Last year</i><span>${esc(yoy)}</span><b>${box(c.yoy)}</b></div><div data-per="prev" data-label="${esc(prev)}" data-tip="${esc(`Previous period: ${prev}\nClick for details`)}"><i>Previous</i><span>${esc(prev)}</span><b>${box(c.prev)}</b></div></div>
         <div class="cc-f"><div class="cc-s"><span>${esc(cur)} share</span><b>${nf(c.share, 0)}%</b></div>
         <div class="cc-bar"><i style="width:${Math.max(c.share > 0 ? 2 : 0, Math.min(100, c.share))}%"></i></div>
-        <div class="cc-med">${c.medium.map((v, k) => `<i style="width:${medTot ? (v / medTot) * 100 : 0}%;background:${MED_COL[k]}"></i>`).join('')}</div></div>
+        <div class="cc-med">${c.medium.map((v, k) => `<i data-med="${k}" data-tip="${esc(`${MED[k]}: ${mnTxt(v)} (${nf(medTot ? (v / medTot) * 100 : 0, 0)}%)\nClick for details`)}" style="width:${medTot ? (v / medTot) * 100 : 0}%;background:${MED_COL[k]}"></i>`).join('')}</div></div>
       </div>`;
     }).join('');
     renderLegend(cur, yoy, prev);
@@ -407,7 +407,7 @@
     });
     return [...groups.values()].sort((x, y) => x.g - y.g).map(G => {
       const a = keyOf(G.g), b = keyOf(G.g + L - 1), label = periodLabel(a, b, yt);
-      return { ...G, label, tipLabel: `${label} (${monLabel(a)} to ${monLabel(b)})`, complete: G.g >= first && G.g + L - 1 <= last };
+      return { ...G, label, from: months[G.idxs[0]], to: months[G.idxs[G.idxs.length - 1]], tipLabel: `${label} (${monLabel(a)} to ${monLabel(b)})`, complete: G.g >= first && G.g + L - 1 <= last };
     });
   }
   const PART_NAME = { m: 'Month-On-Month', q: 'Quarter-On-Quarter', h: 'Half-On-Half', y: 'Year-On-Year' };
@@ -421,11 +421,11 @@
     let periods = [];
     if (part === 'm') {
       const len = n - M.selStart, start = Math.max(0, M.selStart - Math.max(0, 15 - len));
-      for (let i = start; i < n; i++) periods.push({ label: monLabel(M.months[i]).replace('-', " '"), tipLabel: monLabel(M.months[i]), complete: true, inSel: i >= M.selStart, cat: M.cat[i], vals: pool0.map(c => c.monthly[i]) });
+      for (let i = start; i < n; i++) periods.push({ label: monLabel(M.months[i]).replace('-', " '"), from: M.months[i], to: M.months[i], tipLabel: monLabel(M.months[i]), complete: true, inSel: i >= M.selStart, cat: M.cat[i], vals: pool0.map(c => c.monthly[i]) });
     } else {
       periods = periodize(M.months, part).map(G => {
         const vals = pool0.map(c => G.idxs.reduce((a, i) => a + c.monthly[i], 0));
-        return { label: G.label, tipLabel: G.tipLabel, complete: G.complete, inSel: false, cat: G.idxs.reduce((a, i) => a + M.cat[i], 0), vals };
+        return { label: G.label, from: G.from, to: G.to, tipLabel: G.tipLabel, complete: G.complete, inSel: false, cat: G.idxs.reduce((a, i) => a + M.cat[i], 0), vals };
       });
       if (ui.hideInc) periods = periods.filter(p => p.complete);
     }
@@ -479,20 +479,20 @@
       const cx = X0 + gw * (i + 0.5), note = p.complete ? '' : '\nIncomplete period';
       const v = p.cat, top = yc(v);
       if (v > 0) {
-        cats += `<rect x="${cx - catW / 2}" y="${top}" width="${catW}" height="${Math.max(0, Y0 - top)}" fill="url(#cchGreen)" data-tip="${esc(`Category · ${p.tipLabel}\nRs ${nf(v / 1000, 0)} Mn${note}`)}"></rect>`;
+        cats += `<rect x="${cx - catW / 2}" y="${top}" width="${catW}" height="${Math.max(0, Y0 - top)}" fill="url(#cchGreen)" data-scope="${esc(JSON.stringify({ all: true, from: p.from, to: p.to, label: p.label }))}" data-tip="${esc(`Category · ${p.tipLabel}\nRs ${nf(v / 1000, 0)} Mn${note}`)}"></rect>`;
         if (!p.complete) hatch += `<rect x="${cx - catW / 2}" y="${top}" width="${catW}" height="${Math.max(0, Y0 - top)}" fill="url(#cchHatch)" pointer-events="none"></rect>`;
         if (showLabels) { const t = nf(v / 1000, 0), w = t.length * 7 + 10; labels += `<rect x="${cx - w / 2}" y="${top - 18}" width="${w}" height="16" rx="3" fill="#8BD051"></rect><text x="${cx}" y="${top - 6}" text-anchor="middle" font-size="11" font-weight="800" fill="#111">${t}</text>`; }
       }
       const here = shown.filter(c => p.vals[idxOf.get(c.name)] > 0), groupW = here.length * bw;
       here.forEach((c, j) => {
         const bv = p.vals[idxOf.get(c.name)], bx = cx - groupW / 2 + j * bw, by = yb(bv), col = colors.get(c.name);
-        brands += `<rect x="${bx}" y="${by}" width="${bw - 1}" height="${Math.max(0, Y0 - by)}" fill="${col}" data-tip="${esc(`${c.name}${c.mine ? ' (mine)' : ''} · ${p.tipLabel}\nRs ${nf(bv / 1000, 0)} Mn${note}`)}"></rect>`;
+        brands += `<rect x="${bx}" y="${by}" width="${bw - 1}" height="${Math.max(0, Y0 - by)}" fill="${col}" data-scope="${esc(JSON.stringify({ mb: c.name, from: p.from, to: p.to, label: p.label }))}" data-tip="${esc(`${c.name}${c.mine ? ' (mine)' : ''} · ${p.tipLabel}\nRs ${nf(bv / 1000, 0)} Mn${note}`)}"></rect>`;
         if (!p.complete) hatch += `<rect x="${bx}" y="${by}" width="${bw - 1}" height="${Math.max(0, Y0 - by)}" fill="url(#cchHatch)" pointer-events="none"></rect>`;
         if (showLabels && bw >= 8) { const t = nf(bv / 1000, 0), w = t.length * 6 + 8; labels += `<rect x="${bx + (bw - 1) / 2 - w / 2}" y="${by - 15}" width="${w}" height="14" rx="3" fill="${col}"></rect><text x="${bx + (bw - 1) / 2}" y="${by - 4.5}" text-anchor="middle" font-size="9.5" font-weight="800" fill="#fff">${t}</text>`; }
       });
     });
     const every = Math.ceil(n / Math.max(4, Math.floor((X1 - X0) / (part === 'm' ? 62 : 74))));
-    const xl = periods.map((p, i) => (i % every === 0 || i === n - 1 ? `<text x="${X0 + gw * (i + 0.5)}" y="${Y0 + 17}" text-anchor="middle" font-size="11" font-weight="700" fill="#1A1F36">${esc(p.label)}</text>${p.complete ? '' : `<text x="${X0 + gw * (i + 0.5)}" y="${Y0 + 30}" text-anchor="middle" font-size="9" font-weight="800" fill="#E4702A">Incomplete</text>`}` : '')).join('');
+    const xl = periods.map((p, i) => (i % every === 0 || i === n - 1 ? `<text x="${X0 + gw * (i + 0.5)}" y="${Y0 + 17}" data-scope="${esc(JSON.stringify({ all: true, from: p.from, to: p.to, label: p.label }))}" text-anchor="middle" font-size="11" font-weight="700" fill="#1A1F36">${esc(p.label)}</text>${p.complete ? '' : `<text x="${X0 + gw * (i + 0.5)}" y="${Y0 + 30}" text-anchor="middle" font-size="9" font-weight="800" fill="#E4702A">Incomplete</text>`}` : '')).join('');
     box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="cchGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8BC34A" stop-opacity=".95"></stop><stop offset="1" stop-color="#E9F5D8" stop-opacity=".35"></stop></linearGradient><pattern id="cchHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-opacity=".6" stroke-width="2"></line></pattern></defs>${grid}${axisTitle(14)}${axisTitle(W - 12)}${band}${cats}${brands}${hatch}${labels}<line x1="${X0}" x2="${X1}" y1="${Y0}" y2="${Y0}" stroke="#C7CEDF"></line>${xl}</svg>`;
     void two; void M;
   }
@@ -540,12 +540,32 @@
     return `${top.name} contributed ~${nf(Math.max(0, top.part), 0)}% of the net YoY ${d.net < 0 ? 'reduction' : 'increase'}`;
   }
   function tableHtml(t, color, d, L, single) {
-    const title = single ? `${esc(String(d.filters.pg).toUpperCase())}${t.growth == null ? '' : ' | ' + nf(t.growth, 0) + '% YoY'}` : `${esc(t.none ? 'UNASSIGNED' : t.name.toUpperCase())}${t.growth == null ? '' : ' | ' + nf(t.growth, 0) + '% YoY'}`;
+    const nm = single ? String(d.filters.pg).toUpperCase() : (t.none ? 'UNASSIGNED' : t.name.toUpperCase());
+    const title = `${esc(nm)}${t.growth == null ? '' : ' | ' + nf(t.growth, 0) + '% YoY'}`;
     const scope = single ? { all: true } : { sub: t.name };
-    const rows = t.rows.map(r => `<tr class="${r.mine ? 'mine ' : ''}${r.others ? 'oth ' : ''}${r.others ? '' : 'link'}"${r.others ? '' : ` data-mb="${esc(r.name)}"`}><td title="${esc(r.name)}">${esc(r.name)}</td><td class="c1">${numCell(r.yoy)}</td><td class="c2">${numCell(r.prev)}</td><td class="c3">${numCell(r.cur)}</td><td>${pctCell(r.growth)}</td><td>${r.cur > 0 ? nf(r.share, 0) + '%' : ''}</td></tr>`).join('');
+    const sa = single ? '' : ` data-sub="${esc(t.name)}"`;
+    const cells = (r, tot) => `<td class="c1" data-per="yoy">${numCell(r.yoy)}</td><td class="c2" data-per="prev">${numCell(r.prev)}</td><td class="c3" data-per="cur">${numCell(r.cur)}</td><td>${pctCell(r.growth)}</td><td>${tot ? '' : (r.cur > 0 ? nf(r.share, 0) + '%' : '')}</td>`;
+    const rows = t.rows.map(r => {
+      const who = r.others ? ` data-others="${esc(JSON.stringify(r.names || []))}" data-title="${esc(r.name)}"` : ` data-mb="${esc(r.name)}"`;
+      return `<tr class="${r.mine ? 'mine ' : ''}${r.others ? 'oth ' : ''}link"${sa}${who}><td title="${esc(r.name)}">${esc(r.name)}</td>${cells(r, false)}</tr>`;
+    }).join('');
     return `<div class="tblock"><div class="ttl link" data-scope="${esc(JSON.stringify(scope))}" title="Click for details"><i style="background:${color}"></i><span>${title}</span></div>
       <table class="ctab2"><tr><th>Brand</th><th>${esc(tabLabel(L.yoy))}</th><th>${esc(tabLabel(L.prev))}</th><th>${esc(tabLabel(L.cur))}</th><th>YoY</th><th>Shr.</th></tr>${rows}
-      <tr class="tot"><td>${esc(single ? String(d.filters.pg).toUpperCase() : (t.none ? 'UNASSIGNED' : t.name.toUpperCase()))}</td><td>${numCell(t.yoy)}</td><td>${numCell(t.prev)}</td><td>${numCell(t.cur)}</td><td>${pctCell(t.growth)}</td><td></td></tr></table></div>`;
+      <tr class="tot link"${sa}><td>${esc(nm)}</td>${cells(t, true)}</tr></table></div>`;
+  }
+  // The slice a table row or cell stands for: the row's mother brand (inside its sub category), or the folded Others,
+  // or the sub category total; a period column narrows it to that period.
+  function tableScope(el) {
+    const tr = el.closest('tr');
+    if (!tr) return null;
+    const sc = {};
+    if (tr.dataset.sub) sc.sub = tr.dataset.sub;
+    if (tr.dataset.others) { try { sc.mbs = JSON.parse(tr.dataset.others); } catch (err) { sc.mbs = []; } sc.title = tr.dataset.title; }
+    else if (tr.dataset.mb) sc.mb = tr.dataset.mb;
+    else if (!tr.dataset.sub) sc.all = true;
+    const per = el.closest('td[data-per]');
+    if (per) { const r = data.ranges[per.dataset.per]; sc.from = r[0]; sc.to = r[1]; sc.label = labelsOf(data)[per.dataset.per]; }
+    return sc;
   }
   function renderSubs(d, L) {
     const T = d.tables, f = d.filters;
@@ -562,9 +582,9 @@
     // Mix of sub categories in each period (100% bars).
     let mix = '';
     if (d.mix && d.mix.yoy) {
-      const rows = [[L.yoy, d.mix.yoy], d.mix.prev ? [L.prev, d.mix.prev] : null, [L.cur, d.mix.cur, true]].filter(Boolean);
+      const rows = [[L.yoy, d.mix.yoy, false, 'yoy'], d.mix.prev ? [L.prev, d.mix.prev, false, 'prev'] : null, [L.cur, d.mix.cur, true, 'cur']].filter(Boolean);
       mix = `<div class="mixblock"><div class="cblock-t cedit" id="catMixT" contenteditable="true" spellcheck="false" data-key="mix"></div>
-        ${rows.map(([lab, arr, now]) => `<div class="mixrow${now ? ' now' : ''}"><span class="lab">${esc(lab)}</span><div class="mixbar">${arr.map((p, i) => (p > 0 ? `<i style="width:${p}%;background:${colors[i]}" title="${esc(T[i].name)} ${nf(p, 1)}%">${p >= 4 ? nf(p, 0) + '%' : ''}</i>` : '')).join('')}</div></div>`).join('')}
+        ${rows.map(([lab, arr, now, key]) => `<div class="mixrow${now ? ' now' : ''}"><span class="lab">${esc(lab)}</span><div class="mixbar">${arr.map((p, i) => (p > 0 ? `<i class="link" data-scope="${esc(JSON.stringify({ sub: T[i].name, from: d.ranges[key][0], to: d.ranges[key][1], label: lab }))}" style="width:${p}%;background:${colors[i]}" title="${esc(T[i].name)} ${nf(p, 1)}%">${p >= 4 ? nf(p, 0) + '%' : ''}</i>` : '')).join('')}</div></div>`).join('')}
         <div class="mixlg">${T.map((t, i) => `<span><i style="background:${colors[i]}"></i>${esc(t.name)}</span>`).join('')}</div></div>`;
     }
     let contrib = '';
@@ -580,12 +600,11 @@
   }
   $('catSubs').addEventListener('click', e => {
     if (e.target.closest('.cedit')) return;
-    const r = e.target.closest('tr[data-mb]');
-    if (r) { openDetail({ mb: r.dataset.mb }); return; }
-    const sc = e.target.closest('[data-scope]');
-    if (sc) { try { openDetail(JSON.parse(sc.dataset.scope)); } catch (err) { /* bad scope */ } }
+    const ttl = e.target.closest('.ttl[data-scope]');
+    if (ttl) { try { openDetail(JSON.parse(ttl.dataset.scope)); } catch (err) { /* bad scope */ } return; }
+    const sc = tableScope(e.target);
+    if (sc) openDetail(sc);
   });
-
 
   // The small tab on the left card slides between Category investment and Monthly investment by brand.
   let slideM = false;
@@ -627,7 +646,7 @@
     const sumOf = (arr, idxs) => idxs.reduce((a, i) => a + arr[i], 0);
     let all = periodize(M.months, part).map(G => {
       const tv = sumOf(H.tv, G.idxs), radio = sumOf(H.radio, G.idxs), press = sumOf(H.press, G.idxs);
-      return { label: G.label, tipLabel: G.tipLabel, complete: G.complete, tv, radio, press, total: tv + radio + press, subs: H.subs.map(x => sumOf(x.values, G.idxs)) };
+      return { label: G.label, from: G.from, to: G.to, tipLabel: G.tipLabel, complete: G.complete, tv, radio, press, total: tv + radio + press, subs: H.subs.map(x => sumOf(x.values, G.idxs)) };
     });
     // Growth on the same period a year earlier, only between two complete periods.
     all.forEach((p, i) => {
@@ -643,6 +662,7 @@
   const niceMaxV = v => niceMax(Math.max(1, v));
   // Charts are described as simple shapes (rect / text / line / arrow) in a W x H box, so the screen (SVG) and the
   // PowerPoint draw exactly the same picture.
+  const pscope = (p, extra) => ({ all: true, from: p.from, to: p.to, label: p.label, ...extra });
   function ciAxes(P, W, H, T, max, left, right, yAxisTitle) {
     const Y0 = H - 34, y = v => Y0 - (v / max) * (Y0 - T);
     const plotH = Y0 - T, steps = plotH >= 170 ? 4 : plotH >= 100 ? 2 : 1;
@@ -663,7 +683,7 @@
     periods.forEach((p, i) => {
       const cx = X0 + gw * (i + 0.5);
       if (i % every && i !== periods.length - 1) return;
-      P.push({ t: 't', x: cx, y: Y0 + 17, text: p.label, size: gw < 60 ? 10 : 12, bold: true, color: '1A1F36', anchor: 'middle' });
+      P.push({ t: 't', x: cx, y: Y0 + 17, text: p.label, size: gw < 60 ? 10 : 12, bold: true, color: '1A1F36', anchor: 'middle', scope: pscope(p) });
       if (!p.complete) P.push({ t: 't', x: cx, y: Y0 + 30, text: 'Incomplete', size: 9, bold: true, color: 'E4702A', anchor: 'middle' });
     });
   }
@@ -675,14 +695,14 @@
     P.push({ t: 't', x: 6, y: 25, text: 'Total, Rs Mn', size: 11, bold: true, color: '6B7590', anchor: 'start' });
     per.forEach((p, i) => {
       const cx = X0 + gw * (i + 0.5), bw = Math.min(74, gw * 0.62), pw = Math.min(gw * 0.74, 104);
-      P.push({ t: 'r', x: cx - pw / 2, y: 6, w: pw, h: 28, fill: 'E3F0FB', rx: 14 });
-      P.push({ t: 't', x: cx, y: 25, text: nf(p.total / 1000, 0), size: gw < 70 ? 12 : 16, bold: true, color: '14568F', anchor: 'middle' });
+      P.push({ t: 'r', x: cx - pw / 2, y: 6, w: pw, h: 28, fill: 'E3F0FB', rx: 14, scope: pscope(p) });
+      P.push({ t: 't', x: cx, y: 25, text: nf(p.total / 1000, 0), size: gw < 70 ? 12 : 16, bold: true, color: '14568F', anchor: 'middle', scope: pscope(p) });
       let acc = 0;
       [p.tv, p.radio, p.press].forEach((v, k) => {
         if (v <= 0) return;
         const y1 = y(acc), y2 = y(acc + v); acc += v;
         const pct = p.total ? (v / p.total) * 100 : 0;
-        P.push({ t: 'r', x: cx - bw / 2, y: y2, w: bw, h: y1 - y2, fill: MED_HEX[k], tip: `${p.tipLabel}\\n${MED[k]}: Rs ${nf(v / 1000, 0)} Mn · ${nf(pct, 1)}%` + (p.complete ? '' : '\\nIncomplete period') });
+        P.push({ t: 'r', x: cx - bw / 2, y: y2, w: bw, h: y1 - y2, fill: MED_HEX[k], scope: pscope(p, { medium: MED[k] }), tip: `${p.tipLabel}\\n${MED[k]}: Rs ${nf(v / 1000, 0)} Mn · ${nf(pct, 1)}%` + (p.complete ? '' : '\\nIncomplete period') });
         if (pct >= 4 && y1 - y2 >= 15) P.push({ t: 't', x: cx, y: y2 + (y1 - y2) / 2 + 4, text: `${nf(pct, 0)}%`, size: gw < 70 ? 10 : 12, bold: true, color: 'FFFFFF', anchor: 'middle' });
         else if (!compact && pct >= 0.5 && k > 0) P.push({ t: 't', x: cx, y: y2 - 3, text: `${nf(pct, 0)}%`, size: 10, bold: true, color: '1A1F36', anchor: 'middle' });
       });
@@ -707,10 +727,10 @@
     per.forEach((p, i) => {
       const cx = X0 + gw * (i + 0.5), cw = Math.min(110, gw * 0.76), top = y(p.total);
       if (p.total > 0) {
-        P.push({ t: 'r', x: cx - cw / 2, y: top, w: cw, h: Y0 - top, fill: 'D6E9F8', grad: 'blue', tip: `${p.tipLabel}\\nCategory: Rs ${nf(p.total / 1000, 0)} Mn` + (p.complete ? '' : '\\nIncomplete period') });
+        P.push({ t: 'r', x: cx - cw / 2, y: top, w: cw, h: Y0 - top, fill: 'D6E9F8', grad: 'blue', scope: pscope(p), tip: `${p.tipLabel}\\nCategory: Rs ${nf(p.total / 1000, 0)} Mn` + (p.complete ? '' : '\\nIncomplete period') });
         const t = nf(p.total / 1000, 0), w = t.length * 7.5 + 12;
-        P.push({ t: 'r', x: cx - w / 2, y: top - 22, w, h: 19, fill: 'CFE8FB', rx: 3 });
-        P.push({ t: 't', x: cx, y: top - 8, text: t, size: gw < 70 ? 11 : 13, bold: true, color: '1E6FB5', anchor: 'middle' });
+        P.push({ t: 'r', x: cx - w / 2, y: top - 22, w, h: 19, fill: 'CFE8FB', rx: 3, scope: pscope(p) });
+        P.push({ t: 't', x: cx, y: top - 8, text: t, size: gw < 70 ? 11 : 13, bold: true, color: '1E6FB5', anchor: 'middle', scope: pscope(p) });
       }
       const k = on.filter(([, j]) => p.subs[j] > 0).length || 1, bw = Math.min(30, (cw * 0.9) / Math.max(1, on.length)), groupW = bw * k;
       let slot = 0;
@@ -718,11 +738,11 @@
         const v = p.subs[j];
         if (v <= 0) return;
         const hex = SUBC[CD.names.indexOf(nm) % SUBC.length], bx = cx - groupW / 2 + slot * bw, by = y(v); slot++;
-        P.push({ t: 'r', x: bx, y: by, w: bw - 1, h: Y0 - by, fill: hex, tip: `${nm}\\n${p.tipLabel}\\nRs ${nf(v / 1000, 0)} Mn${p.subGrowth[j] == null ? '' : ' · ' + nf(p.subGrowth[j], 0) + '% YoY'}` });
+        P.push({ t: 'r', x: bx, y: by, w: bw - 1, h: Y0 - by, fill: hex, scope: { sub: nm, from: p.from, to: p.to, label: p.label }, tip: `${nm}\\n${p.tipLabel}\\nRs ${nf(v / 1000, 0)} Mn${p.subGrowth[j] == null ? '' : ' · ' + nf(p.subGrowth[j], 0) + '% YoY'}` });
         if (!p.complete) P.push({ t: 'r', x: bx, y: by, w: bw - 1, h: Y0 - by, hatch: true });
         const t = nf(v / 1000, 0), w = t.length * 7 + 10;
-        P.push({ t: 'r', x: bx + (bw - 1) / 2 - w / 2, y: by - 20, w, h: 17, fill: hex, rx: 3 });
-        P.push({ t: 't', x: bx + (bw - 1) / 2, y: by - 7, text: t, size: gw < 70 ? 10 : 12, bold: true, color: SUBC_TXT[hex] || 'FFFFFF', anchor: 'middle' });
+        P.push({ t: 'r', x: bx + (bw - 1) / 2 - w / 2, y: by - 20, w, h: 17, fill: hex, rx: 3, scope: { sub: nm, from: p.from, to: p.to, label: p.label } });
+        P.push({ t: 't', x: bx + (bw - 1) / 2, y: by - 7, text: t, size: gw < 70 ? 10 : 12, bold: true, color: SUBC_TXT[hex] || 'FFFFFF', anchor: 'middle', scope: { sub: nm, from: p.from, to: p.to, label: p.label } });
         if (i === lastIdx && p.subGrowth[j] != null && by - y(p.total) >= 56) {
           const g = p.subGrowth[j], up = g >= 0;
           P.push({ t: 't', x: bx + (bw - 1) / 2, y: by - 50, text: `${up ? '▲' : '▼'} ${up ? '' : '-'}${nf(Math.abs(g), 0)}%`, size: 12, bold: true, color: up ? '2E7D32' : 'E5242B', anchor: 'middle' });
@@ -736,12 +756,12 @@
   const esc2 = v => String(v).replace(/\\n/g, '\n');
   function primsToSvg(P, W, H, id) {
     const out = P.map(e => {
-      const tip = e.tip ? ` data-tip="${esc(esc2(e.tip))}"` : '';
+      const tip = (e.tip ? ` data-tip="${esc(esc2(e.tip))}"` : '') + (e.scope ? ` data-scope="${esc(JSON.stringify(e.scope))}"` : '');
       if (e.t === 'r') return `<rect x="${e.x}" y="${e.y}" width="${Math.max(0, e.w)}" height="${Math.max(0, e.h)}" rx="${e.rx || 0}" fill="${e.hatch ? `url(#${id}H)` : e.grad ? `url(#${id}G)` : '#' + e.fill}"${e.line ? ` stroke="#${e.line}" stroke-width="${e.lw || 1}"` : ''}${e.hatch ? ' pointer-events="none"' : ''}${tip}></rect>`;
       if (e.t === 'l') return `<line x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" stroke="#${e.color}" stroke-width="${e.lw || 1}"></line>`;
       if (e.t === 'a') { const hw = e.w / 2, hh = e.h; const pts = e.dir === 'up' ? `${e.x},${e.y} ${e.x + hw},${e.y + hh * 0.5} ${e.x + hw * 0.4},${e.y + hh * 0.5} ${e.x + hw * 0.4},${e.y + hh} ${e.x - hw * 0.4},${e.y + hh} ${e.x - hw * 0.4},${e.y + hh * 0.5} ${e.x - hw},${e.y + hh * 0.5}` : `${e.x},${e.y + hh} ${e.x + hw},${e.y + hh * 0.5} ${e.x + hw * 0.4},${e.y + hh * 0.5} ${e.x + hw * 0.4},${e.y} ${e.x - hw * 0.4},${e.y} ${e.x - hw * 0.4},${e.y + hh * 0.5} ${e.x - hw},${e.y + hh * 0.5}`; return `<polygon points="${pts}" fill="#${e.fill}"></polygon>`; }
       const anchor = { start: 'start', middle: 'middle', end: 'end' }[e.anchor || 'start'];
-      return `<text x="${e.x}" y="${e.y}" font-size="${e.size}" font-weight="${e.bold ? 800 : 600}" fill="#${e.color}" text-anchor="${anchor}"${e.rot ? ` transform="rotate(${e.rot} ${e.x} ${e.y})"` : ''}>${esc(e.text)}</text>`;
+      return `<text x="${e.x}" y="${e.y}"${e.scope ? ` data-scope="${esc(JSON.stringify(e.scope))}"` : ''} font-size="${e.size}" font-weight="${e.bold ? 800 : 600}" fill="#${e.color}" text-anchor="${anchor}"${e.rot ? ` transform="rotate(${e.rot} ${e.x} ${e.y})"` : ''}>${esc(e.text)}</text>`;
     }).join('');
     return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="${id}G" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BFDDF4"></stop><stop offset="1" stop-color="#F2F8FD"></stop></linearGradient><pattern id="${id}H" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-opacity=".6" stroke-width="2"></line></pattern></defs>${out}</svg>`;
   }
@@ -824,6 +844,7 @@
   $('catCiTgl').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (b && data) { ci.part = b.dataset.v; renderCi(data); } });
   $('catCiHide').addEventListener('change', e => { ci.hideInc = e.target.checked; if (data) renderCi(data); });
   $('catCiBox').addEventListener('click', e => {
+    if (!e.target.closest('.ci-lg') && openScope(e)) return;
     const sp = e.target.closest('.ci-lg span[data-sub]');
     if (!sp || !data) return;
     const nm = sp.dataset.sub;
@@ -835,44 +856,74 @@
   // ---------- card detail ----------
   $('catGrid').addEventListener('click', e => {
     const card = e.target.closest('.ccard');
-    if (card) openDetail({ mb: card.dataset.mb });
+    if (!card) return;
+    const base = { mb: card.dataset.mb };
+    const per = e.target.closest('[data-per]'), med = e.target.closest('[data-med]');
+    if (per) { const r = data.ranges[per.dataset.per]; openDetail({ ...base, from: r[0], to: r[1], label: per.dataset.label }); }
+    else if (med) openDetail({ ...base, medium: MED[Number(med.dataset.med)] });
+    else openDetail(base);
   });
-  const closeModal = () => $('catModal').classList.remove('on');
+  // The total at the top right opens the whole selection; chart bars, labels and mix segments open their own slice.
+  $('catS1').addEventListener('click', e => { if (e.target.closest('.ctot')) openDetail({ all: true }); });
+  const openScope = e => { const el = e.target.closest('[data-scope]'); if (!el) return false; try { openDetail(JSON.parse(el.dataset.scope)); } catch (err) { return false; } return true; };
+  $('catChart').addEventListener('click', openScope);
+  $('catMixC').addEventListener('click', e => { if (!e.target.closest('.cedit')) openScope(e); });
+  const detailStack = [];
+  const closeModal = () => { $('catModal').classList.remove('on'); detailStack.length = 0; };
   $('catModal').addEventListener('click', e => { if (e.target.id === 'catModal' || e.target.closest('.x')) closeModal(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-  // scope: { mb } one mother brand, { sub } one sub category, { all: true } the whole selection.
-  async function openDetail(scope) {
+  // Drill-down. scope can combine: mb, mbs (a set), sub, adv, brand, medium, from + to (a period), or all: true.
+  // Every table row, medium chip and month in the popup goes one level deeper (Back returns).
+  async function openDetail(scope, push = true) {
+    if (push) detailStack.push(scope);
     $('catModalBox').innerHTML = '<div class="cm-h"><h3>Loading…</h3></div>';
     $('catModal').classList.add('on');
     try {
       const d = await engine.call('catDetail', { filters: data.filters, scope });
-      const { cur, yoy } = labelsOf(data);
-      const card = scope.mb ? data.cards.find(c => c.name === scope.mb) : null;
-      const row = scope.mb ? data.tables.flatMap(t => t.rows).find(r => r.name === scope.mb) : null;
-      const mine = !!((card && card.mine) || (row && row.mine));
+      const yt = state.yearType, L0 = labelsOf(data);
+      const curLabel = scope.from ? (scope.label || periodLabel(d.from, d.to, yt)) : L0.cur;
+      const yoyLabel = scope.from ? periodLabel(keyOf(idx(d.from) - 12), keyOf(idx(d.to) - 12), yt) : L0.yoy;
       const g = d.yoy > 0 ? ((d.cur - d.yoy) / d.yoy) * 100 : null;
-      const med = d.monthly.reduce((a, m) => [a[0] + m.tv, a[1] + m.radio, a[2] + m.press], [0, 0, 0]);
-      const medTot = med[0] + med[1] + med[2];
-      const share = data.total.cur ? (d.cur / data.total.cur) * 100 : 0;
+      const share = d.catCur ? (d.cur / d.catCur) * 100 : 0;
+      const mine = (scope.mb && (data.cards.some(c => c.name === scope.mb && c.mine) || data.tables.some(t => t.rows.some(r => r.name === scope.mb && r.mine)))) || (scope.adv && (data.filters.mine || []).includes(scope.adv));
+      const medTot = d.mediumTotals[0] + d.mediumTotals[1] + d.mediumTotals[2];
       const growthCell = (c, p) => (p > 0 ? `<span class="${c >= p ? 'up' : 'down'}">${c >= p ? '▲' : '▼'} ${nf(Math.abs(((c - p) / p) * 100), 0)}%</span>` : '—');
-      const table = (title, rows, kind) => rows.length ? `<div><h4 style="font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:#6B7590;margin-bottom:6px">${title}</h4><table class="cm-t"><tr><th>Name</th><th>${esc(cur)}</th><th>${esc(yoy)}</th><th>Growth</th><th>Share</th></tr>${rows.slice(0, 12).map(r => `<tr${kind === 'mb' ? ` class="link" data-mb="${esc(r.name)}"` : ''}><td title="${esc(r.name)}">${esc(r.name)}</td><td>${mnNum(r.cur)}</td><td>${r.yoy > 0 ? mnNum(r.yoy) : '–'}</td><td>${growthCell(r.cur, r.yoy)}</td><td>${nf(r.share, 0)}%</td></tr>`).join('')}</table></div>` : '';
-      const where = scope.mb ? `${esc(data.filters.pg)} · ${esc(cur)}${card ? ` · rank #${card.rank} of ${data.brandCount}` : ''}` : `${esc(data.filters.pg)} · ${esc(cur)}${scope.sub ? ' · sub category' : ''}`;
-      const tables = scope.mb ? table('Advertisers', d.advertisers) + table('Brands', d.brands) + (d.subs.length > 1 ? table('Sub categories', d.subs) : '')
-        : table('Mother brands', d.mothers, 'mb') + table('Advertisers', d.advertisers) + table('Brands', d.brands);
+      const pinned = { mb: !!scope.mb, adv: !!scope.adv, brand: !!scope.brand, sub: !!scope.sub };
+      const table = (title, rows, dim) => (rows.length && !pinned[dim] && !(rows.length < 2 && dim === 'sub')) ? `<div><h4 style="font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:#6B7590;margin-bottom:6px">${title}</h4><table class="cm-t"><tr><th>Name</th><th>${esc(curLabel)}</th><th>${esc(yoyLabel)}</th><th>Growth</th><th>Share</th></tr>${rows.slice(0, 15).map(r => `<tr class="link" data-dim="${dim}" data-name="${esc(r.name)}" title="Click to go deeper"><td>${esc(r.name)}</td><td>${mnNum(r.cur)}</td><td>${r.yoy > 0 ? mnNum(r.yoy) : '–'}</td><td>${growthCell(r.cur, r.yoy)}</td><td>${nf(r.share, 0)}%</td></tr>`).join('')}</table></div>` : '';
+      const tables = table('Mother brands', d.mothers, 'mb') + table('Advertisers', d.advertisers, 'adv') + table('Brands', d.brands, 'brand') + table('Sub categories', d.subs, 'sub');
+      const chips = [`<span>${esc(curLabel)}</span>`];
+      if (scope.sub && (scope.mb || scope.adv || scope.brand)) chips.push(`<span>${esc(scope.sub)}</span>`);
+      if (scope.mb && scope.adv) chips.push(`<span>${esc(scope.adv)}</span>`);
+      if (scope.brand && scope.mb) chips.push(`<span>${esc(scope.mb)}</span>`);
+      if (scope.medium) chips.push(`<span>${esc(scope.medium)} only</span>`);
+      chips.push(`<span>${esc(data.filters.pg)}</span>`);
+      const medChips = d.mediumTotals.map((v, k) => (v > 0 ? `<button type="button" class="cm-chip${scope.medium === MED[k] ? ' on' : ''}" data-med="${MED[k]}"><i style="background:${MED_COL[k]}"></i>${MED[k]} ${nf(medTot ? (v / medTot) * 100 : 0, 0)}% · ${mnTxt(v)}</button>` : '')).join('')
+        + (scope.medium ? '<button type="button" class="cm-chip" data-med="">All media</button>' : '');
       $('catModalBox').innerHTML = `
-        <div class="cm-h"><h3>${esc(d.name)}</h3>${mine ? '<span class="cm-tag">US</span>' : ''}<span style="color:#8A93AD;font-size:12px">${where}</span><button class="x">✕</button></div>
+        <div class="cm-h">${detailStack.length > 1 ? '<button type="button" class="cm-back" aria-label="Back">← Back</button>' : ''}<h3>${esc(d.name)}</h3>${mine ? '<span class="cm-tag">US</span>' : ''}<span class="cm-sub">${chips.join('')}</span><button class="x" aria-label="Close">✕</button></div>
         <div class="cm-stats">
-          <div class="cm-st"><span>${esc(cur)}</span><b>${mnTxt(d.cur)}</b></div>
-          <div class="cm-st"><span>${esc(yoy)}</span><b>${d.yoy > 0 ? mnTxt(d.yoy) : '–'}</b></div>
+          <div class="cm-st"><span>${esc(curLabel)}</span><b>${mnTxt(d.cur)}</b></div>
+          <div class="cm-st"><span>${esc(yoyLabel)} (last year)</span><b>${d.yoy > 0 ? mnTxt(d.yoy) : '–'}</b></div>
           <div class="cm-st"><span>Y-o-Y growth</span><b style="color:${g == null ? '#9AA3BC' : g >= 0 ? '#14803F' : '#D12B2B'}">${g == null ? '—' : (g >= 0 ? '▲ ' : '▼ ') + nf(Math.abs(g), 0) + '%'}</b></div>
-          <div class="cm-st"><span>Share of category</span><b>${nf(share, 1)}%</b></div>
+          <div class="cm-st"><span>Share of category${scope.medium ? ' (' + esc(scope.medium) + ')' : ''}</span><b>${nf(share, 1)}%</b></div>
         </div>
-        <div class="cm-sec"><h4>Monthly spend by medium (Rs. Mn)</h4>${monthlyChart(d)}
-          <div style="display:flex;gap:14px;font-size:10.5px;color:#4A5570;font-weight:600;margin:2px 0 8px">${MED.map((m, k) => `<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${MED_COL[k]};margin-right:4px"></i>${m} ${nf(medTot ? (med[k] / medTot) * 100 : 0, 0)}%</span>`).join('')}<span style="margin-left:auto"><i style="display:inline-block;width:14px;border-top:2px dashed #8A93AD;margin-right:4px;vertical-align:3px"></i>${esc(yoy)} total</span></div></div>
+        <div class="cm-meds">${medChips}</div>
+        <div class="cm-sec"><h4>${d.months > 1 ? 'Month by month by medium (click a month to go deeper)' : 'By medium'}, Rs. Mn</h4>${monthlyChart(d)}
+          <div style="display:flex;gap:14px;font-size:10.5px;color:#4A5570;font-weight:600;margin:2px 0 8px">${MED.map((m, k) => `<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${MED_COL[k]};margin-right:4px"></i>${m} ${nf(medTot ? (d.mediumTotals[k] / medTot) * 100 : 0, 0)}%</span>`).join('')}<span style="margin-left:auto"><i style="display:inline-block;width:14px;border-top:2px dashed #8A93AD;margin-right:4px;vertical-align:3px"></i>${esc(yoyLabel)} total</span></div></div>
         <div class="cm-two">${tables}</div>`;
     } catch (err) { $('catModalBox').innerHTML = `<div class="cm-h"><h3>Could not load</h3><button class="x">✕</button></div><div style="padding:20px">${esc(err.message)}</div>`; }
   }
-  $('catModalBox').addEventListener('click', e => { const r = e.target.closest('tr[data-mb]'); if (r) openDetail({ mb: r.dataset.mb }); });
+  $('catModalBox').addEventListener('click', e => {
+    const cur = detailStack[detailStack.length - 1];
+    if (!cur) return;
+    if (e.target.closest('.cm-back')) { detailStack.pop(); openDetail(detailStack[detailStack.length - 1], false); return; }
+    const row = e.target.closest('tr[data-dim]');
+    if (row) { const next = { ...cur, [row.dataset.dim]: row.dataset.name }; delete next.title; if (row.dataset.dim === 'mb') delete next.mbs; openDetail(next); return; }
+    const chip = e.target.closest('.cm-chip');
+    if (chip) { const next = { ...cur }; if (chip.dataset.med) next.medium = chip.dataset.med; else delete next.medium; openDetail(next); return; }
+    const mo = e.target.closest('[data-month]');
+    if (mo) openDetail({ ...cur, from: mo.dataset.month, to: mo.dataset.month, label: monLabel(mo.dataset.month) });
+  });
   function monthlyChart(d) {
     const W = 840, H = 190, X0 = 38, Y0 = H - 24, Y1 = 12, n = d.monthly.length;
     const tot = m => m.tv + m.radio + m.press;
@@ -888,7 +939,8 @@
       const label = n <= 14 ? `<text x="${cx}" y="${y(tot(m)) - 4}" text-anchor="middle" font-size="9.5" font-weight="700" fill="#1A1F36">${mnNum(tot(m))}</text>` : '';
       const every = Math.ceil(n / 14);
       const xl = i % every === 0 ? `<text x="${cx}" y="${H - 7}" text-anchor="middle" font-size="9.5" fill="#6B7590">${monLabel(m.key)}</text>` : '';
-      return `<g><title>${monLabel(m.key)}: ${mnTxt(tot(m))}</title>${segs}${label}${xl}</g>`;
+      const hit = n > 1 ? `<rect data-month="${m.key}" x="${cx - slot / 2}" y="${Y1}" width="${slot}" height="${Y0 - Y1 + 18}" fill="transparent" style="cursor:pointer"></rect>` : '';
+      return `<g><title>${monLabel(m.key)}: ${mnTxt(tot(m))}</title>${segs}${label}${xl}${hit}</g>`;
     }).join('');
     const line = d.monthly.map((m, i) => `${i ? 'L' : 'M'}${(X0 + slot * (i + 0.5)).toFixed(1)},${y(m.yoy).toFixed(1)}`).join('');
     const hasY = d.monthly.some(m => m.yoy > 0);

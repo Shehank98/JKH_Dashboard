@@ -310,3 +310,24 @@ body.mode-cat .modebtn:hover{box-shadow:0 4px 12px rgba(47,93,191,.45)}
 /* View-only (shared link): the filters and data cannot be changed, everything else can be clicked */
 body.ro-cat #catFilterBtn,body.ro-cat .ctab[data-pane=cpFilters],body.ro-cat #cpFilters,body.ro-cat #cDfoot{display:none!important}
 .chip .unlock{border:none;background:none;color:#B4540F;font:inherit;font-weight:800;cursor:pointer;margin-left:6px;padding:0;text-decoration:underline}
+
+/* Everything that opens a detail is a pointer */
+[data-scope],.ctot,.cc-b>div,.cc-med i,.ctab2 tr.link,.cm-t tr.link{cursor:pointer}
+.ctot{border-radius:8px;transition:background .15s}
+.ctot:hover{background:#F4F6FA}
+.cc-b>div:hover{background:#E9EDF5}
+.cc-med i:hover{filter:brightness(1.25)}
+.ctab2 tr.link:hover td{filter:brightness(.95)}
+.ci-svg [data-scope]:hover{opacity:.82}
+.cch-box [data-scope]:hover{opacity:.82}
+.mixbar i.link:hover{filter:brightness(1.1)}
+.cm-back{border:1px solid #DDE3EF;background:#fff;color:#1A1F36;font:inherit;font-size:12px;font-weight:700;padding:5px 10px;border-radius:8px;cursor:pointer}
+.cm-back:hover{background:#F6F8FC}
+.cm-sub{display:flex;gap:6px;flex-wrap:wrap}
+.cm-sub span{background:#EEF2FB;color:#3F5480;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px}
+.cm-meds{display:flex;gap:8px;flex-wrap:wrap;padding:8px 20px 0}
+.cm-chip{display:flex;align-items:center;gap:6px;border:1px solid #DDE3EF;background:#fff;color:#1A1F36;font:inherit;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:20px;cursor:pointer}
+.cm-chip i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.cm-chip:hover{background:#F6F8FC}
+.cm-chip.on{background:#1A1F36;color:#fff;border-color:#1A1F36}
+.cm-t tr.link:hover td{background:#F6F8FC}
