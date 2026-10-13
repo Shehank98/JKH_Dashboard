@@ -12,7 +12,7 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 // Spot-log files are read and analysed in each person's browser (public/engine/worker.js), so people never
 // see or overwrite each other's data and the server holds no datasets. The server handles sign-in and
 // serves the app, including the shared calculation code the browser runs.
-const ENGINE_LIB = ['derive', 'builder', 'compute', 'planning', 'competitor', 'browser-readers'];
+const ENGINE_LIB = ['derive', 'builder', 'compute', 'planning', 'competitor', 'category-builder', 'category', 'browser-readers'];
 // Where "Send to planning tool" opens. The planning tool must list this dashboard's address as allowed.
 const PLANNING_TOOL_URL = (process.env.PLANNING_TOOL_URL || 'https://media-planing-v2-copy-production.up.railway.app').replace(/\/+$/, '');
 

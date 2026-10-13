@@ -7,7 +7,7 @@
 importScripts('/vendor/jszip/jszip.min.js');
 
 // ---- a tiny CommonJS loader for the shared modules ----
-const LIB = ['derive', 'builder', 'compute', 'planning', 'competitor', 'browser-readers'];
+const LIB = ['derive', 'builder', 'compute', 'planning', 'competitor', 'category-builder', 'category', 'browser-readers'];
 const SRC = {}, CACHE = {};
 function requireLib(name) {
   if (name === 'jszip') return self.JSZip;
@@ -53,6 +53,7 @@ async function idbDo(mode, fn) {
 
 let owner = 'local';
 let dataset = null;
+let catDataset = null; // the Category file, saved under the same person with a ':category' suffix
 const isoDay = d => new Date(d * 86400000).toISOString().slice(0, 10);
 const describe = ds => (ds ? { ...ds.meta, minDate: isoDay(ds.meta.minDay), maxDate: isoDay(ds.meta.maxDay), storedIn: 'browser' } : null);
 
@@ -79,6 +80,32 @@ const handlers = {
     try { await idbDo('readwrite', s => s.delete(owner)); } catch (e) { /* nothing saved */ }
     return { ok: true };
   },
+  // ---- Category dashboard (a second, independent file) ----
+  async catInit() {
+    catDataset = null;
+    let saved = null, storageError = null;
+    try { saved = await idbDo('readonly', s => s.get(owner + ':category')); } catch (e) { storageError = e.message; }
+    if (saved && saved.cols && saved.dicts && saved.meta && saved.meta.kind === 'category') catDataset = saved;
+    return { dataset: describeCat(catDataset), storageError };
+  },
+  async catIngest({ file }, progress) {
+    const { readCategoryFile } = requireLib('browser-readers');
+    const ds = await readCategoryFile(file, (pct, rows) => progress({ pct, rows }));
+    catDataset = ds;
+    let saved = true, storageError = null;
+    progress({ pct: 1, rows: ds.meta.rows, saving: true });
+    try { await idbDo('readwrite', s => s.put(ds, owner + ':category')); } catch (e) { saved = false; storageError = e.message; }
+    return { dataset: describeCat(ds), saved, storageError };
+  },
+  async catClear() {
+    catDataset = null;
+    try { await idbDo('readwrite', s => s.delete(owner + ':category')); } catch (e) { /* nothing saved */ }
+    return { ok: true };
+  },
+  catOverview() { return requireLib('category').overview(needCat()); },
+  catOptions({ pg, sub }) { return requireLib('category').options(needCat(), String(pg || ''), sub ? String(sub) : ''); },
+  catDashboard(filters) { return requireLib('category').dashboard(needCat(), filters || {}); },
+  catDetail({ filters, scope }) { return requireLib('category').detail(needCat(), filters || {}, scope || {}); },
   overview() { return requireLib('compute').overview(need()); },
   options({ pg }) { return requireLib('compute').groupOptions(need(), String(pg || '')); },
   dashboard(filters) {
@@ -91,6 +118,12 @@ const handlers = {
   planning({ filters, user }) { return requireLib('planning').planning(need(), filters || {}, { user: user || '' }); },
   competitor({ filters, user }) { return requireLib('competitor').competitorIntel(need(), filters || {}, { user: user || '' }); },
 };
+const monKey = m => `${Math.floor(m / 12)}-${String((m % 12) + 1).padStart(2, '0')}`;
+const describeCat = ds => (ds ? { ...ds.meta, minMonth: monKey(ds.meta.minMon), maxMonth: monKey(ds.meta.maxMon), storedIn: 'browser' } : null);
+function needCat() {
+  if (!catDataset) throw new Error('No category file loaded yet. Open Filters, Data file, and choose your category file.');
+  return catDataset;
+}
 function need() {
   if (!dataset) throw new Error('No data file loaded yet. Open Filters, Data file, and choose your file.');
   return dataset;

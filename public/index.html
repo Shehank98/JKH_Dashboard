@@ -370,6 +370,7 @@ tr.me .sharebar{background:#FF8A3D}
 .exporting .card{opacity:1}
 .exporting .acc{overflow:hidden}
 </style>
+<link rel="stylesheet" href="category.css?v=1">
 </head>
 <body>
 
@@ -470,21 +471,116 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
+<input type="checkbox" id="catDrawerToggle">
+<label class="scrim catscrim" for="catDrawerToggle"></label>
+<div class="drawer" id="catDrawer">
+  <div class="dhead">
+    <label class="closeX" for="catDrawerToggle">✕</label>
+    <div class="brand"><img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"></div>
+    <div class="brandsub">Category dashboard</div>
+    <div class="tabs">
+      <button class="ctab on" data-pane="cpFilters">Filters</button>
+      <button class="ctab" data-pane="cpData">Data file<span class="dot" id="catDataDot" style="display:none"></span></button>
+    </div>
+  </div>
+  <div class="dbodyw">
+    <div class="cpane on" id="cpFilters">
+      <div class="sec">
+        <div class="sech"><span class="n">1</span> Period and category</div>
+        <div class="flabel">Month range</div>
+        <div class="dateRow"><select class="inp" id="cFrom" aria-label="From month"></select><select class="inp" id="cTo" aria-label="To month"></select></div>
+        <div class="flabel">Quick range</div>
+        <div class="segbar" id="cQuick">
+          <button class="seg" data-v="q">Latest qtr</button>
+          <button class="seg" data-v="h">Latest half</button>
+          <button class="seg" data-v="y">Latest year</button>
+        </div>
+        <div class="flabel">Year type <span class="cnt">for quarters, halves, years</span></div>
+        <div class="segbar" id="cYearType">
+          <button class="seg on" data-v="CY">Calendar (Jan–Dec)</button>
+          <button class="seg" data-v="FY">Financial (Apr–Mar)</button>
+        </div>
+        <div class="flabel">Product group</div>
+        <select class="inp" id="cPg"></select>
+        <div id="cSubWrap"><div class="flabel">Sub category</div>
+        <select class="inp" id="cSub"></select></div>
+      </div>
+      <div class="sec">
+        <div class="sech"><span class="n">2</span> Advertisers</div>
+        <div class="flabel">My advertiser <span class="cnt" id="cMineCnt"></span></div>
+        <input class="inp search" id="cMineSearch" placeholder="Search advertisers">
+        <div class="olist" id="cMineList"></div>
+        <div class="flabel" style="margin-top:12px">Competitors <span class="cnt" id="cCompCnt"></span></div>
+        <input class="inp search" id="cCompSearch" placeholder="Search advertisers">
+        <div class="olist comp" id="cCompList"></div>
+        <div class="hint">Cards for mother brands of my advertisers are highlighted. Leave competitors empty to rank every mother brand; pick some to show only their mother brands plus mine.</div>
+      </div>
+      <div class="sec">
+        <div class="sech"><span class="n">3</span> Cards</div>
+        <div class="flabel">How many mother brands</div>
+        <div class="segbar" id="cTop">
+          <button class="seg" data-v="5">Top 5</button>
+          <button class="seg on" data-v="10">Top 10</button>
+          <button class="seg" data-v="15">Top 15</button>
+          <button class="seg" data-v="0">All</button>
+        </div>
+      </div>
+    </div>
+    <div class="cpane" id="cpData">
+      <div class="sec">
+        <div class="sech">Category data (this browser)</div>
+        <div id="cDfile"></div>
+        <div class="btnrow"><button class="btn ghost" id="cDeleteBtn" disabled>Remove data</button></div>
+      </div>
+      <div class="sec">
+        <div class="sech">Load a file</div>
+        <label class="drop" id="cDrop" for="cFileInput">
+          <span id="cDropText">Drop .xlsx or .csv here, or click to choose</span>
+          <small>Read on this computer, never sent to the server · only you see it</small>
+        </label>
+        <input type="file" id="cFileInput" accept=".xlsx,.xlsm,.csv" style="display:none">
+        <div class="btnrow"><button class="btn pri" id="cUploadBtn" disabled>Upload</button></div>
+        <div class="prog" id="cProg" style="display:none"><div id="cProgBar"></div></div>
+        <div class="ustatus" id="cUstatus"></div>
+      </div>
+      <div class="sec cols">
+        <div class="sech">Columns used</div>
+        <code>Month</code> <code>Product Group</code> <code>Mother Brand</code> <code>Advertiser</code> <code>Brand</code>
+        <code>Tv (000Rs)</code> <code>Radio (000Rs)</code> <code>Press (000Rs)</code>, and optionally <code>Sub Category</code>.
+        Frequency, duration, insertion and Total columns are ignored. Month can be written like Jan-22.
+      </div>
+    </div>
+  </div>
+  <div class="dfoot" id="cDfoot">
+    <button class="resetBtn" id="cResetBtn">Reset</button>
+    <label class="applyBtn" for="catDrawerToggle" id="cApplyBtn">Apply Filters</label>
+  </div>
+</div>
+
 <div class="topbar">
   <div class="logo">
     <img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub">
   </div>
-  <label class="fbtn" for="drawerToggle" id="filterBtn">☰ Filters</label>
-  <div class="daterange">
+  <button class="modebtn" id="modeBtn" title="Switch between the spot log dashboard and the category dashboard"><span class="mi">⇄</span><span id="modeTxt">Switch to Category</span></button>
+  <label class="fbtn spot-only" for="drawerToggle" id="filterBtn">☰ Filters</label>
+  <label class="fbtn cat-only" for="catDrawerToggle" id="catFilterBtn">☰ Filters</label>
+  <div class="daterange cat-only">
+    <span class="dr-l">Period</span>
+    <span class="dr-v" id="catPeriodText">No data</span>
+    <span class="chip" id="catPeriodLen" style="background:#F4F6FA;color:#6B7590">0 months</span>
+  </div>
+  <div class="chips cat-only" id="catChips"></div>
+  <div class="daterange spot-only">
     <span class="dr-l">Period</span>
     <span class="dr-v" id="periodText">No data</span>
     <span class="chip" id="periodLen" style="background:#F4F6FA;color:#6B7590">0 months</span>
   </div>
-  <div class="chips" id="chips"></div>
+  <div class="chips spot-only" id="chips"></div>
   <div class="tright" id="tright">
-    <button class="fbtn light" id="exportBtn">Export ▾</button>
-    <button class="fbtn light" id="shareBtn">Share</button>
-    <div class="menu" id="exportMenu">
+    <button class="fbtn light cat-only" id="catSaveBtn">Save image</button>
+    <button class="fbtn light spot-only" id="exportBtn">Export ▾</button>
+    <button class="fbtn light spot-only" id="shareBtn">Share</button>
+    <div class="menu spot-only" id="exportMenu">
       <button data-x="jpg"><b>JPG images (ZIP)</b><span>Full dashboard plus each chart as its own JPG</span></button>
       <button data-x="pdf"><b>PDF</b><span>The whole dashboard on one landscape page</span></button>
       <button data-x="ppt"><b>PowerPoint (PPT)</b><span>Title slide, full dashboard, then one slide per chart</span></button>
@@ -503,6 +599,7 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
+<div class="view" id="viewSpot">
 <div class="kpirow" id="kpis">
   <div class="card kpi" id="k1" data-tip="Click to see every advertiser in the category">
     <div class="kl">Total Category Spend <span class="more">Details ›</span></div>
@@ -561,6 +658,17 @@ tr.me .sharebar{background:#FF8A3D}
     <div class="fill" id="duration"></div>
   </div>
 </div>
+</div>
+
+<div class="view" id="viewCat">
+  <div class="chead2">
+    <div class="ctl"><h2 id="catTitle" contenteditable="true" spellcheck="false" title="Click to edit the headline">Leading Brands by Investment</h2><p id="catSub">Top 10 mother brands ranked by investment | Investment in Rs. Mn</p></div>
+    <div class="ctot"><span id="catTotLabel">TOTAL</span><b id="catTot">0 Mn</b></div>
+  </div>
+  <div class="cgrid" id="catGrid"></div>
+  <div class="clegend" id="catLegend"></div>
+  <div class="coverlay" id="catOverlay"><div class="ovcard"><h3 id="catOvTitle">Load your category file</h3><p id="catOvText"></p><label class="fbtn" for="catDrawerToggle">☰ Open Filters</label></div></div>
+</div>
 
 <div class="overlay" id="overlay">
   <div class="ovcard">
@@ -594,6 +702,9 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=31"></script>
+<div class="cmodal" id="catModal"><div class="cmbox" id="catModalBox"></div></div>
+
+<script src="app.js?v=32"></script>
+<script src="category.js?v=1"></script>
 </body>
 </html>

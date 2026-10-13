@@ -62,6 +62,7 @@
   window.__lastDetail = null;
   window.__engineCall = (cmd, args) => engine.call(cmd, args);
   let me = null; // signed-in person, owner of the data saved in this browser
+  window.ORBIT = { engine, ready: false, esc, nf: (v, d = 0) => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }), toast: m => toast(m) };
 
   const nf = (v, d = 0) => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
   function money(v, withLkr = true) {
@@ -1463,6 +1464,7 @@
       await loadUser();
       const s = await engine.call('init', { user: me ? me.email : 'local' });
       renderDataFile(s.dataset);
+      window.ORBIT.ready = true; document.dispatchEvent(new Event('orbit:ready')); // the Category dashboard starts here
       if (s.storageError) setUploadStatus('This browser does not allow saving data, so you will need to load your file each time.', true);
       if (s.dataset) await loadOverview(false);
       else { showEmpty(); showPane('paneData'); }
