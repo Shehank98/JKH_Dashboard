@@ -661,39 +661,59 @@ tr.me .sharebar{background:#FF8A3D}
 </div>
 
 <div class="view" id="viewCat">
-  <div class="cscroll" id="catScroll">
-    <section class="cslide" id="catS0">
-      <div class="chead2">
-        <div class="ctl"><h2 class="cedit" id="catTitle0" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2><p id="catSub0"></p></div>
-        <label class="opt2 ciopt" id="catCiHideWrap"><input type="checkbox" id="catCiHide">Hide incomplete</label>
-        <div class="tgl" id="catCiTgl" title="Group by year, half year or quarter (follows Calendar / Financial year)"><button data-v="y" class="on">Years</button><button data-v="h">Halves</button><button data-v="q">Quarters</button></div>
-      </div>
-      <div class="ci-grid" id="catCi"></div>
-      <div class="ci-notes" id="catCiNotes" contenteditable="true" spellcheck="false" title="Click to edit the notes"></div>
-    </section>
-    <section class="cslide" id="catS1">
+  <div class="cone" id="catOne">
+    <section class="cpanel cards" id="catS1">
       <div class="chead2">
         <div class="ctl"><h2 class="cedit" id="catTitle" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2><p id="catSub"></p></div>
         <div class="ctot"><span id="catTotLabel">TOTAL</span><b id="catTot">0 Mn</b></div>
       </div>
-      <div class="cgrid" id="catGrid"></div>
-      <div class="clegend" id="catLegend"></div>
-    </section>
-    <section class="cslide" id="catS2">
-      <div class="chead2">
-        <div class="ctl"><h2 class="cedit" id="catTitle2" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2><p id="catSub2"></p></div>
-        <div class="tgl" id="catPartTgl" title="Group the chart by month, quarter, half year or year (follows Calendar / Financial year)"><button data-v="m" class="on">Months</button><button data-v="q">Quarters</button><button data-v="h">Halves</button><button data-v="y">Years</button></div>
+      <div class="cstrip">
+        <button type="button" class="cs-arrow l" id="csPrev" aria-label="Show earlier brands" hidden>‹</button>
+        <div class="cgrid" id="catGrid"></div>
+        <button type="button" class="cs-arrow r" id="csNext" aria-label="Show more brands" hidden>›</button>
       </div>
-      <div class="cchart" id="catChart"></div>
+      <div class="clegend" id="catLegend" hidden></div>
     </section>
-    <section class="cslide auto" id="catS3">
-      <div class="chead2">
-        <div class="ctl"><h2 class="cedit" id="catTitle3" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2><p id="catSub3"></p></div>
+    <div class="cmain">
+      <div class="ccolL">
+        <section class="cpanel" id="catS0">
+          <div class="cph">
+            <h2 class="cedit cpt" id="catTitle0" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2>
+            <p id="catSub0" hidden></p>
+            <label class="opt2" id="catCiHideWrap"><input type="checkbox" id="catCiHide">Hide incomplete</label>
+            <div class="tgl" id="catCiTgl" title="Group by year, half year or quarter (follows Calendar / Financial year)"><button data-v="y" class="on">Years</button><button data-v="h">Halves</button><button data-v="q">Quarters</button></div>
+            <button type="button" class="flipbtn" id="catCiFlip" aria-label="Flip between category and sub category investment" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-15.5-6.2L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 15.5 6.2L21 16"/><path d="M21 21v-5h-5"/></svg><span>Sub categories</span></button>
+          </div>
+          <div class="flipbox" id="catCiBox">
+            <div class="face f" id="ciFront"></div>
+            <div class="face b" id="ciBack"></div>
+          </div>
+          <div class="ci-notes" id="catCiNotes" contenteditable="true" spellcheck="false" title="Click to edit the notes"></div>
+        </section>
+        <section class="cpanel" id="catS2">
+          <div class="cph">
+            <h2 class="cedit cpt" id="catTitle2" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2>
+            <p id="catSub2" hidden></p>
+            <div class="tgl" id="catPartTgl" title="Group the chart by month, quarter, half year or year (follows Calendar / Financial year)"><button data-v="m" class="on">Months</button><button data-v="q">Quarters</button><button data-v="h">Halves</button><button data-v="y">Years</button></div>
+          </div>
+          <div class="cchart" id="catChart"></div>
+        </section>
       </div>
-      <div class="csubs" id="catSubs"></div>
-    </section>
+      <div class="ccolR">
+        <section class="cpanel" id="catS3">
+          <div class="cph">
+            <h2 class="cedit cpt" id="catTitle3" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2>
+            <p id="catSub3" hidden></p>
+            <button type="button" class="flipbtn" id="catBrFlip" aria-label="Flip between mother brand tables and mix and contribution" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-15.5-6.2L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 15.5 6.2L21 16"/><path d="M21 21v-5h-5"/></svg><span>Mix &amp; contribution</span></button>
+          </div>
+          <div class="flipbox" id="catBrBox">
+            <div class="face f"><div class="csubs" id="catSubs"></div></div>
+            <div class="face b"><div class="csubs mixc" id="catMixC"></div></div>
+          </div>
+        </section>
+      </div>
+    </div>
   </div>
-  <div class="cnav" id="catNav"><button data-s="catS0" class="on" title="Category investment"></button><button data-s="catS1" title="Cards"></button><button data-s="catS2" title="Month by month"></button><button data-s="catS3" title="Sub categories"></button></div>
   <div class="coverlay" id="catOverlay"><div class="ovcard"><h3 id="catOvTitle">Load your category file</h3><p id="catOvText"></p><label class="fbtn" for="catDrawerToggle">☰ Open Filters</label></div></div>
 </div>
 

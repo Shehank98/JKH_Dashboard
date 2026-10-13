@@ -204,3 +204,89 @@ body.mode-cat .modebtn:hover{box-shadow:0 4px 12px rgba(47,93,191,.45)}
 .ciopt{align-self:center;margin:0 4px 0 0!important}
 .chead2 .opt2{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#4A5570;cursor:pointer}
 .chead2 .opt2 input{accent-color:#FF8A3D}
+
+/* ===== One-screen layout (cards on top, charts left, mother brands right) ===== */
+.cone{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
+.cpanel{background:#fff;border:1px solid #E5E9F2;border-radius:12px;padding:8px 12px 6px;display:flex;flex-direction:column;gap:4px;min-height:0;min-width:0;position:relative}
+.cpanel.cards{flex:0 0 auto;padding:10px 14px 8px;gap:6px}
+.cmain{flex:1;min-height:0;display:flex;gap:10px}
+.ccolL{flex:0 0 62%;max-width:62%;display:flex;flex-direction:column;gap:10px;min-width:0}
+.ccolL .cpanel{flex:1 1 0}
+.ccolR{flex:1;min-width:0;display:flex}
+.ccolR .cpanel{flex:1}
+.cph{display:flex;align-items:center;gap:10px;min-height:30px;flex-shrink:0}
+.cpt{flex:1;min-width:0;margin:0 0 0 -4px;padding:1px 4px;border-radius:5px;font-family:inherit;font-size:15px;font-weight:700;color:#1A1F36;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cpt:focus{text-overflow:clip}
+.cph .opt2{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#4A5570;cursor:pointer;white-space:nowrap}
+.cph .opt2 input{accent-color:#FF8A3D}
+.flipbtn{display:flex;align-items:center;gap:6px;border:1px solid #DDE3EF;background:#fff;color:#1A1F36;font-family:inherit;font-size:11px;font-weight:700;padding:6px 10px;border-radius:8px;cursor:pointer;flex-shrink:0;white-space:nowrap}
+.flipbtn:hover{background:#F6F8FC}
+.flipbtn[hidden]{display:none}
+.flipbox{position:relative;flex:1;min-height:0}
+.flipbox .face{position:absolute;inset:0;display:flex;flex-direction:column;min-height:0}
+.flipbox .face.b{visibility:hidden}
+.flipbox.back .face.f{visibility:hidden}
+.flipbox.back .face.b{visibility:visible}
+.flipbox.out{animation:flipOut .22s ease-in forwards}
+.flipbox.in{animation:flipIn .26s ease-out}
+@keyframes flipOut{to{transform:perspective(1400px) rotateY(90deg);opacity:.25}}
+@keyframes flipIn{from{transform:perspective(1400px) rotateY(-90deg);opacity:.25}}
+.flipbox .ci-box{border:none;padding:0;border-radius:0;flex:1;background:none}
+.ci-t{font-size:13px}
+
+/* Cards: one row, left to right, no scroll bar (arrows, drag and wheel move it) */
+#catOne .cards .chead2{border-bottom:none;padding:0 0 2px;align-items:flex-end}
+#catOne .cards .chead2 h2{font-size:22px}
+.cstrip{position:relative}
+.cstrip::before,.cstrip::after{content:"";position:absolute;top:0;bottom:6px;width:46px;pointer-events:none;z-index:1;opacity:0;transition:opacity .2s}
+.cstrip::before{left:0;background:linear-gradient(270deg,rgba(255,255,255,0),#fff)}
+.cstrip::after{right:0;background:linear-gradient(90deg,rgba(255,255,255,0),#fff)}
+.cstrip.more-l::before,.cstrip.more-r::after{opacity:1}
+#catOne .cgrid{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;height:142px;flex:none;padding:3px 3px 6px;scrollbar-width:none;-ms-overflow-style:none;cursor:grab;grid-template-columns:none;grid-auto-rows:auto}
+#catOne .cgrid::-webkit-scrollbar{display:none;width:0;height:0}
+#catOne .cgrid.drag{cursor:grabbing;user-select:none}
+#catOne .ccard{flex:0 0 218px;height:auto;box-sizing:border-box;padding:6px 10px 7px;border-top-width:5px;border-radius:12px;gap:2px;justify-content:space-between}
+#catOne .ccard.us{box-shadow:0 0 0 3px rgba(255,138,61,.18),0 4px 12px rgba(228,112,42,.25)}
+#catOne .cc-h{min-height:0;padding-bottom:4px;gap:8px}
+#catOne .cc-av{width:22px;height:22px;font-size:9px}
+#catOne .cc-n{font-size:11.5px;-webkit-line-clamp:1}
+#catOne .cc-l{font-size:8.5px}
+#catOne .cc-v{font-size:20px}
+#catOne .cc-gv{font-size:13px}
+#catOne .cc-b{gap:6px}
+#catOne .cc-b div{padding:2px 2px 3px;border-radius:7px}
+#catOne .cc-b span{font-size:8px}
+#catOne .cc-b b{font-size:12px}
+#catOne .cc-s span{font-size:7.5px}
+#catOne .cc-s b{font-size:11.5px}
+#catOne .cc-bar{height:5px}
+#catOne .cc-med{display:none}
+#catOne .ccard.us::before{font-size:8.5px;padding:2px 7px 3px;right:10px}
+.cs-arrow{position:absolute;top:50%;transform:translateY(-50%);width:30px;height:30px;border-radius:50%;border:1px solid #DDE3EF;background:#fff;box-shadow:0 2px 8px rgba(20,26,46,.18);font-size:20px;line-height:1;color:#1A1F36;cursor:pointer;z-index:2;padding:0 0 3px}
+.cs-arrow:hover{background:#F6F8FC}
+.cs-arrow.l{left:-8px}.cs-arrow.r{right:-8px}
+.cs-arrow[hidden]{display:none}
+
+/* Charts and tables inside panels */
+#catOne .cchart{border:none;padding:0;border-radius:0;flex:1;min-height:0}
+#catOne .cch-t{font-size:13px}
+#catOne .csubs{display:block;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;max-width:none;padding:0 6px 0 0}
+#catOne .csubs .tblock{margin-bottom:14px}
+#catOne .ctab2{font-size:11.5px}
+#catOne .ctab2 th{padding:5px 6px;font-size:9.5px}
+#catOne .ctab2 td{padding:3px 6px}
+#catOne .ctab2 tr.mine td{font-size:12.5px}
+#catOne .ttl{font-size:13px}
+#catOne .mixc{display:flex;flex-direction:column;gap:24px;padding-top:4px}
+#catOne .cblock-t{font-size:15px}
+#catOne .ci-notes{flex-shrink:0;border:none;border-top:1px solid #EEF1F7;border-radius:0;padding:5px 4px 2px;font-size:12px;line-height:1.4}
+#catOne .ci-notes li{margin:2px 0}
+#catOne .clegend{display:none}
+@media (max-height:999px){#catOne .ci-notes{display:none}}
+@media (max-height:800px){
+  #catOne .ci-t,#catOne .cch-t{display:none}
+  #catOne .cch-lg .opt2{display:none}
+  #catOne .cc-b{display:none}
+  #catOne .cgrid{height:106px}
+  #catOne .cards .chead2 h2{font-size:19px}
+}

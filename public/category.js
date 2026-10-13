@@ -151,8 +151,9 @@
     $('catOverlay').classList.add('on');
     $('viewCat').classList.add('nodata');
     for (const id of ['catTitle', 'catSub', 'catTot', 'catTotLabel', 'catTitle2', 'catSub2', 'catTitle3', 'catSub3', 'catTitle0', 'catSub0']) $(id).textContent = '';
-    $('catCi').innerHTML = ''; $('catCiNotes').innerHTML = '';
+    $('ciFront').innerHTML = ''; $('ciBack').innerHTML = ''; $('catCiNotes').innerHTML = ''; $('catMixC').innerHTML = '';
     $('catGrid').innerHTML = ''; $('catLegend').innerHTML = ''; $('catChart').innerHTML = ''; $('catSubs').innerHTML = '';
+    $('catCiFlip').hidden = true; $('catBrFlip').hidden = true;
     $('catPeriodText').textContent = 'No data'; $('catPeriodLen').textContent = '0 months'; $('catChips').innerHTML = '';
     showPane('cpData');
   }
@@ -305,7 +306,6 @@
     renderSubs(d, { cur, yoy, prev });
     if (!d.cards.length) { $('catGrid').innerHTML = '<div class="nodata2">No spend found for these filters.</div>'; renderLegend(cur, yoy, prev); return; }
     const colors = brandColors(d.cards);
-    sizeGrid();
     $('catGrid').innerHTML = d.cards.map((c, i) => {
       const color = colors.get(c.name);
       const g = c.growth;
@@ -326,6 +326,8 @@
       </div>`;
     }).join('');
     renderLegend(cur, yoy, prev);
+    $('catGrid').scrollLeft = 0;
+    requestAnimationFrame(updateStrip);
   }
 
   // The same colour for a mother brand on its card and in the chart; ours are orange.
@@ -335,13 +337,37 @@
     cards.forEach(c => m.set(c.name, c.mine ? US : COLORS[ci++ % COLORS.length]));
     return m;
   }
-  // Every card is the same size whether 5 or 10 are shown: two rows fill the screen, more rows scroll.
-  function sizeGrid() {
-    const g = $('catGrid');
-    if (!g.clientHeight) return;
-    g.style.setProperty('--rowh', Math.max(215, Math.floor((g.clientHeight - 9 - 12) / 2)) + 'px');
+  // The cards are one row, left to right, whatever the count. There is no scroll bar: arrows, dragging and the
+  // wheel / trackpad move it, and a fade shows there are more.
+  function updateStrip() {
+    const g = $('catGrid'), wrap = g.parentNode, max = g.scrollWidth - g.clientWidth - 2;
+    const l = g.scrollLeft > 4, r = g.scrollLeft < max;
+    wrap.classList.toggle('more-l', l); wrap.classList.toggle('more-r', r);
+    $('csPrev').hidden = !l; $('csNext').hidden = !r;
   }
-  window.addEventListener('resize', () => { if (data && document.body.classList.contains('mode-cat')) { sizeGrid(); renderChart(data, null); renderCi(data); } });
+  const sizeGrid = updateStrip;
+  (function wireStrip() {
+    const g = $('catGrid');
+    let frame = 0, down = false, startX = 0, startLeft = 0, moved = false;
+    g.addEventListener('scroll', () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(updateStrip); });
+    $('csPrev').addEventListener('click', () => g.scrollBy({ left: -Math.max(240, g.clientWidth * 0.8), behavior: 'smooth' }));
+    $('csNext').addEventListener('click', () => g.scrollBy({ left: Math.max(240, g.clientWidth * 0.8), behavior: 'smooth' }));
+    g.addEventListener('wheel', e => {
+      if (g.scrollWidth <= g.clientWidth + 2) return;
+      const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      g.scrollLeft += d; e.preventDefault();
+    }, { passive: false });
+    g.addEventListener('mousedown', e => { if (e.button) return; down = true; moved = false; startX = e.clientX; startLeft = g.scrollLeft; });
+    window.addEventListener('mousemove', e => {
+      if (!down) return;
+      const dx = e.clientX - startX;
+      if (Math.abs(dx) > 5) { moved = true; g.classList.add('drag'); }
+      if (moved) g.scrollLeft = startLeft - dx;
+    });
+    window.addEventListener('mouseup', () => { if (down) { down = false; g.classList.remove('drag'); } });
+    g.addEventListener('click', e => { if (moved) { e.stopImmediatePropagation(); e.preventDefault(); moved = false; } }, true);
+  })();
+  window.addEventListener('resize', () => { if (data && document.body.classList.contains('mode-cat')) { updateStrip(); renderChart(data, null); renderCi(data); } });
 
   // ---------- Category behaviour, month by month ----------
   // Big green bars: the whole category each month (left axis). Small bars: the mother brands (right axis, own scale).
@@ -406,7 +432,7 @@
       + `<span class="lg2" style="cursor:default"><i style="background:linear-gradient(#8BC34A,#E6F4D4)"></i>Category total</span>`
       + `<label class="opt2"><input type="checkbox" id="cchLabels" ${ui.labels ? 'checked' : ''}>Value labels</label>`
       + (part === 'm' ? '' : `<label class="opt2"><input type="checkbox" id="cchHide" ${ui.hideInc ? 'checked' : ''}>Hide incomplete periods</label>`);
-    const box = $('cchBox'), W = Math.max(400, box.clientWidth), H = Math.max(200, box.clientHeight);
+    const box = $('cchBox'), W = Math.max(300, box.clientWidth), H = Math.max(110, box.clientHeight);
     if (!d.cards.length || !n) { box.innerHTML = `<div class="nodata2">${d.cards.length ? 'No complete periods here. Untick “Hide incomplete periods” or widen the dates.' : 'No spend found for these filters.'}</div>`; return; }
     const two = false, L = 58, R = 58, T = 26, B = part !== 'm' && incomplete ? 40 : 28, X0 = L, X1 = W - R, Y0 = H - B;
     const idxOf = new Map(pool.map((c, j) => [c.name, j]));
@@ -424,7 +450,7 @@
         + `<text x="${X0 - 8}" y="${yy + 4}" text-anchor="end" font-size="11" font-weight="700" fill="#1A1F36">${nf((maxCat * i) / 4, maxCat < 4 ? 1 : 0)}</text>`
         + `<text x="${X1 + 8}" y="${yy + 4}" text-anchor="start" font-size="11" font-weight="700" fill="#1A1F36">${nf((maxBr * i) / 4, maxBr < 4 ? 1 : 0)}</text>`;
     }).join('');
-    const axisTitle = x => `<text transform="translate(${x},${(T + Y0) / 2}) rotate(-90)" text-anchor="middle" font-size="11" font-weight="700" fill="#1A1F36">Investments in (Rs. in Mn)</text>`;
+    const axisTitle = x => (Y0 - T < 110 ? '' : `<text transform="translate(${x},${(T + Y0) / 2}) rotate(-90)" text-anchor="middle" font-size="11" font-weight="700" fill="#1A1F36">Investments in (Rs. in Mn)</text>`);
     const selFirst = periods.findIndex(p => p.inSel);
     const band = part === 'm' && selFirst >= 0 ? `<rect x="${X0 + gw * selFirst}" y="${T - 8}" width="${gw * (n - selFirst)}" height="${Y0 - T + 8}" fill="#FF8A3D" fill-opacity="0.07"></rect>`
       + (selFirst > 0 ? `<text x="${X0 + gw * selFirst + 6}" y="${T - 12}" font-size="10" font-weight="800" fill="#E4702A">SELECTED PERIOD · ${esc(curLabel)}</text>` : '') : '';
@@ -509,11 +535,11 @@
       ? `Sub categories of ${f.pg} · ${L.cur} against ${L.yoy} and ${L.prev} | Investment in Rs. Mn`
       : `Mother brands in ${f.sub || f.pg} · ${L.cur} against ${L.yoy} and ${L.prev} | Investment in Rs. Mn`;
     const host = $('catSubs');
-    if (!T.length) { host.className = 'csubs single'; host.innerHTML = '<div class="nodata2">No spend found for these filters.</div>'; return; }
+    if (!T.length) { host.innerHTML = '<div class="nodata2">No spend found for these filters.</div>'; $('catMixC').innerHTML = ''; $('catBrFlip').hidden = true; if (flips.br) setFlip('br', false, true); return; }
     const colors = T.map((t, i) => SUB_COLORS[i % SUB_COLORS.length]);
     const multi = d.hasSubs && T.length > 1;
-    host.className = 'csubs' + (multi ? '' : ' single');
-    if (!multi) { host.innerHTML = tableHtml(T[0], T[0] && '#F24B4B', d, L, !d.hasSubs); return; }
+    $('catBrFlip').hidden = !multi;
+    if (!multi) { host.innerHTML = tableHtml(T[0], T[0] && '#F24B4B', d, L, !d.hasSubs); $('catMixC').innerHTML = ''; if (flips.br) setFlip('br', false, true); return; }
     // Mix of sub categories in each period (100% bars).
     let mix = '';
     if (d.mix && d.mix.yoy) {
@@ -528,9 +554,8 @@
         ${d.contribution.map((c, i) => `<div class="controw link" data-scope="${esc(JSON.stringify({ sub: c.name }))}"><i style="background:${colors[i]}"></i><b>${esc(c.name)}</b><span class="mv">${mnNum(c.yoy)} → ${mnNum(c.cur)}</span><span class="gv ${c.growth == null ? 'flat' : c.growth > 0.5 ? 'pos' : c.growth < -0.5 ? 'neg' : 'flat'}">${c.growth == null ? '—' : nf(c.growth, 0) + '%'}</span></div>`).join('')}
         <div class="contfoot"><span></span><span></span><span class="fl"><u>${esc(L.yoy)}</u><u>${esc(L.cur)}</u></span><u>Y-O-Y</u></div></div>`;
     }
-    const left = [mix], right = [contrib];
-    T.forEach((t, i) => { (i === 0 || (i >= 3 && i % 2 === 1) ? right : left).push(tableHtml(t, colors[i], d, L, false)); });
-    host.innerHTML = `<div class="ccol">${left.join('')}</div><div class="ccol">${right.join('')}</div>`;
+    host.innerHTML = T.map((t, i) => tableHtml(t, colors[i], d, L, false)).join('');
+    $('catMixC').innerHTML = mix + contrib;
     if (mix) heading($('catMixT'), 'mix', mixTitle(d));
     if (contrib) heading($('catContT'), 'contrib', contribTitle(d));
   }
@@ -542,6 +567,21 @@
     if (sc) { try { openDetail(JSON.parse(sc.dataset.scope)); } catch (err) { /* bad scope */ } }
   });
 
+
+  // Card flips: the panel turns edge-on, swaps faces, and turns back (no lasting 3D, so exports capture cleanly).
+  const flips = { ci: false, br: false };
+  function setFlip(which, back, instant) {
+    const box = $(which === 'ci' ? 'catCiBox' : 'catBrBox'), btn = $(which === 'ci' ? 'catCiFlip' : 'catBrFlip');
+    flips[which] = back;
+    const labels = which === 'ci' ? ['Sub categories', 'Category total'] : ['Mix & contribution', 'Mother brands'];
+    btn.querySelector('span').textContent = back ? labels[1] : labels[0];
+    const apply = () => box.classList.toggle('back', back);
+    if (instant || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) { apply(); return; }
+    box.classList.add('out');
+    setTimeout(() => { apply(); box.classList.remove('out'); box.classList.add('in'); setTimeout(() => box.classList.remove('in'), 300); }, 220);
+  }
+  $('catCiFlip').addEventListener('click', () => setFlip('ci', !flips.ci));
+  $('catBrFlip').addEventListener('click', () => setFlip('br', !flips.br));
 
   // ---------- category investment: stacked by medium, and the sub categories ----------
   const MED_HEX = ['0070C0', 'E8484B', '111111'];
@@ -570,14 +610,17 @@
   // PowerPoint draw exactly the same picture.
   function ciAxes(P, W, H, T, max, left, right, yAxisTitle) {
     const Y0 = H - 34, y = v => Y0 - (v / max) * (Y0 - T);
-    for (let i = 0; i <= 4; i++) {
-      const v = (max * i) / 4, yy = Y0 - (i * (Y0 - T)) / 4;
+    const plotH = Y0 - T, steps = plotH >= 170 ? 4 : plotH >= 100 ? 2 : 1;
+    for (let i = 0; i <= steps; i++) {
+      const v = (max * i) / steps, yy = Y0 - (i * (Y0 - T)) / steps, txt = nf(v / 1000, max / 1000 < 4 ? 1 : 0).replace(/^0$/, '–');
       P.push({ t: 'l', x1: left, y1: yy, x2: W - right, y2: yy, color: 'EEF1F7', lw: 1 });
-      P.push({ t: 't', x: left - 6, y: yy + 4, text: nf(v / 1000, max / 1000 < 4 ? 1 : 0).replace(/^0$/, '–'), size: 11, color: '4A5570', anchor: 'end' });
-      if (right > 20) P.push({ t: 't', x: W - right + 6, y: yy + 4, text: nf(v / 1000, max / 1000 < 4 ? 1 : 0).replace(/^0$/, '–'), size: 11, color: '4A5570', anchor: 'start' });
+      P.push({ t: 't', x: left - 6, y: yy + 4, text: txt, size: 11, color: '4A5570', anchor: 'end' });
+      if (right > 20) P.push({ t: 't', x: W - right + 6, y: yy + 4, text: txt, size: 11, color: '4A5570', anchor: 'start' });
     }
-    P.push({ t: 't', x: 12, y: (T + Y0) / 2, text: yAxisTitle, size: 11, color: '4A5570', anchor: 'middle', rot: -90 });
-    if (right > 20) P.push({ t: 't', x: W - 10, y: (T + Y0) / 2, text: yAxisTitle, size: 11, color: '4A5570', anchor: 'middle', rot: -90 });
+    if (plotH >= 90) {
+      P.push({ t: 't', x: 12, y: (T + Y0) / 2, text: yAxisTitle, size: 11, color: '4A5570', anchor: 'middle', rot: -90 });
+      if (right > 20) P.push({ t: 't', x: W - 10, y: (T + Y0) / 2, text: yAxisTitle, size: 11, color: '4A5570', anchor: 'middle', rot: -90 });
+    }
     return { Y0, y };
   }
   function ciXLabels(P, periods, X0, gw, Y0) {
@@ -591,16 +634,14 @@
   }
   function ciLeft(CD, W, H) {
     const P = [], per = CD.periods, n = per.length, L = 74, R = 12, X0 = L, X1 = W - R, gw = (X1 - X0) / n;
-    const maxT = niceMaxV(Math.max(0, ...per.map(p => p.total))), T = 92;
+    const compact = H < 250, maxT = niceMaxV(Math.max(0, ...per.map(p => p.total))), T = compact ? 66 : 92;
     const { Y0, y } = ciAxes(P, W, H, T, maxT, L, 0, 'Investment (Rs. In Mn)');
-    // The totals row (a table above the bars).
-    P.push({ t: 'r', x: 4, y: 2, w: L - 4, h: 38, fill: 'D9ECFA', line: '9CC3E4', lw: 1 });
-    P.push({ t: 't', x: 4 + (L - 4) / 2, y: 17, text: 'Investment', size: 11, bold: true, color: '1A1F36', anchor: 'middle' });
-    P.push({ t: 't', x: 4 + (L - 4) / 2, y: 31, text: '(Rs in Mns)', size: 10, bold: true, color: '1A1F36', anchor: 'middle' });
+    // Totals above the bars: a quiet caption and one pill per period.
+    P.push({ t: 't', x: 6, y: 25, text: 'Total, Rs Mn', size: 11, bold: true, color: '6B7590', anchor: 'start' });
     per.forEach((p, i) => {
-      const cx = X0 + gw * (i + 0.5), bw = Math.min(74, gw * 0.62);
-      P.push({ t: 'r', x: X0 + gw * i, y: 2, w: gw, h: 38, fill: 'D9ECFA', line: '9CC3E4', lw: 1 });
-      P.push({ t: 't', x: cx, y: 27, text: nf(p.total / 1000, 0), size: gw < 70 ? 12 : 16, bold: true, color: '1A1F36', anchor: 'middle' });
+      const cx = X0 + gw * (i + 0.5), bw = Math.min(74, gw * 0.62), pw = Math.min(gw * 0.74, 104);
+      P.push({ t: 'r', x: cx - pw / 2, y: 6, w: pw, h: 28, fill: 'E3F0FB', rx: 14 });
+      P.push({ t: 't', x: cx, y: 25, text: nf(p.total / 1000, 0), size: gw < 70 ? 12 : 16, bold: true, color: '14568F', anchor: 'middle' });
       let acc = 0;
       [p.tv, p.radio, p.press].forEach((v, k) => {
         if (v <= 0) return;
@@ -608,14 +649,14 @@
         const pct = p.total ? (v / p.total) * 100 : 0;
         P.push({ t: 'r', x: cx - bw / 2, y: y2, w: bw, h: y1 - y2, fill: MED_HEX[k], tip: `${p.tipLabel}\\n${MED[k]}: Rs ${nf(v / 1000, 0)} Mn · ${nf(pct, 1)}%` + (p.complete ? '' : '\\nIncomplete period') });
         if (pct >= 4 && y1 - y2 >= 15) P.push({ t: 't', x: cx, y: y2 + (y1 - y2) / 2 + 4, text: `${nf(pct, 0)}%`, size: gw < 70 ? 10 : 12, bold: true, color: 'FFFFFF', anchor: 'middle' });
-        else if (pct >= 0.5 && k > 0) P.push({ t: 't', x: cx, y: y2 - 3, text: `${nf(pct, 0)}%`, size: 10, bold: true, color: '1A1F36', anchor: 'middle' });
+        else if (!compact && pct >= 0.5 && k > 0) P.push({ t: 't', x: cx, y: y2 - 3, text: `${nf(pct, 0)}%`, size: 10, bold: true, color: '1A1F36', anchor: 'middle' });
       });
       const top = y(p.total);
       if (!p.complete) P.push({ t: 'r', x: cx - bw / 2, y: top, w: bw, h: Y0 - top, hatch: true });
       if (p.growth != null) {
         const up = p.growth >= 0;
-        P.push({ t: 't', x: cx, y: top - 36, text: `${up ? '' : '-'}${nf(Math.abs(p.growth), 0)}%`, size: gw < 70 ? 12 : 15, bold: true, color: up ? '2E7D32' : 'E5242B', anchor: 'middle' });
-        P.push({ t: 'a', x: cx, y: top - 31, w: 20, h: 26, dir: up ? 'up' : 'down', fill: up ? '2E7D32' : 'E5484D' });
+        P.push({ t: 't', x: cx, y: top - (compact ? 22 : 36), text: `${up ? '' : '-'}${nf(Math.abs(p.growth), 0)}%`, size: compact || gw < 70 ? 12 : 15, bold: true, color: up ? '2E7D32' : 'E5242B', anchor: 'middle' });
+        P.push({ t: 'a', x: cx, y: top - (compact ? 19 : 31), w: compact ? 14 : 20, h: compact ? 16 : 26, dir: up ? 'up' : 'down', fill: up ? '2E7D32' : 'E5484D' });
       }
     });
     P.push({ t: 'l', x1: X0, y1: Y0, x2: X1, y2: Y0, color: 'C7CEDF', lw: 1 });
@@ -647,7 +688,7 @@
         const t = nf(v / 1000, 0), w = t.length * 7 + 10;
         P.push({ t: 'r', x: bx + (bw - 1) / 2 - w / 2, y: by - 20, w, h: 17, fill: hex, rx: 3 });
         P.push({ t: 't', x: bx + (bw - 1) / 2, y: by - 7, text: t, size: gw < 70 ? 10 : 12, bold: true, color: SUBC_TXT[hex] || 'FFFFFF', anchor: 'middle' });
-        if (i === lastIdx && p.subGrowth[j] != null) {
+        if (i === lastIdx && p.subGrowth[j] != null && by - y(p.total) >= 56) {
           const g = p.subGrowth[j], up = g >= 0;
           P.push({ t: 't', x: bx + (bw - 1) / 2, y: by - 50, text: `${up ? '▲' : '▼'} ${up ? '' : '-'}${nf(Math.abs(g), 0)}%`, size: 12, bold: true, color: up ? '2E7D32' : 'E5242B', anchor: 'middle' });
         }
@@ -719,22 +760,24 @@
     return `${f.pg} Investment Grows ${nf(latest.growth, 0)}% in ${latest.label}`;
   }
   function renderCi(d) {
-    const CD = ciData(d), host = $('catCi'), f = d.filters;
+    const CD = ciData(d), f = d.filters;
     const first = CD.periods[0], last = CD.periods[CD.periods.length - 1];
     heading($('catTitle0'), 's0', ciHeadline(d, CD));
     $('catSub0').textContent = first ? `${f.pg}${f.sub ? ' · ' + f.sub : ''} · ${first.label} to ${last.label}${CD.periods.some(p => !p.complete) ? ', incomplete periods hatched' : ''} | Investment in Rs. Mn` : 'No complete periods in this range';
     [...$('catCiTgl').children].forEach(b => b.classList.toggle('on', b.dataset.v === ci.part));
     $('catCiTgl').querySelector('[data-v=y]').textContent = state.yearType === 'FY' ? 'Years (FY)' : 'Years';
     $('catCiHide').checked = ci.hideInc;
-    const hasSubs = CD.names.length > 1;
-    host.className = 'ci-grid' + (hasSubs ? '' : ' single');
-    if (!CD.periods.length) { host.innerHTML = '<div class="nodata2">No complete periods here. Untick “Hide incomplete” or widen the dates.</div>'; $('catCiNotes').innerHTML = ''; return; }
+    const hasSubs = CD.names.length > 1, front = $('ciFront'), back = $('ciBack');
+    $('catCiFlip').hidden = !hasSubs || !CD.periods.length;
+    if ((!hasSubs || !CD.periods.length) && flips.ci) setFlip('ci', false, true);
+    if (!CD.periods.length) { front.innerHTML = '<div class="nodata2">No complete periods here. Untick “Hide incomplete” or widen the dates.</div>'; back.innerHTML = ''; $('catCiNotes').innerHTML = ''; return; }
     const medLegend = MED.map((m, k) => `<span><i style="background:#${MED_HEX[k]}"></i>${m}</span>`).join('');
     const subLegend = CD.names.map((nm, k) => `<span data-sub="${esc(nm)}" class="${ci.subsOn.has(nm) ? '' : 'off'}" title="Click to show or hide"><i style="background:#${SUBC[k % SUBC.length]}"></i>${esc(nm)}</span>`).join('') + '<span><i style="background:linear-gradient(#BFDDF4,#F2F8FD);border:1px solid #9CC3E4"></i>Category total</span>';
-    host.innerHTML = `<div class="ci-box"><div class="ci-t">${esc(f.pg)} Category Investment</div><div class="ci-svg" id="ciL"></div><div class="ci-lg">${medLegend}</div></div>`
-      + (hasSubs ? `<div class="ci-box"><div class="ci-t">${esc(f.pg)} Sub Category Investments</div><div class="ci-svg" id="ciR"></div><div class="ci-lg">${subLegend}</div></div>` : '');
-    const L = $('ciL'); L.innerHTML = primsToSvg(ciLeft(CD, Math.max(300, L.clientWidth), Math.max(200, L.clientHeight)), Math.max(300, L.clientWidth), Math.max(200, L.clientHeight), 'ciL');
-    if (hasSubs) { const R = $('ciR'); R.innerHTML = primsToSvg(ciRight(CD, Math.max(300, R.clientWidth), Math.max(200, R.clientHeight)), Math.max(300, R.clientWidth), Math.max(200, R.clientHeight), 'ciR'); }
+    front.innerHTML = `<div class="ci-box"><div class="ci-t">${esc(f.pg)} Category Investment</div><div class="ci-svg" id="ciL"></div><div class="ci-lg">${medLegend}</div></div>`;
+    back.innerHTML = hasSubs ? `<div class="ci-box"><div class="ci-t">${esc(f.pg)} Sub Category Investments</div><div class="ci-svg" id="ciR"></div><div class="ci-lg">${subLegend}</div></div>` : '';
+    const L = $('ciL'), lw = Math.max(300, L.clientWidth), lh = Math.max(110, L.clientHeight);
+    L.innerHTML = primsToSvg(ciLeft(CD, lw, lh), lw, lh, 'ciL');
+    if (hasSubs) { const R = $('ciR'), rw = Math.max(300, R.clientWidth), rh = Math.max(110, R.clientHeight); R.innerHTML = primsToSvg(ciRight(CD, rw, rh), rw, rh, 'ciR'); }
     const notes = $('catCiNotes');
     if (document.activeElement !== notes) notes.innerHTML = savedText('ci-notes', f.pg) ? cleanHtml(savedText('ci-notes', f.pg)) : ciNotesHtml(d, CD);
   }
@@ -745,25 +788,13 @@
   });
   $('catCiTgl').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (b && data) { ci.part = b.dataset.v; renderCi(data); } });
   $('catCiHide').addEventListener('change', e => { ci.hideInc = e.target.checked; if (data) renderCi(data); });
-  $('catCi').addEventListener('click', e => {
+  $('catCiBox').addEventListener('click', e => {
     const sp = e.target.closest('.ci-lg span[data-sub]');
     if (!sp || !data) return;
     const nm = sp.dataset.sub;
     if (ci.subsOn.has(nm)) ci.subsOn.delete(nm); else ci.subsOn.add(nm);
     try { localStorage.removeItem(textKey('ci-notes', data.filters.pg)); } catch (err) { /* storage unavailable */ }   // the notes follow the displayed sub categories
     renderCi(data);
-  });
-
-  // ---------- section navigation ----------
-  $('catNav').addEventListener('click', e => {
-    const b = e.target.closest('button[data-s]');
-    if (b) $(b.dataset.s).scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
-  $('catScroll').addEventListener('scroll', () => {
-    const sc = $('catScroll'), mid = sc.scrollTop + sc.clientHeight / 2;
-    let on = 'catS0';
-    for (const id of ['catS0', 'catS1', 'catS2', 'catS3']) if ($(id).offsetTop <= mid) on = id;
-    [...$('catNav').children].forEach(b => b.classList.toggle('on', b.dataset.s === on));
   });
 
   // ---------- card detail ----------
@@ -848,38 +879,45 @@
   });
   const fileBase = () => `Category_${data.filters.pg.replace(/[^\w]+/g, '-')}_${labelsOf(data).cur.replace(/[^\w]+/g, '-')}`;
   const download = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); };
-  const SECTIONS = [['01_Category_Investment', 'catS0'], ['02_Cards', 'catS1'], ['03_Month_by_Month', 'catS2'], ['04_Mother_Brands', 'catS3']];
-
-  // Each section as its own JPG, in a ZIP. Sections are shown in full (all cards, the whole page 3).
+  // The whole screen, then each panel as its own JPG (both sides of the flip panels), in a ZIP.
   async function exportJpg() {
     toast('Preparing JPG images');
-    const root = $('viewCat'), scroll = $('catScroll');
-    const saved = scroll.scrollTop;
+    const root = $('viewCat'), savedCi = flips.ci, savedBr = flips.br;
+    const grid = $('catGrid'), s3 = $('catS3'), subs = $('catSubs');
     try {
       await Promise.all([loadScript('vendor/html-to-image/html-to-image.js'), loadScript('vendor/jszip/jszip.min.js')]);
       $('catDrawerToggle').checked = false;
-      scroll.style.scrollBehavior = 'auto';
       root.classList.add('exporting');
-      const zip = new window.JSZip();
-      for (const [name, id] of SECTIONS) {
-        const el = $(id);
-        el.scrollIntoView({ block: 'start' });
-        await new Promise(r => setTimeout(r, 120));
-        const grid = $('catGrid');
-        const extra = id === 'catS1' ? Math.max(0, grid.scrollHeight - grid.clientHeight) : 0;
-        const prevH = el.style.height;
-        if (extra) el.style.height = (el.offsetHeight + extra) + 'px';
-        if (extra) { grid.style.overflow = 'visible'; grid.style.flex = 'none'; }
-        const w = el.offsetWidth, h = el.offsetHeight;
-        const url = await window.htmlToImage.toJpeg(el, { quality: 0.95, pixelRatio: 2, backgroundColor: '#F4F6FA', width: w, height: h, style: { transform: 'none' } });
-        el.style.height = prevH; grid.style.overflow = ''; grid.style.flex = '';
+      const zip = new window.JSZip(), settle = () => new Promise(r => setTimeout(r, 150));
+      const shot = async (name, el) => {
+        const url = await window.htmlToImage.toJpeg(el, { quality: 0.95, pixelRatio: 2, backgroundColor: '#F4F6FA', width: el.offsetWidth, height: el.offsetHeight, style: { transform: 'none' } });
         zip.file(`${name}.jpg`, url.split(',')[1], { base64: true });
-      }
+      };
+      setFlip('ci', false, true); setFlip('br', false, true); await settle();
+      await shot('00_Full_screen', $('catOne'));
+      // Every card (the strip wraps into rows for this picture).
+      grid.style.cssText += ';flex-wrap:wrap;overflow:visible;height:auto'; await settle();
+      await shot('01_Cards', $('catS1'));
+      grid.style.flexWrap = ''; grid.style.overflow = ''; grid.style.height = '';
+      await shot('02_Category_Investment', $('catS0'));
+      if (!$('catCiFlip').hidden) { setFlip('ci', true, true); await settle(); await shot('03_Sub_Category_Investment', $('catS0')); setFlip('ci', false, true); }
+      await shot('04_Category_Behaviour', $('catS2'));
+      // Tables can be longer than the panel: grow the panel for the picture.
+      const grow = async name => {
+        const extra = Math.max(0, (flips.br ? $('catMixC') : subs).scrollHeight - (flips.br ? $('catMixC') : subs).clientHeight);
+        const h0 = s3.style.height;
+        if (extra) { s3.style.height = (s3.offsetHeight + extra) + 'px'; subs.style.overflow = 'visible'; $('catMixC').style.overflow = 'visible'; await settle(); }
+        await shot(name, s3);
+        s3.style.height = h0; subs.style.overflow = ''; $('catMixC').style.overflow = '';
+      };
+      await grow('05_Mother_Brands');
+      if (!$('catBrFlip').hidden) { setFlip('br', true, true); await settle(); await grow('06_Mix_and_Contribution'); setFlip('br', false, true); }
       download(await zip.generateAsync({ type: 'blob' }), fileBase() + '_JPG.zip');
       toast('JPG images downloaded');
     } catch (e) { toast('Export failed: ' + e.message); } finally {
-      root.classList.remove('exporting'); scroll.scrollTop = saved; scroll.style.scrollBehavior = '';
-      if (data) { sizeGrid(); renderChart(data, null); }
+      root.classList.remove('exporting');
+      setFlip('ci', savedCi, true); setFlip('br', savedBr, true);
+      if (data) { updateStrip(); renderChart(data, null); renderCi(data); }
     }
   }
   // Editable PowerPoint: real text, shapes, tables and a real chart, one slide per section (more if a section is long).
