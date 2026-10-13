@@ -489,12 +489,8 @@ tr.me .sharebar{background:#FF8A3D}
         <div class="sech"><span class="n">1</span> Period and category</div>
         <div class="flabel">Month range</div>
         <div class="dateRow"><select class="inp" id="cFrom" aria-label="From month"></select><select class="inp" id="cTo" aria-label="To month"></select></div>
-        <div class="flabel">Quick range</div>
-        <div class="segbar" id="cQuick">
-          <button class="seg" data-v="q">Latest qtr</button>
-          <button class="seg" data-v="h">Latest half</button>
-          <button class="seg" data-v="y">Latest year</button>
-        </div>
+        <div class="flabel">Quarter, half or year <span class="cnt">available in your data</span></div>
+        <select class="inp" id="cQuick"></select>
         <div class="flabel">Year type <span class="cnt">for quarters, halves, years</span></div>
         <div class="segbar" id="cYearType">
           <button class="seg on" data-v="CY">Calendar (Jan–Dec)</button>
@@ -662,10 +658,12 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="view" id="viewCat">
   <div class="chead2">
-    <div class="ctl"><h2 id="catTitle" contenteditable="true" spellcheck="false" title="Click to edit the headline">Leading Brands by Investment</h2><p id="catSub">Top 10 mother brands ranked by investment | Investment in Rs. Mn</p></div>
+    <div class="ctl"><h2 id="catTitle" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2><p id="catSub"></p></div>
+    <div class="tgl" id="catViewTgl" title="Show the mother brand cards or the month by month chart"><button data-v="cards" class="on">Cards</button><button data-v="months">Month by month</button></div>
     <div class="ctot"><span id="catTotLabel">TOTAL</span><b id="catTot">0 Mn</b></div>
   </div>
   <div class="cgrid" id="catGrid"></div>
+  <div class="cchart" id="catChart" hidden></div>
   <div class="clegend" id="catLegend"></div>
   <div class="coverlay" id="catOverlay"><div class="ovcard"><h3 id="catOvTitle">Load your category file</h3><p id="catOvText"></p><label class="fbtn" for="catDrawerToggle">☰ Open Filters</label></div></div>
 </div>

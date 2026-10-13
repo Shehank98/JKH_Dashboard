@@ -35,6 +35,12 @@ const C = require('../server/category');
   assert.ok(sunsilk && sunsilk.mine, 'our mother brands are flagged');
   assert.ok(d.cards.every((c, i) => i === 0 || d.cards[i - 1].cur >= c.cur), 'sorted by spend');
   assert.ok(Math.abs(d.cards.reduce((s, c) => s + c.share, 0) - 100) < 100 && d.total.cur > 0);
+  // Month by month window: 15 months for a quarter, ending on the last selected month, adding up to the card.
+  assert.strictEqual(d.monthly.months.length, 15);
+  assert.strictEqual(d.monthly.months[d.monthly.selStart], '2026-07');
+  assert.strictEqual(d.monthly.months[14], '2026-09');
+  assert.ok(Math.abs(sunsilk.monthly.slice(d.monthly.selStart).reduce((a, b) => a + b, 0) - sunsilk.cur) < 1e-6);
+  assert.ok(Math.abs(d.monthly.cat.slice(d.monthly.selStart).reduce((a, b) => a + b, 0) - d.total.cur) < 1e-6);
   // Cards add up to the category when every mother brand is shown.
   const all = C.dashboard(ds, { ...F, top: 0 });
   assert.ok(Math.abs(all.cards.reduce((s, c) => s + c.cur, 0) - all.total.cur) < 1e-6);

@@ -49,9 +49,10 @@ body.mode-cat .modebtn:hover{box-shadow:0 4px 12px rgba(47,93,191,.45)}
 .ctot b{display:block;font-size:26px;letter-spacing:-.5px;font-weight:800;color:#1A1F36;margin-top:2px}
 
 /* Cards */
-.cgrid{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:minmax(168px,1fr);gap:12px;padding:3px 3px 6px}
+.cgrid{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:var(--rowh,215px);align-content:start;gap:12px;padding:3px 3px 6px}
+.cgrid[hidden],.cchart[hidden]{display:none}
 .cgrid::-webkit-scrollbar{width:7px}.cgrid::-webkit-scrollbar-thumb{background:#D5DBE9;border-radius:4px}
-.ccard{--c:#2F6FD3;position:relative;background:#fff;border:2px solid var(--c);border-top-width:6px;border-radius:14px;padding:10px 12px 9px;display:flex;flex-direction:column;gap:6px;cursor:pointer;min-width:0;box-shadow:0 2px 6px rgba(20,26,46,.08);animation:cardIn .55s cubic-bezier(.2,.9,.25,1) both;animation-delay:calc(var(--i,0) * 55ms);transition:transform .18s,box-shadow .18s}
+.ccard{--c:#2F6FD3;position:relative;background:#fff;border:2px solid var(--c);border-top-width:6px;border-radius:14px;padding:10px 12px 9px;display:flex;flex-direction:column;justify-content:space-between;gap:6px;cursor:pointer;min-width:0;box-shadow:0 2px 6px rgba(20,26,46,.08);animation:cardIn .55s cubic-bezier(.2,.9,.25,1) both;animation-delay:calc(var(--i,0) * 55ms);transition:transform .18s,box-shadow .18s}
 .ccard:hover{transform:translateY(-3px);box-shadow:0 8px 20px rgba(20,26,46,.16)}
 @keyframes cardIn{from{opacity:0;transform:translateY(22px) scale(.96)}to{opacity:1;transform:none}}
 .ccard.us{border-width:3px;border-top-width:7px;background:linear-gradient(180deg,#FFF6EE,#fff 55%);box-shadow:0 0 0 4px rgba(255,138,61,.18),0 8px 22px rgba(228,112,42,.28)}
@@ -69,7 +70,8 @@ body.mode-cat .modebtn:hover{box-shadow:0 4px 12px rgba(47,93,191,.45)}
 .cc-b div{background:#F3F5F9;border-radius:8px;padding:5px 4px 5px;text-align:center;border:1px solid #E9EDF5}
 .cc-b span{display:block;font-size:9.5px;color:#6B7590;font-weight:600}
 .cc-b b{display:block;font-size:15px;font-weight:800;color:#1A1F36;margin-top:1px}
-.cc-s{display:flex;justify-content:space-between;align-items:baseline;margin-top:auto}
+.cc-f{display:flex;flex-direction:column;gap:5px}
+.cc-s{display:flex;justify-content:space-between;align-items:baseline}
 .cc-s span{font-size:9px;letter-spacing:.4px;color:#6B7590;font-weight:700;text-transform:uppercase}
 .cc-s b{font-size:14px;font-weight:800;color:var(--c)}
 .cc-bar{height:6px;border-radius:4px;background:#E7EBF3;overflow:hidden}
@@ -113,3 +115,20 @@ body.mode-cat .modebtn:hover{box-shadow:0 4px 12px rgba(47,93,191,.45)}
 .cm-t td:first-child{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cm-t .up{color:#14803F;font-weight:700}.cm-t .down{color:#D12B2B;font-weight:700}
 @media (max-width:1100px){.cgrid{grid-template-columns:repeat(3,minmax(0,1fr))}.cm-two{grid-template-columns:1fr}}
+
+/* No file yet: nothing from a previous file is shown */
+.view.nodata .chead2,.view.nodata .clegend{visibility:hidden}
+.chead2 .tgl{align-self:center}
+
+/* Month by month chart */
+.cchart{flex:1;min-height:0;display:flex;flex-direction:column;background:#fff;border:1px solid #E5E9F2;border-radius:12px;padding:8px 14px 10px;position:relative}
+.cch-t{text-align:center;font-size:17px;font-weight:700;color:#6B7590;text-decoration:underline;text-underline-offset:4px;flex-shrink:0}
+.cch-box{flex:1;min-height:0;position:relative}
+.cch-box svg{position:absolute;inset:0}
+.cch-lg{display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:center;align-items:center;flex-shrink:0;margin-top:4px}
+.cch-lg .lg2{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;letter-spacing:.2px;text-transform:uppercase;color:#1A1F36;cursor:pointer;padding:1px 5px;border-radius:5px;transition:opacity .15s}
+.cch-lg .lg2:hover{background:#F4F6FA}
+.cch-lg .lg2.off{opacity:.35;text-decoration:line-through}
+.cch-lg .lg2 i{width:11px;height:11px;border-radius:2px;display:inline-block}
+.cch-lg .opt2{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#4A5570;cursor:pointer;margin-left:10px}
+.cch-lg .opt2 input{accent-color:#FF8A3D}

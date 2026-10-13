@@ -8,10 +8,13 @@
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const COLORS = ['#A0104F', '#D6262B', '#2F6FD3', '#1E8E4E', '#13998F', '#7B4FA0', '#2F5A9E', '#C2410C', '#B84A93', '#0A3EA6', '#5B6B2F', '#8A5A2B', '#1A7F8E', '#9C27B0', '#455A64'];
   const US = '#FF8A3D';
+  const CHART_COLORS = ['#F5B400', '#C81D1D', '#1E88E5', '#7B3FA0', '#1FA55A', '#E91E63', '#111111', '#00ACC1'];
   const MED = ['TV', 'Radio', 'Press'], MED_COL = ['#2F5DBF', '#FF8A3D', '#1FA97A'];
 
   let overview = null, options = { advertisers: [], subs: [] }, data = null, pendingFile = null, started = false, busy = false;
   const state = { from: '', to: '', pg: '', sub: '', mine: [], comps: [], top: 10, yearType: 'CY' };
+  const ui = { view: 'cards', labels: true };   // cards or the month by month chart
+  const hiddenBrands = new Set();               // brands switched off in the chart legend
 
   // ---------- month helpers ----------
   const idx = key => { const [y, m] = key.split('-').map(Number); return y * 12 + m - 1; };
@@ -29,13 +32,36 @@
     const one = i => `${MON[i % 12]}'${yy(Math.floor(i / 12))}`;
     return len === 1 ? one(m0) : `${one(m0)}–${one(m1)}`;
   }
-  // The latest whole quarter / half / year that ends on a boundary of the chosen year type.
+  // Every whole quarter / half / year the data covers for the chosen year type, newest first.
+  function periodsAvailable() {
+    const minI = idx(overview.minMonth), maxI = idx(overview.maxMonth), shift = state.yearType === 'FY' ? 3 : 0;
+    const out = { q: [], h: [], y: [] };
+    for (const [k, len] of [['q', 3], ['h', 6], ['y', 12]]) {
+      let start = minI + ((((shift - minI) % len) + len) % len);   // first month that begins a period
+      for (; start + len - 1 <= maxI; start += len) out[k].push([keyOf(start), keyOf(start + len - 1)]);
+      out[k].reverse();
+    }
+    return out;
+  }
+  // The latest whole quarter / half / year (falls back to everything if the data is shorter).
   function latest(len) {
-    const maxI = idx(overview.maxMonth), minI = idx(overview.minMonth), shift = state.yearType === 'FY' ? 3 : 0;
-    let end = maxI;
-    while (end - len + 1 >= minI && ((end + 1 - shift) % len + len) % len !== 0) end--;
-    if (end - len + 1 < minI) return [overview.minMonth, overview.maxMonth];
-    return [keyOf(end - len + 1), keyOf(end)];
+    const list = periodsAvailable()[{ 3: 'q', 6: 'h', 12: 'y' }[len]];
+    return list.length ? list[0] : [overview.minMonth, overview.maxMonth];
+  }
+  function buildQuick() {
+    if (!overview) return;
+    const P = periodsAvailable(), yt = state.yearType;
+    const opt = ([a, b]) => `<option value="${a}|${b}">${esc(periodLabel(a, b, yt))} · ${monLabel(a)} to ${monLabel(b)}</option>`;
+    $('cQuick').innerHTML = '<option value="">Custom (use the month boxes)</option>'
+      + (P.q.length ? `<optgroup label="Quarters">${P.q.map(opt).join('')}</optgroup>` : '')
+      + (P.h.length ? `<optgroup label="Half years">${P.h.map(opt).join('')}</optgroup>` : '')
+      + (P.y.length ? `<optgroup label="Full years">${P.y.map(opt).join('')}</optgroup>` : '');
+    syncQuick();
+  }
+  function syncQuick() {
+    const want = `${state.from}|${state.to}`;
+    const q = $('cQuick');
+    q.value = [...q.options].some(o => o.value === want) ? want : '';
   }
 
   // ---------- formatting (spend is in thousand rupees) ----------
@@ -122,7 +148,9 @@
     $('catOvTitle').textContent = 'Load your category file';
     $('catOvText').textContent = 'Open the filter drawer, choose Data file and pick your category file (Month, Product Group, Mother Brand, Advertiser, Brand, Tv / Radio / Press in 000Rs). It is read on this computer only.';
     $('catOverlay').classList.add('on');
-    $('catGrid').innerHTML = ''; $('catLegend').innerHTML = '';
+    $('viewCat').classList.add('nodata');
+    $('catTitle').textContent = ''; $('catSub').textContent = ''; $('catTot').textContent = ''; $('catTotLabel').textContent = '';
+    $('catGrid').innerHTML = ''; $('catLegend').innerHTML = ''; $('catChart').innerHTML = '';
     $('catPeriodText').textContent = 'No data'; $('catPeriodLen').textContent = '0 months'; $('catChips').innerHTML = '';
     showPane('cpData');
   }
@@ -161,7 +189,7 @@
   }
   function writeForm() {
     $('cFrom').value = state.from; $('cTo').value = state.to; $('cPg').value = state.pg;
-    renderSubSelect();
+    renderSubSelect(); buildQuick();
     [...$('cYearType').children].forEach(b => b.classList.toggle('on', b.dataset.v === state.yearType));
     [...$('cTop').children].forEach(b => b.classList.toggle('on', Number(b.dataset.v) === Number(state.top)));
     renderLists();
@@ -191,22 +219,21 @@
   };
   $('cMineList').addEventListener('change', onList); $('cCompList').addEventListener('change', onList);
   $('cMineSearch').addEventListener('input', renderLists); $('cCompSearch').addEventListener('input', renderLists);
-  $('cFrom').addEventListener('change', e => { state.from = e.target.value; if (state.from > state.to) { state.to = state.from; $('cTo').value = state.to; } });
-  $('cTo').addEventListener('change', e => { state.to = e.target.value; if (state.from > state.to) { state.from = state.to; $('cFrom').value = state.from; } });
+  $('cFrom').addEventListener('change', e => { state.from = e.target.value; if (state.from > state.to) { state.to = state.from; $('cTo').value = state.to; } syncQuick(); });
+  $('cTo').addEventListener('change', e => { state.to = e.target.value; if (state.from > state.to) { state.from = state.to; $('cFrom').value = state.from; } syncQuick(); });
   $('cPg').addEventListener('change', async e => { state.pg = e.target.value; state.sub = ''; await loadOptions(true); writeForm(); });
   $('cSub').addEventListener('change', async e => { state.sub = e.target.value; await loadOptions(false); writeForm(); });
-  $('cQuick').addEventListener('click', e => {
-    const b = e.target.closest('.seg');
-    if (!b || !overview) return;
-    [state.from, state.to] = latest({ q: 3, h: 6, y: 12 }[b.dataset.v]);
-    writeForm();
+  $('cQuick').addEventListener('change', e => {
+    if (!e.target.value) return;
+    [state.from, state.to] = e.target.value.split('|');
+    $('cFrom').value = state.from; $('cTo').value = state.to;
   });
   $('cYearType').addEventListener('click', e => {
     const b = e.target.closest('.seg');
     if (!b) return;
     state.yearType = b.dataset.v === 'FY' ? 'FY' : 'CY';
     [...$('cYearType').children].forEach(x => x.classList.toggle('on', x === b));
-    save(); if (data) render();   // only the period names change, so no recalculation
+    buildQuick(); save(); if (data) render();   // only the period names change, so no recalculation
   });
   $('cTop').addEventListener('click', e => {
     const b = e.target.closest('.seg');
@@ -231,11 +258,12 @@
     try {
       data = await engine.call('catDashboard', JSON.parse(JSON.stringify(state)));
       $('catOverlay').classList.remove('on');
+      $('viewCat').classList.remove('nodata');
       render();
       if (!state.mine.length) toast('Tip: pick your advertiser under Filters to highlight your brands');
     } catch (e) { toast(e.message); } finally { document.body.classList.remove('loading'); }
   }
-  const titleKey = pg => 'orbit-cat-title:' + pg;
+  const titleKey = pg => 'orbit-cat-title:' + (ui.view === 'months' ? 'm:' : '') + pg;
   function render() {
     const d = data, yt = state.yearType, R = d.ranges;
     const cur = periodLabel(R.cur[0], R.cur[1], yt), yoy = periodLabel(R.yoy[0], R.yoy[1], yt), prev = periodLabel(R.prev[0], R.prev[1], yt);
@@ -243,7 +271,7 @@
     const title = $('catTitle');
     let saved = null;
     try { saved = localStorage.getItem(titleKey(f.pg)); } catch (e) { /* storage unavailable */ }
-    if (document.activeElement !== title) title.textContent = saved || `Leading ${f.pg} Brands by Investment`;
+    if (document.activeElement !== title) title.textContent = saved || (ui.view === 'months' ? `Monthly ${f.pg} Investment by Brand` : `Leading ${f.pg} Brands by Investment`);
     const topN = f.top === 0 ? null : Math.min(f.top, d.brandCount);
     const scope = (f.comps && f.comps.length) ? `${d.shown} mother brands (mine and selected competitors)` : topN == null ? `All ${d.brandCount} mother brands` : `Top ${topN} mother brands`;
     $('catSub').textContent = `${scope} ranked by ${cur} investment${f.sub ? ' · ' + f.sub : ''} | Investment in Rs. Mn`;
@@ -257,10 +285,15 @@
     if (f.comps && f.comps.length) chips.push(`<span class="chip">${f.comps.length} competitor${f.comps.length === 1 ? '' : 's'}</span>`);
     chips.push(`<span class="chip">${yt === 'FY' ? 'Financial year (Apr–Mar)' : 'Calendar year'}</span>`);
     $('catChips').innerHTML = chips.join('');
+    const months = ui.view === 'months';
+    $('catGrid').hidden = months; $('catChart').hidden = !months; $('catLegend').style.display = months ? 'none' : '';
+    [...$('catViewTgl').children].forEach(b => b.classList.toggle('on', b.dataset.v === ui.view));
+    if (months) { renderChart(d, cur); return; }
     if (!d.cards.length) { $('catGrid').innerHTML = '<div class="nodata2">No spend found for these filters.</div>'; renderLegend(cur, yoy, prev); return; }
-    let ci = 0;
+    const colors = brandColors(d.cards);
+    sizeGrid();
     $('catGrid').innerHTML = d.cards.map((c, i) => {
-      const color = c.mine ? US : COLORS[ci++ % COLORS.length];
+      const color = colors.get(c.name);
       const g = c.growth;
       const gcls = g == null ? 'flat' : g > 0.5 ? 'up' : g < -0.5 ? 'down' : 'flat';
       const garrow = g == null ? '' : g > 0.5 ? '▲ ' : g < -0.5 ? '▼ ' : '■ ';
@@ -273,13 +306,91 @@
         <div class="cc-m"><div><div class="cc-l">${esc(cur)}</div><div class="cc-v">${mnTxt(c.cur)}</div></div>
           <div class="cc-g"><div class="cc-l">Y-o-Y growth</div><div class="cc-gv ${gcls}">${gtxt}</div></div></div>
         <div class="cc-b"><div><span>${esc(yoy)}</span><b>${box(c.yoy)}</b></div><div><span>${esc(prev)}</span><b>${box(c.prev)}</b></div></div>
-        <div class="cc-s"><span>${esc(cur)} share</span><b>${nf(c.share, 0)}%</b></div>
+        <div class="cc-f"><div class="cc-s"><span>${esc(cur)} share</span><b>${nf(c.share, 0)}%</b></div>
         <div class="cc-bar"><i style="width:${Math.max(c.share > 0 ? 2 : 0, Math.min(100, c.share))}%"></i></div>
-        <div class="cc-med">${c.medium.map((v, k) => `<i style="width:${medTot ? (v / medTot) * 100 : 0}%;background:${MED_COL[k]}"></i>`).join('')}</div>
+        <div class="cc-med">${c.medium.map((v, k) => `<i style="width:${medTot ? (v / medTot) * 100 : 0}%;background:${MED_COL[k]}"></i>`).join('')}</div></div>
       </div>`;
     }).join('');
     renderLegend(cur, yoy, prev);
   }
+
+  // The same colour for a mother brand on its card and in the chart; ours are orange.
+  function brandColors(cards) {
+    const m = new Map();
+    let ci = 0;
+    cards.forEach(c => m.set(c.name, c.mine ? US : COLORS[ci++ % COLORS.length]));
+    return m;
+  }
+  // Every card is the same size whether 5 or 10 are shown: two rows fill the screen, more rows scroll.
+  function sizeGrid() {
+    const g = $('catGrid');
+    if (g.hidden || !g.clientHeight) return;
+    g.style.setProperty('--rowh', Math.max(215, Math.floor((g.clientHeight - 9 - 12) / 2)) + 'px');
+  }
+  window.addEventListener('resize', () => { if (data && ui.view === 'cards') sizeGrid(); else if (data && ui.view === 'months') renderChart(data, null); });
+  $('catViewTgl').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || !data) return;
+    ui.view = b.dataset.v;
+    render();
+  });
+
+  // ---------- Category behaviour, month by month ----------
+  // Big green bars: the whole category each month (left axis). Small bars: the mother brands (right axis, own scale).
+  const niceMax = v => { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; };
+  function renderChart(d, curLabel) {
+    const host = $('catChart');
+    // Up to 8 mother brands: ours first, then the biggest. Each gets its own colour (ours are marked with a star)
+    // because several of ours can be in the chart at once.
+    const pool = d.cards.filter(c => c.mine).concat(d.cards.filter(c => !c.mine)).slice(0, 8).sort((a, b) => b.cur - a.cur);
+    const colors = new Map(pool.map((c, i) => [c.name, CHART_COLORS[i % CHART_COLORS.length]]));
+    if (!curLabel) { const R = d.ranges; curLabel = periodLabel(R.cur[0], R.cur[1], state.yearType); }
+    const M = d.monthly, n = M.months.length;
+    $('catSub').textContent = `Category total against ${pool.length} mother brand${pool.length === 1 ? '' : 's'} · ${monLabel(M.months[0])} to ${monLabel(M.months[n - 1])}, selected period ${curLabel} shaded | Investment in Rs. Mn`;
+    host.innerHTML = `<div class="cch-t">Category Behaviour – Month-On-Month</div><div class="cch-box" id="cchBox"></div><div class="cch-lg" id="cchLg"></div>`;
+    $('cchLg').innerHTML = pool.map(c => `<span class="lg2${hiddenBrands.has(c.name) ? ' off' : ''}" data-b="${esc(c.name)}" title="Click to show or hide"><i style="background:${colors.get(c.name)}"></i>${c.mine ? '★ ' : ''}${esc(c.name)}</span>`).join('')
+      + `<span class="lg2" style="cursor:default"><i style="background:linear-gradient(#8BC34A,#E6F4D4)"></i>Category total</span>`
+      + `<label class="opt2"><input type="checkbox" id="cchLabels" ${ui.labels ? 'checked' : ''}>Value labels</label>`;
+    const box = $('cchBox'), W = Math.max(400, box.clientWidth), H = Math.max(200, box.clientHeight);
+    if (!d.cards.length) { box.innerHTML = '<div class="nodata2">No spend found for these filters.</div>'; return; }
+    const L = 58, R = 58, T = 26, B = 28, X0 = L, X1 = W - R, Y0 = H - B;
+    const shown = pool.filter(c => !hiddenBrands.has(c.name));
+    const maxCat = niceMax(Math.max(0, ...M.cat) / 1000), maxBr = niceMax(Math.max(0, ...shown.flatMap(c => c.monthly)) / 1000);
+    const yc = v => Y0 - (v / 1000 / maxCat) * (Y0 - T), yb = v => Y0 - (v / 1000 / maxBr) * (Y0 - T);
+    const gw = (X1 - X0) / n, catW = Math.min(gw * 0.86, 120);
+    const k = Math.max(1, shown.length), bw = Math.min(16, (gw * 0.8) / k), groupW = bw * k;
+    const grid = [0, 1, 2, 3, 4].map(i => {
+      const yy = Y0 - (i * (Y0 - T)) / 4;
+      return `<line x1="${X0}" x2="${X1}" y1="${yy}" y2="${yy}" stroke="#EEF1F7"></line>`
+        + `<text x="${X0 - 8}" y="${yy + 4}" text-anchor="end" font-size="11" font-weight="700" fill="#1A1F36">${nf((maxCat * i) / 4, maxCat < 4 ? 1 : 0)}</text>`
+        + `<text x="${X1 + 8}" y="${yy + 4}" text-anchor="start" font-size="11" font-weight="700" fill="#1A1F36">${nf((maxBr * i) / 4, maxBr < 4 ? 1 : 0)}</text>`;
+    }).join('');
+    const axisTitle = (x, side) => `<text transform="translate(${x},${(T + Y0) / 2}) rotate(-90)" text-anchor="middle" font-size="11" font-weight="700" fill="#1A1F36">Investments in (Rs. in Mn)${side === 'r' ? '' : ''}</text>`;
+    const band = `<rect x="${X0 + gw * M.selStart}" y="${T - 8}" width="${gw * (n - M.selStart)}" height="${Y0 - T + 8}" fill="#FF8A3D" fill-opacity="0.07"></rect>`
+      + (M.selStart > 0 ? `<text x="${X0 + gw * M.selStart + 6}" y="${T - 12}" font-size="10" font-weight="800" fill="#E4702A">SELECTED PERIOD · ${esc(curLabel)}</text>` : '');
+    let cats = '', brands = '', labels = '';
+    const showLabels = ui.labels;
+    M.months.forEach((key, i) => {
+      const cx = X0 + gw * (i + 0.5);
+      const v = M.cat[i], top = yc(v);
+      cats += `<rect x="${cx - catW / 2}" y="${top}" width="${catW}" height="${Math.max(0, Y0 - top)}" fill="url(#cchGreen)" data-tip="${esc(`Category · ${monLabel(key)}\nRs ${nf(v / 1000, 0)} Mn`)}"></rect>`;
+      if (showLabels && v > 0) { const t = nf(v / 1000, 0), w = t.length * 7 + 10; labels += `<rect x="${cx - w / 2}" y="${top - 18}" width="${w}" height="16" rx="3" fill="#8BD051"></rect><text x="${cx}" y="${top - 6}" text-anchor="middle" font-size="11" font-weight="800" fill="#111">${t}</text>`; }
+      shown.forEach((c, j) => {
+        const bv = c.monthly[i], bx = cx - groupW / 2 + j * bw, by = yb(bv);
+        const col = colors.get(c.name);
+        brands += `<rect x="${bx}" y="${by}" width="${bw - 1}" height="${Math.max(0, Y0 - by)}" fill="${col}" data-tip="${esc(`${c.name}${c.mine ? ' (mine)' : ''} · ${monLabel(key)}\nRs ${nf(bv / 1000, 0)} Mn`)}"></rect>`;
+        if (showLabels && bv > 0 && bw >= 8) { const t = nf(bv / 1000, 0), w = t.length * 6 + 8; labels += `<rect x="${bx + (bw - 1) / 2 - w / 2}" y="${by - 15}" width="${w}" height="14" rx="3" fill="${col}"></rect><text x="${bx + (bw - 1) / 2}" y="${by - 4.5}" text-anchor="middle" font-size="9.5" font-weight="800" fill="#fff">${t}</text>`; }
+      });
+    });
+    const every = Math.ceil(n / Math.max(4, Math.floor((X1 - X0) / 62)));
+    const xl = M.months.map((key, i) => (i % every === 0 || i === n - 1 ? `<text x="${X0 + gw * (i + 0.5)}" y="${H - 8}" text-anchor="middle" font-size="11" font-weight="700" fill="#1A1F36">${monLabel(key).replace('-', " '")}</text>` : '')).join('');
+    box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="cchGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8BC34A" stop-opacity=".95"></stop><stop offset="1" stop-color="#E9F5D8" stop-opacity=".35"></stop></linearGradient></defs>${grid}${axisTitle(14)}${axisTitle(W - 12)}${band}${cats}${brands}${labels}<line x1="${X0}" x2="${X1}" y1="${Y0}" y2="${Y0}" stroke="#C7CEDF"></line>${xl}</svg>`;
+  }
+  document.addEventListener('click', e => {
+    const lg = e.target.closest('#cchLg .lg2[data-b]');
+    if (lg && data) { const b = lg.dataset.b; if (hiddenBrands.has(b)) hiddenBrands.delete(b); else hiddenBrands.add(b); renderChart(data, null); return; }
+    if (e.target.id === 'cchLabels' && data) { ui.labels = e.target.checked; renderChart(data, null); }
+  });
   function renderLegend(cur, yoy, prev) {
     $('catLegend').innerHTML = `
       <div class="li"><span class="sw" style="background:#2F6FD3"></span><div><b>Investment amount</b><small>${esc(yoy)}, ${esc(prev)} and ${esc(cur)} (Rs. Mn)</small></div></div>

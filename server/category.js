@@ -64,6 +64,9 @@ function dashboard(ds, f) {
   const nMb = dicts.mb.length;
   const cur = new Float64Array(nMb), yoy = new Float64Array(nMb), prev = new Float64Array(nMb);
   const med = new Float64Array(nMb * 3);
+  // Month by month window for the chart: the selected months plus enough earlier months to show about 15.
+  const w0 = Math.max(ds.meta.minMon, m0 - Math.max(0, 15 - len)), nW = m1 - w0 + 1;
+  const catMon = new Float64Array(nW), mbMon = new Float64Array(nMb * nW);
   const isMine = new Uint8Array(nMb), isComp = new Uint8Array(nMb), seen = new Uint8Array(nMb);
   const cat = { cur: 0, yoy: 0, prev: 0 };
   const y0 = m0 - 12, y1 = m1 - 12, p0 = m0 - len, p1 = m0 - 1;
@@ -74,6 +77,7 @@ function dashboard(ds, f) {
     seen[b] = 1;
     if (mine[a]) isMine[b] = 1; else if (comp[a]) isComp[b] = 1;
     const m = mon[i], t = tv[i], r = radio[i], p = press[i], v = t + r + p;
+    if (m >= w0 && m <= m1) { catMon[m - w0] += v; mbMon[b * nW + m - w0] += v; }
     if (m >= m0 && m <= m1) { cur[b] += v; cat.cur += v; med[b * 3] += t; med[b * 3 + 1] += r; med[b * 3 + 2] += p; }
     if (m >= y0 && m <= y1) { yoy[b] += v; cat.yoy += v; }
     if (m >= p0 && m <= p1) { prev[b] += v; cat.prev += v; }
@@ -96,10 +100,12 @@ function dashboard(ds, f) {
     growth: hasYoy && yoy[b] > 0 ? ((cur[b] - yoy[b]) / yoy[b]) * 100 : null,
     share: cat.cur ? (cur[b] / cat.cur) * 100 : 0,
     medium: [med[b * 3], med[b * 3 + 1], med[b * 3 + 2]],
+    monthly: Array.from(mbMon.subarray(b * nW, (b + 1) * nW)),
   }));
   return {
     filters: { ...f, top: f.top },
     ranges: { cur: [monthKey(m0), monthKey(m1)], yoy: [monthKey(y0), monthKey(y1)], prev: [monthKey(p0), monthKey(p1)], months: len },
+    monthly: { months: Array.from({ length: nW }, (_, k) => monthKey(w0 + k)), selStart: m0 - w0, cat: Array.from(catMon) },
     hasYoy, hasPrev, total: { cur: cat.cur, yoy: hasYoy ? cat.yoy : null, prev: hasPrev ? cat.prev : null },
     brandCount: ranked.length, shown: cards.length, cards,
   };
