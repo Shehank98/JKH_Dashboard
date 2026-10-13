@@ -342,6 +342,7 @@ tr[data-detail]:hover td{background:#F6F8FC}
 .ms .v{font-size:16px;font-weight:700;margin-top:2px;letter-spacing:-.3px}
 .mtabs{display:flex;gap:4px;padding:0 20px;border-bottom:1px solid #EEF1F7}
 .mtabs button{border:none;background:none;font-size:12px;font-weight:700;color:#8A93AD;padding:9px 12px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.mtabs button[hidden]{display:none}
 .mtabs button.on{color:#1A1F36;border-bottom-color:#FF8A3D}
 .mbody{flex:1;overflow-y:auto;padding:6px 20px 14px;min-height:160px}
 .mbody table td{font-size:11.5px;padding:7px 8px}
@@ -749,6 +750,7 @@ tr.me .sharebar{background:#FF8A3D}
     <div class="mtabs" id="mTabs">
       <button data-t="adv" class="on">Advertisers</button>
       <button data-t="camp">Campaigns</button>
+      <button data-t="va" hidden>Value additions</button>
       <button data-t="ch">Channels</button>
       <button data-t="mon">Months</button>
     </div>

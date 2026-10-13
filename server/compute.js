@@ -451,10 +451,12 @@ function detail(ds, f, scope = {}) {
     });
   }
   advertisers.sort((x, y) => y.spend - x.spend);
-  const campaigns = [...themes].map(([key, v]) => {
+  const allCampaigns = [...themes].map(([key, v]) => {
     const t = key % nTheme, a = (key - t) / nTheme;
-    return { name: dicts.theme[t], advertiser: dicts.adv[a], role: role[a] === 1 ? 'mine' : role[a] === 2 ? 'comp' : '', spend: v[0], spots: v[1] };
-  }).sort((x, y) => y.spend - x.spend).slice(0, 50);
+    return { name: dicts.theme[t], advertiser: dicts.adv[a], role: role[a] === 1 ? 'mine' : role[a] === 2 ? 'comp' : '', va: excluded[t] === 1, spend: v[0], spots: v[1] };
+  }).sort((x, y) => y.spend - x.spend);
+  // Top 50 commercials and top 50 value additions, so each tab is complete on its own.
+  const campaigns = [...allCampaigns.filter(c => !c.va).slice(0, 50), ...allCampaigns.filter(c => c.va).slice(0, 50)].sort((x, y) => y.spend - x.spend);
   const channels = [];
   for (let c = 0; c < nCh; c++) {
     if (chSpend[c] <= 0) continue;

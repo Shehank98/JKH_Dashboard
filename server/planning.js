@@ -280,13 +280,18 @@ function planning(ds, f, meta = {}) {
     const list = [];
     for (const [k, t] of themes) if (Math.floor(k / nTheme) === a) list.push({ th: k % nTheme, ...t });
     list.sort((x, y) => y.spend - x.spend);
-    const shown = role[a] === 1 ? list : list.slice(0, 10);
-    p(`### ${name(a)}${role[a] === 1 ? ' (mine)' : ''}`, '',
-      table(['Campaign', 'Type', 'Spend (LKR Mn)', '% of advertiser', 'Spots', 'Months active', 'First spot', 'Last spot', 'Channels'],
-        shown.map(t => [dicts.theme[t.th] || '(blank)', excluded[t.th] ? 'VA' : 'Commercial', mn(t.spend), pc(t.spend, spend[a]), int(t.spots), t.months.size,
+    p(`### ${name(a)}${role[a] === 1 ? ' (mine)' : ''}`, '');
+    const heads = ['Campaign', 'Type', 'Spend (LKR Mn)', '% of advertiser', 'Spots', 'Months active', 'First spot', 'Last spot', 'Channels'];
+    const groups = [['Commercials', list.filter(t => !excluded[t.th])], ['Value additions', list.filter(t => excluded[t.th])]].filter(g => g[1].length);
+    for (const [label, items] of groups) {
+      const shown = role[a] === 1 ? items : items.slice(0, 10);
+      p(`#### ${label}`, '',
+        table(heads, shown.map(t => [dicts.theme[t.th] || '(blank)', excluded[t.th] ? 'VA' : 'Commercial', mn(t.spend), pc(t.spend, spend[a]), int(t.spots), t.months.size,
           toIso(t.first), toIso(t.last), [...t.channels].sort((x, y) => chA[y * nAdv + a] - chA[x * nAdv + a]).map(c => dicts.channelName[c]).join(', ')]),
         ['l', 'l', 'r', 'r', 'r', 'r', 'l', 'l', 'l']),
-      list.length > shown.length ? `\n${list.length - shown.length} smaller campaigns not listed.` : '', '');
+        items.length > shown.length ? `\n${items.length - shown.length} smaller ${label.toLowerCase()} not listed.` : '', '');
+    }
+    if (!groups.length) p('No campaigns in this selection.', '');
   }
 
   // ---- 11. monthly lead per month ----

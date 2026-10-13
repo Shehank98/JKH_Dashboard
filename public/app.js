@@ -924,7 +924,8 @@
   // Only my advertiser's row is highlighted.
   function renderDuration(d) {
     const { buckets, legacy } = d.duration;
-    const rows = durMedium === 'All' ? d.duration.rows : d.duration.byMedium[durMedium];
+    const allRows = durMedium === 'All' ? d.duration.rows : d.duration.byMedium[durMedium];
+    const rows = allRows.filter(r => r.avg || r.ads > 0);
     const med = durMedium === 'All' ? undefined : durMedium;
     const cell = r => (v, j) => {
       const share = r.ads ? pctS((v / r.ads) * 100) : '0%';
@@ -944,6 +945,7 @@
         <span class="durname" title="${esc(r.name)} · ${nf(r.ads)} ads"${detA(scope)}><span class="nm2">${esc(r.name)}</span></span>
         ${cells}${acd}</div>`;
     }).join('');
+    if (!rows.some(r => !r.avg)) { $('duration').innerHTML = '<div class="nodata">No TV or Radio ads in this selection</div>'; return; }
     const cols = `grid-template-columns:minmax(70px,1.1fr) repeat(${buckets.length},minmax(32px,1fr)) 34px`;
     $('duration').innerHTML = `${legacy ? '<div class="durnote">Re-upload your file to apply the new length buckets and ACD</div>' : ''}
       <div class="bgrid" style="${cols}">
@@ -1144,6 +1146,11 @@
   function renderDetailBody() {
     const x = detailData;
     if (!x) return;
+    const split = state.adType === 'All';
+    if (!split && detailTab === 'va') detailTab = 'camp';
+    const tb = $('mTabs').querySelector('[data-t="camp"]');
+    tb.textContent = split ? 'Commercials' : state.adType === 'Sponsorship' ? 'Value additions' : 'Commercials';
+    $('mTabs').querySelector('[data-t="va"]').hidden = !split;
     [...$('mTabs').children].forEach(b => b.classList.toggle('on', b.dataset.t === detailTab));
     const sub = o => ` data-sub="${esc(JSON.stringify(o))}"`;
     const bar = (v, max) => `<span class="sharebar" style="width:${max ? Math.max(2, (v / max) * 60) : 0}px"></span>`;
@@ -1158,13 +1165,15 @@
             <td class="num">${bar(a.spend, max)}${money(a.spend, false)}</td><td class="num">${x.total ? pctS((a.spend / x.total) * 100) : ''}</td>
             <td class="num">${nf(a.spots)}</td><td class="num">${money(a.spots ? a.spend / a.spots : 0, false)}</td></tr>`).join('') + '</tbody></table>';
       if (!rows.length) html = '<div class="mload">No spend in this selection</div>';
-    } else if (detailTab === 'camp') {
-      const max = x.campaigns.length ? x.campaigns[0].spend : 0;
-      html = `<table><tbody><tr><th>#</th><th>Campaign (Advt_Theme)</th><th>Advertiser</th><th class="num">Spend</th><th class="num">Share</th><th class="num">Spots</th></tr>` +
-        x.campaigns.map((c, i) => `<tr class="${c.role === 'mine' ? 'me' : ''}"${sub({ advertiser: c.advertiser, theme: c.name, title: `“${c.name}”`, tab: 'ch' })} style="cursor:pointer" title="Click to see where this campaign ran">
+    } else if (detailTab === 'camp' || detailTab === 'va') {
+      const wantVa = detailTab === 'va' || state.adType === 'Sponsorship';
+      const list = state.adType === 'All' ? x.campaigns.filter(c => !!c.va === wantVa) : x.campaigns;
+      const max = list.length ? list[0].spend : 0;
+      html = `<table><tbody><tr><th>#</th><th>${wantVa ? 'Value addition' : 'Commercial'} (Advt_Theme)</th><th>Advertiser</th><th class="num">Spend</th><th class="num">Share</th><th class="num">Spots</th></tr>` +
+        list.map((c, i) => `<tr class="${c.role === 'mine' ? 'me' : ''}"${sub({ advertiser: c.advertiser, theme: c.name, title: `“${c.name}”`, tab: 'ch' })} style="cursor:pointer" title="Click to see where this campaign ran">
           <td class="rk">${i + 1}</td><td class="nm">“${esc(c.name)}”</td><td class="nm">${esc(c.advertiser)}${tag(c.role)}</td>
           <td class="num">${bar(c.spend, max)}${money(c.spend, false)}</td><td class="num">${x.total ? pctS((c.spend / x.total) * 100) : ''}</td><td class="num">${nf(c.spots)}</td></tr>`).join('') + '</tbody></table>';
-      if (!x.campaigns.length) html = '<div class="mload">No campaigns in this selection</div>';
+      if (!list.length) html = `<div class="mload">No ${wantVa ? 'value additions' : 'commercials'} in this selection</div>`;
     } else if (detailTab === 'mon') {
       const rows = x.months;
       const max = Math.max(0, ...rows.map(m => m.spend));
