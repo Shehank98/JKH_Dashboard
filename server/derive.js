@@ -107,9 +107,11 @@ const EXCLUDED_THEMES = ((typeof process !== 'undefined' && process.env && proce
   .split(';').map(t => t.trim().toLowerCase()).filter(Boolean);
 
 // Excluded when the theme equals an item, or ends with a dash marker such as "Summer Promo -BB".
-function isExcludedTheme(theme) {
+// opts.tagCommercial: some teams treat "Tag" as a commercial; the dashboard has a tick box for it.
+function isExcludedTheme(theme, opts) {
   const t = String(theme || '').trim().toLowerCase();
   if (!t) return false;
+  if (opts && opts.tagCommercial && t === 'tag') return false;
   return EXCLUDED_THEMES.some(x => t === x || (x.startsWith('-') && t.endsWith(x)));
 }
 

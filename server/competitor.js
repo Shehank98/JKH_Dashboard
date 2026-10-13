@@ -51,7 +51,7 @@ function competitorIntel(ds, f, meta = {}) {
   const role = new Uint8Array(nAdv);
   for (const n of f.comps || []) { const i = dicts.adv.indexOf(n); if (i >= 0) role[i] = 2; }
   for (const n of f.mine || []) { const i = dicts.adv.indexOf(n); if (i >= 0) role[i] = 1; }
-  const excluded = dicts.theme.map(t => (D.isExcludedTheme(t) ? 1 : 0));
+  const excluded = dicts.theme.map(t => (D.isExcludedTheme(t, { tagCommercial: !!f.tagCommercial }) ? 1 : 0));
   // Datasets loaded before programmes and breaks were kept do not have these columns.
   const hasDetail = !!(cols.prog && cols.adPos && cols.brk && cols.pos && cols.ads && cols.hour && dicts.program);
   const breakIds = hasDetail ? dicts.adPos.map(breakOf) : [];
@@ -223,7 +223,7 @@ function competitorIntel(ds, f, meta = {}) {
     currency: 'LKR', spendBasis: 'rate card',
     filters: { category: f.pg, from: toIso(from), to: toIso(to), months: nMonths, medium: f.medium || 'All', channel: f.channel || 'All',
       daypart: f.daypart || 'All', adType: { Sponsorship: 'Value Additions', Commercial: 'Commercials' }[f.adType] || 'All',
-      mine: f.mine || [], competitors: f.comps || [] },
+      tagCountsAs: f.tagCommercial ? 'Commercial' : 'Value Addition', mine: f.mine || [], competitors: f.comps || [] },
     totals: { spend: Math.round(catSpend), spots: catSpots, advertisers: ids.length },
     lists: { positionsInBreak: POSITIONS, breaksInProgramme: BREAKS, lengths: D.DUR_BUCKETS, dayparts: D.DAYPARTS, days: DAYS },
     advertisers, summary, channels, programmes, breakPositions, breakNumbers, durations, hours, dayparts, months, weeks, campaigns,

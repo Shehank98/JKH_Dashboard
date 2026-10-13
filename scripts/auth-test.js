@@ -124,7 +124,7 @@ const wrong = c => String((Number(c) + 1) % 1e6).padStart(6, '0');
     assert.strictEqual(r.status, 400, 'a code works once');
 
     // Signed in: dashboard and API open, login page bounces to the dashboard.
-    r = await call('GET', '/'); assert.strictEqual(r.status, 200); assert.ok(r.text.includes('JKH Group Dashboard'));
+    r = await call('GET', '/'); assert.strictEqual(r.status, 200); assert.ok(r.text.includes('id="chMix"') && !r.text.includes('JKH Group Dashboard'));
     r = await call('GET', '/login'); assert.strictEqual(r.status, 302);
     r = await call('GET', '/api/status'); assert.strictEqual(r.status, 200);
     r = await call('GET', '/api/auth/me'); assert.strictEqual(r.json.user.email, email);

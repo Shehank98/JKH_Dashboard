@@ -142,5 +142,36 @@ assert.strictEqual(D.dayNumber(1, 'Jan', 26), D.dayNumber(1, 1, 2026));
   assert.strictEqual(news.spots, 3); assert.strictEqual(news.usualHour, 19); assert.deepStrictEqual(news.airDays, ['Mon', 'Fri']);
   assert.strictEqual(ci.hours.find(r => r.advertiser === 'Me' && r.day === 'Fri' && r.hour === 19).spots, 2);
   assert.deepStrictEqual(ci.warnings, []);
+  // "Count Tag as a commercial" tick box: Tag is a Value Addition by default, a commercial when ticked.
+  const tagFile = path.join(os.tmpdir(), `cas-tag-${process.pid}.csv`);
+  fs.writeFileSync(tagFile, [
+    'Product_Group,Advertiser,Product,Advt_Theme,Channel,Program,Dd,Mn,Yr,Day,Prog_time,Advt_time,AdPos,TotAds,BrkNo,PosinBrk,AdsinBrk,Lng,Dur,Cost',
+    'Biscuits,Me,P,Tag,TV - Derana TV,News,5,1,2026,Mon,19:00,19:45:00,Mid,5,1,1,5,Sinhala,15,500',
+    'Biscuits,Me,P,Theme A,TV - Derana TV,News,6,1,2026,Tue,19:00,19:45:00,Mid,5,1,2,5,Sinhala,30,300',
+    'Biscuits,Rival,P,tag,FM Derana,Show,7,1,2026,Wed,08:00,08:10:00,Start,4,1,1,4,Sinhala,10,50',
+    'Biscuits,Rival,P,-BB,TV - Sirasa TV,News,8,1,2026,Thu,20:00,20:15:00,End,6,2,6,6,Sinhala,5,20',
+  ].join('\n'));
+  const tds = await ingestFile(tagFile, 'tag.csv');
+  fs.rmSync(tagFile);
+  const TF = { from: '2026-01-01', to: '2026-01-31', pg: 'Biscuits', mine: ['Me'], comps: ['Rival'], medium: 'All' };
+  const td = (extra) => compute.dashboard(tds, { ...TF, ...extra });
+  assert.ok(D.isExcludedTheme('Tag') && !D.isExcludedTheme('Tag', { tagCommercial: true }) && D.isExcludedTheme('-BB', { tagCommercial: true }));
+  assert.strictEqual(td({ adType: 'Sponsorship' }).kpi.catSpend, 570);                        // Tag 500 + tag 50 + -BB 20
+  assert.strictEqual(td({ adType: 'Commercial' }).kpi.catSpend, 300);
+  assert.strictEqual(td({ adType: 'Sponsorship', tagCommercial: true }).kpi.catSpend, 20);     // only -BB is left
+  assert.strictEqual(td({ adType: 'Commercial', tagCommercial: true }).kpi.catSpend, 850);
+  assert.strictEqual(td({}).drill[0].campaign.name, 'Theme A');                                // Tag never leads by default
+  assert.strictEqual(td({ tagCommercial: true }).drill[0].campaign.name, 'Tag');               // as a commercial it can
+  assert.deepStrictEqual(td({}).duration.rows[0].counts, [1, 0, 0, 0, 1, 0]);                  // Tag counts as 5s
+  assert.deepStrictEqual(td({ tagCommercial: true }).duration.rows[0].counts, [0, 0, 1, 0, 1, 0]); // its real 15s
+  assert.strictEqual(compute.detail(tds, { ...TF, adType: 'Sponsorship', tagCommercial: true }, {}).total, 20);
+  assert.strictEqual(compute.detail(tds, { ...TF, adType: 'Commercial', tagCommercial: true }, {}).total, 850);
+  const tagMd = planning(tds, { ...TF, tagCommercial: true });
+  assert.ok(tagMd.includes('| Tag (Advt_Theme) | Counted as a commercial |') && tagMd.includes('including Tag') && tagMd.includes('| Tag | Commercial |'));
+  assert.ok(planning(tds, TF).includes('| Tag | VA |'));
+  const tagCi = competitorIntel(tds, { ...TF, tagCommercial: true });
+  assert.strictEqual(tagCi.filters.tagCountsAs, 'Commercial');
+  assert.strictEqual(tagCi.summary.find(r => r.advertiser === 'Me').valueAdditionsShare, 0);
+  assert.strictEqual(competitorIntel(tds, TF).summary.find(r => r.advertiser === 'Me').valueAdditionsShare, 62.5);
   console.log('All smoke tests passed');
 })().catch(e => { console.error(e); process.exit(1); });

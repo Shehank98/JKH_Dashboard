@@ -41,7 +41,7 @@ function planning(ds, f, meta = {}) {
   for (const n of f.comps || []) { const i = dicts.adv.indexOf(n); if (i >= 0) role[i] = 2; }
   for (const n of f.mine || []) { const i = dicts.adv.indexOf(n); if (i >= 0) role[i] = 1; }
   const excluded = new Uint8Array(nTheme);
-  dicts.theme.forEach((t, i) => { if (D.isExcludedTheme(t)) excluded[i] = 1; });
+  dicts.theme.forEach((t, i) => { if (D.isExcludedTheme(t, { tagCommercial: !!f.tagCommercial })) excluded[i] = 1; });
 
   const t0 = new Date(from * 86400000), t1 = new Date(to * 86400000);
   const m0 = t0.getUTCFullYear() * 12 + t0.getUTCMonth();
@@ -130,7 +130,7 @@ function planning(ds, f, meta = {}) {
   // ---- header ----
   p('# Competitive Media Planning Brief',
     '',
-    `**${f.pg}** · ${fmtDate(toIso(from))} to ${fmtDate(toIso(to))} · Ogilvy Orbit Chub · JKH Group Dashboard`,
+    `**${f.pg}** · ${fmtDate(toIso(from))} to ${fmtDate(toIso(to))} · Ogilvy Orbit Chub Live Dashboard`,
     '',
     table(['Setting', 'Value'], [
       ['Product group (category)', f.pg],
@@ -139,6 +139,7 @@ function planning(ds, f, meta = {}) {
       ['Channel', f.channel || 'All channels'],
       ['Daypart', f.daypart || 'All dayparts'],
       ['Ad type', adTypeLabel],
+      ['Tag (Advt_Theme)', f.tagCommercial ? 'Counted as a commercial' : 'Counted as a Value Addition'],
       ['My advertiser(s)', (f.mine || []).join(', ') || 'None selected'],
       ['Competitors', (f.comps || []).join(', ') || 'None selected'],
       ['Spend basis', 'Rate card, LKR (not net of discounts)'],
@@ -157,7 +158,7 @@ function planning(ds, f, meta = {}) {
     '- **SOV** (share of voice): advertiser spots / category spots.',
     '- **ACD** (average commercial duration): total seconds / ads with a duration, TV and Radio only.',
     `- **Duration buckets:** ${D.DUR_BUCKETS.join(', ')}. 1 to 9s counts as 5s; 10 to 30s snaps to the nearest standard (ties go to the shorter); over 30s is 30s+. Value Additions always count as 5s.`,
-    '- **Value Additions:** sponsorship and filler items (-BB, Com Break, DJ, -Extro, -Intro, -LLogo, Next Card, Tag, Time Check, -Tr). Everything else is a Commercial.',
+    `- **Value Additions:** sponsorship and filler items (-BB, Com Break, DJ, -Extro, -Intro, -LLogo, Next Card, ${f.tagCommercial ? '' : 'Tag, '}Time Check, -Tr). Everything else is a Commercial${f.tagCommercial ? ', including Tag' : ''}.`,
     `- **Dayparts:** ${D.DAYPARTS.map((d, i) => `${d} ${D.DAYPART_TIMES[i]}`).join('; ')}.`,
     '- Spend in summary tables is in **LKR millions** (Mn). The flat data table at the end uses whole LKR.',
     '- "Other advertisers" groups every advertiser in the category that is not mine or a selected competitor.',

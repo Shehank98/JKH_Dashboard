@@ -56,6 +56,9 @@ input[type=date].inp{color-scheme:dark}
 .segbar{display:flex;background:#1E2540;border-radius:8px;padding:3px;gap:2px}
 .seg{flex:1;text-align:center;font-size:10.5px;padding:6px 0;border-radius:6px;cursor:pointer;color:#8D9ABA;border:none;background:none;font-weight:600}
 .seg.on{background:#FF8A3D;color:#141A2E}
+.tick{display:flex;align-items:flex-start;gap:9px;margin-top:9px;padding:8px 9px;background:#1E2540;border:1px solid #2A3352;border-radius:8px;cursor:pointer;font-size:11px;color:#E3E8F5;line-height:1.35}
+.tick input{width:15px;height:15px;margin-top:1px;accent-color:#FF8A3D;cursor:pointer;flex-shrink:0}
+.tick small{display:block;color:#8D9ABA;font-size:9.5px;margin-top:2px}
 .hint{font-size:10px;color:#9AA3BC;margin-top:6px;font-style:italic;line-height:1.45}
 .dptable{width:100%;margin-top:8px;border-collapse:collapse}
 .dptable td{font-size:10px;color:#A9B6D4;padding:3px 4px;border-bottom:1px solid #242C45;white-space:nowrap}
@@ -93,8 +96,6 @@ input[type=date].inp{color-scheme:dark}
 .lstack{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
 .logo img{height:22px;width:auto;display:block}
 .logo img.xlogo{height:40px}
-.logo .t1{font-size:15px;font-weight:700;letter-spacing:-.2px;line-height:1;white-space:nowrap;color:#1A1F36}
-.logo .lsep{width:1px;height:22px;background:#DDE3EF}
 .logo .t2{font-size:9.5px;color:#8A93AD;font-weight:600;letter-spacing:.3px;white-space:nowrap}
 .fbtn{background:#141A2E;color:#fff;border:none;border-radius:9px;padding:10px 15px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .fbtn.light{background:#fff;color:#4A5570;border:1px solid #DDE3EF}
@@ -412,7 +413,8 @@ tr.me .sharebar{background:#FF8A3D}
           <button class="seg" data-v="Commercial">Commercials</button>
           <button class="seg" data-v="Sponsorship">Value Additions</button>
         </div>
-        <div class="hint">Value Additions: -BB, Com Break, DJ, -Extro, -Intro, -LLogo, Next Card, Tag, Time Check, -Tr (Advt_Theme). Everything else is a commercial. Value additions always count as 5s in Duration Mix and are never picked as the Month Drill Down lead campaign (except in Value Additions view).</div>
+        <label class="tick"><input type="checkbox" id="fTagCommercial"><span>Count <b>Tag</b> as a commercial<small id="fTagHint">Unticked: Tag is a Value Addition (sponsorship)</small></span></label>
+        <div class="hint">Value Additions: -BB, Com Break, DJ, -Extro, -Intro, -LLogo, Next Card, <span id="fTagInList">Tag, </span>Time Check, -Tr (Advt_Theme). Everything else is a commercial. Value additions always count as 5s in Duration Mix and are never picked as the Month Drill Down lead campaign (except in Value Additions view).</div>
         <div class="flabel">Medium</div>
         <div class="segbar" id="fMedium">
           <button class="seg on" data-v="All">All</button>
@@ -461,7 +463,7 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="topbar">
   <div class="logo">
-    <img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"><span class="lsep"></span><span class="t1">JKH Group Dashboard</span>
+    <img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub">
   </div>
   <label class="fbtn" for="drawerToggle" id="filterBtn">☰ Filters</label>
   <div class="daterange">
@@ -578,6 +580,6 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=30"></script>
+<script src="app.js?v=31"></script>
 </body>
 </html>

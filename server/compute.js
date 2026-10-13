@@ -49,16 +49,18 @@ function groupOptions(ds, pgName) {
 const LEGACY_DUR = [0, 2, 3, 4, 5];
 const legacyDur = i => (i < LEGACY_DUR.length ? LEGACY_DUR[i] : 255);
 
-// Theme ids that are sponsorship or filler items, cached per dataset.
+// Theme ids that are sponsorship or filler items, cached per dataset and per "Tag counts as commercial" choice.
 const excludedCache = new WeakMap();
-function excludedThemes(ds) {
-  let set = excludedCache.get(ds);
-  if (!set) {
-    set = new Uint8Array(ds.dicts.theme.length);
-    ds.dicts.theme.forEach((t, i) => { if (D.isExcludedTheme(t)) set[i] = 1; });
-    excludedCache.set(ds, set);
+function excludedThemes(ds, tagCommercial) {
+  let byFlag = excludedCache.get(ds);
+  if (!byFlag) { byFlag = {}; excludedCache.set(ds, byFlag); }
+  const key = tagCommercial ? 'tagC' : 'tagVA';
+  if (!byFlag[key]) {
+    const set = new Uint8Array(ds.dicts.theme.length);
+    ds.dicts.theme.forEach((t, i) => { if (D.isExcludedTheme(t, { tagCommercial })) set[i] = 1; });
+    byFlag[key] = set;
   }
-  return set;
+  return byFlag[key];
 }
 
 // Shared filter resolution for the dashboard and the detail view.
@@ -90,7 +92,7 @@ function dashboard(ds, f) {
   const { dicts, cols } = ds;
   const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
   const { pgId, from, to, pFrom, pTo, mediumId, chId, dpId, role, mineIds, comps, adType } = resolve(ds, f);
-  const excluded = excludedThemes(ds);
+  const excluded = excludedThemes(ds, !!f.tagCommercial);
   // Month Drill Down never picks a sponsorship item as the lead campaign, except when only sponsorships are shown.
   const skipCampaign = adType === 2 ? null : excluded;
 
@@ -356,7 +358,7 @@ function detail(ds, f, scope = {}) {
     to = Math.min(ds.meta.maxDay, toDay(`${scope.year}-12-31`));
     if (!(to >= from)) throw new Error('No data in ' + scope.year);
   }
-  const excluded = excludedThemes(ds);
+  const excluded = excludedThemes(ds, !!f.tagCommercial);
   let mon = -1;
   if (scope.month) { const [y, m] = scope.month.split('-').map(Number); mon = y * 12 + m - 1; }
   const sMed = scope.medium ? D.MEDIA.indexOf(scope.medium) : -1;
