@@ -18,9 +18,9 @@ button,select,input{font-family:inherit}
 /* ---------- Drawer ---------- */
 #drawerToggle{display:none}
 .scrim{position:fixed;inset:0;background:rgba(20,26,46,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:8}
-#drawerToggle:checked ~ .scrim{opacity:1;pointer-events:auto}
+#drawerToggle:checked ~ #spotScrim{opacity:1;pointer-events:auto}
 .drawer{position:fixed;top:0;left:0;width:320px;height:100%;background:#141A2E;color:#C9D1E4;display:flex;flex-direction:column;transform:translateX(-330px);transition:transform .25s ease;z-index:9;box-shadow:6px 0 26px rgba(0,0,0,.25)}
-#drawerToggle:checked ~ .drawer{transform:translateX(0)}
+#drawerToggle:checked ~ #drawer{transform:translateX(0)}
 .dhead{padding:16px 16px 0;position:relative;flex-shrink:0}
 .brand{padding:2px 22px 12px 0}
 .brand img{height:22px;display:block;max-width:250px}
@@ -375,7 +375,7 @@ tr.me .sharebar{background:#FF8A3D}
 <body>
 
 <input type="checkbox" id="drawerToggle">
-<label class="scrim" for="drawerToggle"></label>
+<label class="scrim" id="spotScrim" for="drawerToggle"></label>
 <div class="drawer" id="drawer">
   <div class="dhead">
     <label class="closeX" for="drawerToggle">✕</label>
@@ -472,7 +472,7 @@ tr.me .sharebar{background:#FF8A3D}
 </div>
 
 <input type="checkbox" id="catDrawerToggle">
-<label class="scrim catscrim" for="catDrawerToggle"></label>
+<label class="scrim catscrim" id="catScrim" for="catDrawerToggle"></label>
 <div class="drawer" id="catDrawer">
   <div class="dhead">
     <label class="closeX" for="catDrawerToggle">✕</label>

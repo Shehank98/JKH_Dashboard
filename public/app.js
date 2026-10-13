@@ -1218,7 +1218,7 @@
     logo.setAttribute('src', EXPORT_LOGO); logo.classList.add('xlogo');
     await logo.decode().catch(() => {});
     b.classList.add('exporting');
-    const skip = new Set(['drawer', 'drawerToggle', 'toast', 'overlay', 'filterBtn', 'tright', 'modal', 'tip', 'exportStage']);
+    const skip = new Set(['drawer', 'drawerToggle', 'catDrawer', 'catDrawerToggle', 'catModal', 'toast', 'overlay', 'filterBtn', 'tright', 'modal', 'tip', 'exportStage']);
     const url = await window.htmlToImage.toJpeg(b, {
       quality: 0.95, pixelRatio: 2, backgroundColor: '#F4F6FA', width: w, height: h,
       style: { transform: 'none' },
