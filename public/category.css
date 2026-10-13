@@ -186,3 +186,21 @@ body.mode-cat .modebtn:hover{box-shadow:0 4px 12px rgba(47,93,191,.45)}
 .ctab2 tr.tot td:first-child{text-transform:uppercase}
 .ctab2 tr.link:hover td{filter:brightness(.96)}
 .cm-t tr.link{cursor:pointer}.cm-t tr.link:hover td{background:#F6F8FC}
+
+/* Section: category investment (stacked by medium, and by sub category) */
+.ci-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.ci-grid.single{grid-template-columns:minmax(0,1fr)}
+.ci-box{display:flex;flex-direction:column;min-height:0;background:#fff;border:1px solid #E5E9F2;border-radius:12px;padding:8px 12px 8px}
+.ci-t{text-align:center;font-size:17px;font-weight:700;color:#6B7590;text-decoration:underline;text-underline-offset:4px;flex-shrink:0}
+.ci-svg{flex:1;min-height:0;position:relative}
+.ci-svg svg{position:absolute;inset:0}
+.ci-lg{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:center;flex-shrink:0;margin-top:2px;font-size:12px;font-weight:700;color:#1A1F36}
+.ci-lg span{display:flex;align-items:center;gap:5px;padding:1px 5px;border-radius:5px}
+.ci-lg span[data-sub]{cursor:pointer}.ci-lg span[data-sub]:hover{background:#F4F6FA}.ci-lg span.off{opacity:.35;text-decoration:line-through}
+.ci-lg i{width:11px;height:11px;border-radius:2px;display:inline-block}
+.ci-notes{flex-shrink:0;background:#fff;border:1px solid #E5E9F2;border-radius:12px;padding:8px 18px 8px 8px;outline:none;font-size:14.5px;line-height:1.5;color:#1A1F36}
+.ci-notes ul{margin:0;padding-left:26px}.ci-notes li{margin:4px 0}
+.ci-notes:focus{box-shadow:0 0 0 2px #FFC599}
+.ciopt{align-self:center;margin:0 4px 0 0!important}
+.chead2 .opt2{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#4A5570;cursor:pointer}
+.chead2 .opt2 input{accent-color:#FF8A3D}

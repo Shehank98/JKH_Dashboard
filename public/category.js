@@ -14,6 +14,7 @@
   let overview = null, options = { advertisers: [], subs: [] }, data = null, pendingFile = null, started = false, busy = false;
   const state = { from: '', to: '', pg: '', sub: '', mine: [], comps: [], top: 10, yearType: 'CY' };
   const ui = { labels: true, part: 'm', hideInc: false };   // chart: value labels, months / quarters / halves / years, hide incomplete
+  const ci = { part: 'y', hideInc: false, subsOn: new Set(), subKey: '' };   // category investment section
   const hiddenBrands = new Set();               // brands switched off in the chart legend
 
   // ---------- month helpers ----------
@@ -149,7 +150,8 @@
     $('catOvText').textContent = 'Open the filter drawer, choose Data file and pick your category file (Month, Product Group, Mother Brand, Advertiser, Brand, Tv / Radio / Press in 000Rs). It is read on this computer only.';
     $('catOverlay').classList.add('on');
     $('viewCat').classList.add('nodata');
-    for (const id of ['catTitle', 'catSub', 'catTot', 'catTotLabel', 'catTitle2', 'catSub2', 'catTitle3', 'catSub3']) $(id).textContent = '';
+    for (const id of ['catTitle', 'catSub', 'catTot', 'catTotLabel', 'catTitle2', 'catSub2', 'catTitle3', 'catSub3', 'catTitle0', 'catSub0']) $(id).textContent = '';
+    $('catCi').innerHTML = ''; $('catCiNotes').innerHTML = '';
     $('catGrid').innerHTML = ''; $('catLegend').innerHTML = ''; $('catChart').innerHTML = ''; $('catSubs').innerHTML = '';
     $('catPeriodText').textContent = 'No data'; $('catPeriodLen').textContent = '0 months'; $('catChips').innerHTML = '';
     showPane('cpData');
@@ -298,6 +300,7 @@
     if (f.comps && f.comps.length) chips.push(`<span class="chip">${f.comps.length} competitor${f.comps.length === 1 ? '' : 's'}</span>`);
     chips.push(`<span class="chip">${yt === 'FY' ? 'Financial year (Apr–Mar)' : 'Calendar year'}</span>`);
     $('catChips').innerHTML = chips.join('');
+    renderCi(d);
     renderChart(d, cur);
     renderSubs(d, { cur, yoy, prev });
     if (!d.cards.length) { $('catGrid').innerHTML = '<div class="nodata2">No spend found for these filters.</div>'; renderLegend(cur, yoy, prev); return; }
@@ -338,7 +341,7 @@
     if (!g.clientHeight) return;
     g.style.setProperty('--rowh', Math.max(215, Math.floor((g.clientHeight - 9 - 12) / 2)) + 'px');
   }
-  window.addEventListener('resize', () => { if (data && document.body.classList.contains('mode-cat')) { sizeGrid(); renderChart(data, null); } });
+  window.addEventListener('resize', () => { if (data && document.body.classList.contains('mode-cat')) { sizeGrid(); renderChart(data, null); renderCi(data); } });
 
   // ---------- Category behaviour, month by month ----------
   // Big green bars: the whole category each month (left axis). Small bars: the mother brands (right axis, own scale).
@@ -346,6 +349,21 @@
   function chartPool(d) {
     const pool = d.cards.filter(c => c.mine).concat(d.cards.filter(c => !c.mine)).slice(0, 8).sort((a, b) => b.cur - a.cur);
     return { pool, colors: new Map(pool.map((c, i) => [c.name, CHART_COLORS[i % CHART_COLORS.length]])) };
+  }
+
+  // Quarters / half years / years of the chosen year type built from a list of month keys.
+  function periodize(months, part) {
+    const L = { q: 3, h: 6, y: 12 }[part], yt = state.yearType, shift = yt === 'FY' ? 3 : 0;
+    const first = idx(months[0]), last = idx(months[months.length - 1]), groups = new Map();
+    months.forEach((k, i) => {
+      const g = Math.floor((idx(k) - shift) / L) * L + shift;
+      if (!groups.has(g)) groups.set(g, { g, idxs: [] });
+      groups.get(g).idxs.push(i);
+    });
+    return [...groups.values()].sort((x, y) => x.g - y.g).map(G => {
+      const a = keyOf(G.g), b = keyOf(G.g + L - 1), label = periodLabel(a, b, yt);
+      return { ...G, label, tipLabel: `${label} (${monLabel(a)} to ${monLabel(b)})`, complete: G.g >= first && G.g + L - 1 <= last };
+    });
   }
   const PART_NAME = { m: 'Month-On-Month', q: 'Quarter-On-Quarter', h: 'Half-On-Half', y: 'Year-On-Year' };
   const PART_ADJ = { m: 'Monthly', q: 'Quarterly', h: 'Half-yearly', y: 'Yearly' };
@@ -360,17 +378,9 @@
       const len = n - M.selStart, start = Math.max(0, M.selStart - Math.max(0, 15 - len));
       for (let i = start; i < n; i++) periods.push({ label: monLabel(M.months[i]).replace('-', " '"), tipLabel: monLabel(M.months[i]), complete: true, inSel: i >= M.selStart, cat: M.cat[i], vals: pool0.map(c => c.monthly[i]) });
     } else {
-      const L = { q: 3, h: 6, y: 12 }[part], shift = yt === 'FY' ? 3 : 0;
-      const first = idx(M.months[0]), last = idx(M.months[n - 1]), groups = new Map();
-      M.months.forEach((k, i) => {
-        const g = Math.floor((idx(k) - shift) / L) * L + shift;
-        if (!groups.has(g)) groups.set(g, { g, cat: 0, vals: pool0.map(() => 0) });
-        const G = groups.get(g);
-        G.cat += M.cat[i]; pool0.forEach((c, j) => { G.vals[j] += c.monthly[i]; });
-      });
-      periods = [...groups.values()].sort((x, y) => x.g - y.g).map(G => {
-        const a = keyOf(G.g), b = keyOf(G.g + L - 1), label = periodLabel(a, b, yt);
-        return { label, tipLabel: `${label} (${monLabel(a)} to ${monLabel(b)})`, complete: G.g >= first && G.g + L - 1 <= last, inSel: false, cat: G.cat, vals: G.vals };
+      periods = periodize(M.months, part).map(G => {
+        const vals = pool0.map(c => G.idxs.reduce((a, i) => a + c.monthly[i], 0));
+        return { label: G.label, tipLabel: G.tipLabel, complete: G.complete, inSel: false, cat: G.idxs.reduce((a, i) => a + M.cat[i], 0), vals };
       });
       if (ui.hideInc) periods = periods.filter(p => p.complete);
     }
@@ -532,6 +542,218 @@
     if (sc) { try { openDetail(JSON.parse(sc.dataset.scope)); } catch (err) { /* bad scope */ } }
   });
 
+
+  // ---------- category investment: stacked by medium, and the sub categories ----------
+  const MED_HEX = ['0070C0', 'E8484B', '111111'];
+  const SUBC = ['E91E8C', '8ED63D', 'F5A300', '7B3FA0', '1E88E5', '00ACC1', '455A64', 'C2410C'];
+  const SUBC_TXT = { E91E8C: 'FFFFFF', '8ED63D': '111111', F5A300: '111111', '7B3FA0': 'FFFFFF', '1E88E5': 'FFFFFF', '00ACC1': 'FFFFFF', '455A64': 'FFFFFF', C2410C: 'FFFFFF' };
+  function ciData(d) {
+    const H = d.history, M = d.monthly, part = ci.part, lag = { y: 1, h: 2, q: 4 }[part];
+    const sumOf = (arr, idxs) => idxs.reduce((a, i) => a + arr[i], 0);
+    let all = periodize(M.months, part).map(G => {
+      const tv = sumOf(H.tv, G.idxs), radio = sumOf(H.radio, G.idxs), press = sumOf(H.press, G.idxs);
+      return { label: G.label, tipLabel: G.tipLabel, complete: G.complete, tv, radio, press, total: tv + radio + press, subs: H.subs.map(x => sumOf(x.values, G.idxs)) };
+    });
+    // Growth on the same period a year earlier, only between two complete periods.
+    all.forEach((p, i) => {
+      const q = all[i - lag], g = (cur, prev) => (p.complete && q && q.complete && prev > 0 ? ((cur - prev) / prev) * 100 : null);
+      p.growth = g(p.total, q && q.total); p.subGrowth = p.subs.map((v, k) => g(v, q && q.subs[k]));
+    });
+    const periods = ci.hideInc ? all.filter(p => p.complete) : all;
+    const names = H.subs.map(x => x.name);
+    const key = d.filters.pg + '|' + d.filters.sub + '|' + names.join(',');
+    if (ci.subKey !== key) { ci.subKey = key; ci.subsOn = new Set(d.tables.filter(t => names.includes(t.name)).slice(0, 2).map(t => t.name)); }
+    return { part, periods, names };
+  }
+  const niceMaxV = v => niceMax(Math.max(1, v));
+  // Charts are described as simple shapes (rect / text / line / arrow) in a W x H box, so the screen (SVG) and the
+  // PowerPoint draw exactly the same picture.
+  function ciAxes(P, W, H, T, max, left, right, yAxisTitle) {
+    const Y0 = H - 34, y = v => Y0 - (v / max) * (Y0 - T);
+    for (let i = 0; i <= 4; i++) {
+      const v = (max * i) / 4, yy = Y0 - (i * (Y0 - T)) / 4;
+      P.push({ t: 'l', x1: left, y1: yy, x2: W - right, y2: yy, color: 'EEF1F7', lw: 1 });
+      P.push({ t: 't', x: left - 6, y: yy + 4, text: nf(v / 1000, max / 1000 < 4 ? 1 : 0).replace(/^0$/, '–'), size: 11, color: '4A5570', anchor: 'end' });
+      if (right > 20) P.push({ t: 't', x: W - right + 6, y: yy + 4, text: nf(v / 1000, max / 1000 < 4 ? 1 : 0).replace(/^0$/, '–'), size: 11, color: '4A5570', anchor: 'start' });
+    }
+    P.push({ t: 't', x: 12, y: (T + Y0) / 2, text: yAxisTitle, size: 11, color: '4A5570', anchor: 'middle', rot: -90 });
+    if (right > 20) P.push({ t: 't', x: W - 10, y: (T + Y0) / 2, text: yAxisTitle, size: 11, color: '4A5570', anchor: 'middle', rot: -90 });
+    return { Y0, y };
+  }
+  function ciXLabels(P, periods, X0, gw, Y0) {
+    const every = Math.ceil(periods.length / Math.max(3, Math.floor((gw * periods.length) / 70)));
+    periods.forEach((p, i) => {
+      const cx = X0 + gw * (i + 0.5);
+      if (i % every && i !== periods.length - 1) return;
+      P.push({ t: 't', x: cx, y: Y0 + 17, text: p.label, size: gw < 60 ? 10 : 12, bold: true, color: '1A1F36', anchor: 'middle' });
+      if (!p.complete) P.push({ t: 't', x: cx, y: Y0 + 30, text: 'Incomplete', size: 9, bold: true, color: 'E4702A', anchor: 'middle' });
+    });
+  }
+  function ciLeft(CD, W, H) {
+    const P = [], per = CD.periods, n = per.length, L = 74, R = 12, X0 = L, X1 = W - R, gw = (X1 - X0) / n;
+    const maxT = niceMaxV(Math.max(0, ...per.map(p => p.total))), T = 92;
+    const { Y0, y } = ciAxes(P, W, H, T, maxT, L, 0, 'Investment (Rs. In Mn)');
+    // The totals row (a table above the bars).
+    P.push({ t: 'r', x: 4, y: 2, w: L - 4, h: 38, fill: 'D9ECFA', line: '9CC3E4', lw: 1 });
+    P.push({ t: 't', x: 4 + (L - 4) / 2, y: 17, text: 'Investment', size: 11, bold: true, color: '1A1F36', anchor: 'middle' });
+    P.push({ t: 't', x: 4 + (L - 4) / 2, y: 31, text: '(Rs in Mns)', size: 10, bold: true, color: '1A1F36', anchor: 'middle' });
+    per.forEach((p, i) => {
+      const cx = X0 + gw * (i + 0.5), bw = Math.min(74, gw * 0.62);
+      P.push({ t: 'r', x: X0 + gw * i, y: 2, w: gw, h: 38, fill: 'D9ECFA', line: '9CC3E4', lw: 1 });
+      P.push({ t: 't', x: cx, y: 27, text: nf(p.total / 1000, 0), size: gw < 70 ? 12 : 16, bold: true, color: '1A1F36', anchor: 'middle' });
+      let acc = 0;
+      [p.tv, p.radio, p.press].forEach((v, k) => {
+        if (v <= 0) return;
+        const y1 = y(acc), y2 = y(acc + v); acc += v;
+        const pct = p.total ? (v / p.total) * 100 : 0;
+        P.push({ t: 'r', x: cx - bw / 2, y: y2, w: bw, h: y1 - y2, fill: MED_HEX[k], tip: `${p.tipLabel}\\n${MED[k]}: Rs ${nf(v / 1000, 0)} Mn · ${nf(pct, 1)}%` + (p.complete ? '' : '\\nIncomplete period') });
+        if (pct >= 4 && y1 - y2 >= 15) P.push({ t: 't', x: cx, y: y2 + (y1 - y2) / 2 + 4, text: `${nf(pct, 0)}%`, size: gw < 70 ? 10 : 12, bold: true, color: 'FFFFFF', anchor: 'middle' });
+        else if (pct >= 0.5 && k > 0) P.push({ t: 't', x: cx, y: y2 - 3, text: `${nf(pct, 0)}%`, size: 10, bold: true, color: '1A1F36', anchor: 'middle' });
+      });
+      const top = y(p.total);
+      if (!p.complete) P.push({ t: 'r', x: cx - bw / 2, y: top, w: bw, h: Y0 - top, hatch: true });
+      if (p.growth != null) {
+        const up = p.growth >= 0;
+        P.push({ t: 't', x: cx, y: top - 36, text: `${up ? '' : '-'}${nf(Math.abs(p.growth), 0)}%`, size: gw < 70 ? 12 : 15, bold: true, color: up ? '2E7D32' : 'E5242B', anchor: 'middle' });
+        P.push({ t: 'a', x: cx, y: top - 31, w: 20, h: 26, dir: up ? 'up' : 'down', fill: up ? '2E7D32' : 'E5484D' });
+      }
+    });
+    P.push({ t: 'l', x1: X0, y1: Y0, x2: X1, y2: Y0, color: 'C7CEDF', lw: 1 });
+    ciXLabels(P, per, X0, gw, Y0);
+    return P;
+  }
+  function ciRight(CD, W, H, names) {
+    const P = [], per = CD.periods, n = per.length, L = 66, R = 66, X0 = L, X1 = W - R, gw = (X1 - X0) / n;
+    const on = CD.names.map((nm, k) => [nm, k]).filter(([nm]) => ci.subsOn.has(nm));
+    const maxT = niceMaxV(Math.max(0, ...per.map(p => p.total))), T = 40;
+    const { Y0, y } = ciAxes(P, W, H, T, maxT, L, R, 'Investment (Rs. In Mn)');
+    const lastIdx = (() => { for (let i = n - 1; i >= 0; i--) if (per[i].complete) return i; return -1; })();
+    per.forEach((p, i) => {
+      const cx = X0 + gw * (i + 0.5), cw = Math.min(110, gw * 0.76), top = y(p.total);
+      if (p.total > 0) {
+        P.push({ t: 'r', x: cx - cw / 2, y: top, w: cw, h: Y0 - top, fill: 'D6E9F8', grad: 'blue', tip: `${p.tipLabel}\\nCategory: Rs ${nf(p.total / 1000, 0)} Mn` + (p.complete ? '' : '\\nIncomplete period') });
+        const t = nf(p.total / 1000, 0), w = t.length * 7.5 + 12;
+        P.push({ t: 'r', x: cx - w / 2, y: top - 22, w, h: 19, fill: 'CFE8FB', rx: 3 });
+        P.push({ t: 't', x: cx, y: top - 8, text: t, size: gw < 70 ? 11 : 13, bold: true, color: '1E6FB5', anchor: 'middle' });
+      }
+      const k = on.filter(([, j]) => p.subs[j] > 0).length || 1, bw = Math.min(30, (cw * 0.9) / Math.max(1, on.length)), groupW = bw * k;
+      let slot = 0;
+      on.forEach(([nm, j]) => {
+        const v = p.subs[j];
+        if (v <= 0) return;
+        const hex = SUBC[CD.names.indexOf(nm) % SUBC.length], bx = cx - groupW / 2 + slot * bw, by = y(v); slot++;
+        P.push({ t: 'r', x: bx, y: by, w: bw - 1, h: Y0 - by, fill: hex, tip: `${nm}\\n${p.tipLabel}\\nRs ${nf(v / 1000, 0)} Mn${p.subGrowth[j] == null ? '' : ' · ' + nf(p.subGrowth[j], 0) + '% YoY'}` });
+        if (!p.complete) P.push({ t: 'r', x: bx, y: by, w: bw - 1, h: Y0 - by, hatch: true });
+        const t = nf(v / 1000, 0), w = t.length * 7 + 10;
+        P.push({ t: 'r', x: bx + (bw - 1) / 2 - w / 2, y: by - 20, w, h: 17, fill: hex, rx: 3 });
+        P.push({ t: 't', x: bx + (bw - 1) / 2, y: by - 7, text: t, size: gw < 70 ? 10 : 12, bold: true, color: SUBC_TXT[hex] || 'FFFFFF', anchor: 'middle' });
+        if (i === lastIdx && p.subGrowth[j] != null) {
+          const g = p.subGrowth[j], up = g >= 0;
+          P.push({ t: 't', x: bx + (bw - 1) / 2, y: by - 50, text: `${up ? '▲' : '▼'} ${up ? '' : '-'}${nf(Math.abs(g), 0)}%`, size: 12, bold: true, color: up ? '2E7D32' : 'E5242B', anchor: 'middle' });
+        }
+      });
+    });
+    P.push({ t: 'l', x1: X0, y1: Y0, x2: X1, y2: Y0, color: 'C7CEDF', lw: 1 });
+    ciXLabels(P, per, X0, gw, Y0);
+    return P;
+  }
+  const esc2 = v => String(v).replace(/\\n/g, '\n');
+  function primsToSvg(P, W, H, id) {
+    const out = P.map(e => {
+      const tip = e.tip ? ` data-tip="${esc(esc2(e.tip))}"` : '';
+      if (e.t === 'r') return `<rect x="${e.x}" y="${e.y}" width="${Math.max(0, e.w)}" height="${Math.max(0, e.h)}" rx="${e.rx || 0}" fill="${e.hatch ? `url(#${id}H)` : e.grad ? `url(#${id}G)` : '#' + e.fill}"${e.line ? ` stroke="#${e.line}" stroke-width="${e.lw || 1}"` : ''}${e.hatch ? ' pointer-events="none"' : ''}${tip}></rect>`;
+      if (e.t === 'l') return `<line x1="${e.x1}" y1="${e.y1}" x2="${e.x2}" y2="${e.y2}" stroke="#${e.color}" stroke-width="${e.lw || 1}"></line>`;
+      if (e.t === 'a') { const hw = e.w / 2, hh = e.h; const pts = e.dir === 'up' ? `${e.x},${e.y} ${e.x + hw},${e.y + hh * 0.5} ${e.x + hw * 0.4},${e.y + hh * 0.5} ${e.x + hw * 0.4},${e.y + hh} ${e.x - hw * 0.4},${e.y + hh} ${e.x - hw * 0.4},${e.y + hh * 0.5} ${e.x - hw},${e.y + hh * 0.5}` : `${e.x},${e.y + hh} ${e.x + hw},${e.y + hh * 0.5} ${e.x + hw * 0.4},${e.y + hh * 0.5} ${e.x + hw * 0.4},${e.y} ${e.x - hw * 0.4},${e.y} ${e.x - hw * 0.4},${e.y + hh * 0.5} ${e.x - hw},${e.y + hh * 0.5}`; return `<polygon points="${pts}" fill="#${e.fill}"></polygon>`; }
+      const anchor = { start: 'start', middle: 'middle', end: 'end' }[e.anchor || 'start'];
+      return `<text x="${e.x}" y="${e.y}" font-size="${e.size}" font-weight="${e.bold ? 800 : 600}" fill="#${e.color}" text-anchor="${anchor}"${e.rot ? ` transform="rotate(${e.rot} ${e.x} ${e.y})"` : ''}>${esc(e.text)}</text>`;
+    }).join('');
+    return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="${id}G" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#BFDDF4"></stop><stop offset="1" stop-color="#F2F8FD"></stop></linearGradient><pattern id="${id}H" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-opacity=".6" stroke-width="2"></line></pattern></defs>${out}</svg>`;
+  }
+  // Notes under the charts, written from the numbers (editable).
+  function ciNotesHtml(d, CD) {
+    const f = d.filters, cp = CD.periods.filter(p => p.complete), latest = cp[cp.length - 1];
+    if (!latest) return '<ul><li>No complete period in this range.</li></ul>';
+    const per = { y: 'YoY', h: 'YoY', q: 'YoY' }[CD.part], pct = g => `${nf(Math.abs(g), 0)}%`;
+    const lines = [];
+    const li = cp.indexOf(latest);
+    let run = 0;
+    for (let k = li - 1; k >= 0 && cp[k].growth != null && cp[k].growth > 0; k--) run++;
+    const total = `Rs. <b>${nf(latest.total / 1000, 0)} Mn</b>`;
+    if (latest.growth == null) lines.push(`${esc(f.pg)} investment was ${total} in ${esc(latest.label)}.`);
+    else if (latest.growth < 0) lines.push(`${run ? `After ${run} consecutive ${CD.part === 'y' ? 'years' : 'periods'} of growth, ` : ''}${esc(f.pg)} investment declined by <b>${pct(latest.growth)} ${per}</b> to ${total} in ${esc(latest.label)}.`);
+    else lines.push(`${esc(f.pg)} investment grew by <b>${pct(latest.growth)} ${per}</b> to ${total} in ${esc(latest.label)}.`);
+    const med = [latest.tv, latest.radio, latest.press], mi = med.indexOf(Math.max(...med)), share = latest.total ? (med[mi] / latest.total) * 100 : 0;
+    const medTxt = `${MED[mi]} continued to dominate with a <b>${nf(share, 0)}% investment share</b>.`;
+    if (CD.names.length) {
+      const shownSubs = CD.names.map((nm, k) => ({ nm, k, v: latest.subs[k], g: latest.subGrowth[k] })).filter(x => ci.subsOn.has(x.nm) && x.v > 0).sort((a, b) => b.v - a.v);
+      const hidden = CD.names.map((nm, k) => ({ nm, g: latest.subGrowth[k], v: latest.subs[k] })).filter(x => !ci.subsOn.has(x.nm) && x.v > 0 && x.g != null).sort((a, b) => Math.abs(b.g) - Math.abs(a.g))[0];
+      if (shownSubs.length) {
+        const top = shownSubs[0];
+        let t = `Among the displayed sub-categories, <b>${esc(top.nm)}</b> remained the primary investment ${top.k >= 0 ? 'driver' : ''}${top.g == null ? '' : top.g < 0 ? ` despite declining by <b>${pct(top.g)}</b>` : ` after growing by <b>${pct(top.g)}</b>`}`;
+        const rest = shownSubs.slice(1).filter(x => x.g != null).map(x => `${esc(x.nm)} ${x.g < 0 ? 'contracted' : 'expanded'} by <b>${pct(x.g)}</b>`);
+        if (rest.length) t += `, while ${rest.join(' and ')}`;
+        t += `. ${medTxt}`;
+        if (hidden) t += ` (${esc(hidden.nm)} (not shown here) ${hidden.g >= 0 ? `experienced a ${pct(hidden.g)} increase` : `declined by ${pct(hidden.g)}`} in investments)`;
+        lines.push(t);
+      } else lines.push(medTxt);
+    } else lines.push(medTxt);
+    return `<ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul>`;
+  }
+  const cleanHtml = html => {
+    const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+    const walk = node => [...node.childNodes].map(n => {
+      if (n.nodeType === 3) return esc(n.textContent);
+      const tag = n.nodeName.toLowerCase();
+      if (['b', 'strong', 'i', 'em', 'ul', 'li', 'br'].includes(tag)) { const t = tag === 'strong' ? 'b' : tag === 'em' ? 'i' : tag; return t === 'br' ? '<br>' : `<${t}>${walk(n)}</${t}>`; }
+      return walk(n);
+    }).join('');
+    return walk(doc.body);
+  };
+  function ciHeadline(d, CD) {
+    const f = d.filters, cp = CD.periods.filter(p => p.complete), latest = cp[cp.length - 1];
+    if (!latest || latest.growth == null) return `${f.pg} Investment by Year`;
+    if (latest.growth < 0) {
+      const peak = cp.reduce((a, p) => (p.total > a.total ? p : a), cp[0]);
+      return peak !== latest ? `${f.pg} Investment Moderates After Its ${peak.label} Peak` : `${f.pg} Investment Declines in ${latest.label}`;
+    }
+    return `${f.pg} Investment Grows ${nf(latest.growth, 0)}% in ${latest.label}`;
+  }
+  function renderCi(d) {
+    const CD = ciData(d), host = $('catCi'), f = d.filters;
+    const first = CD.periods[0], last = CD.periods[CD.periods.length - 1];
+    heading($('catTitle0'), 's0', ciHeadline(d, CD));
+    $('catSub0').textContent = first ? `${f.pg}${f.sub ? ' · ' + f.sub : ''} · ${first.label} to ${last.label}${CD.periods.some(p => !p.complete) ? ', incomplete periods hatched' : ''} | Investment in Rs. Mn` : 'No complete periods in this range';
+    [...$('catCiTgl').children].forEach(b => b.classList.toggle('on', b.dataset.v === ci.part));
+    $('catCiTgl').querySelector('[data-v=y]').textContent = state.yearType === 'FY' ? 'Years (FY)' : 'Years';
+    $('catCiHide').checked = ci.hideInc;
+    const hasSubs = CD.names.length > 1;
+    host.className = 'ci-grid' + (hasSubs ? '' : ' single');
+    if (!CD.periods.length) { host.innerHTML = '<div class="nodata2">No complete periods here. Untick “Hide incomplete” or widen the dates.</div>'; $('catCiNotes').innerHTML = ''; return; }
+    const medLegend = MED.map((m, k) => `<span><i style="background:#${MED_HEX[k]}"></i>${m}</span>`).join('');
+    const subLegend = CD.names.map((nm, k) => `<span data-sub="${esc(nm)}" class="${ci.subsOn.has(nm) ? '' : 'off'}" title="Click to show or hide"><i style="background:#${SUBC[k % SUBC.length]}"></i>${esc(nm)}</span>`).join('') + '<span><i style="background:linear-gradient(#BFDDF4,#F2F8FD);border:1px solid #9CC3E4"></i>Category total</span>';
+    host.innerHTML = `<div class="ci-box"><div class="ci-t">${esc(f.pg)} Category Investment</div><div class="ci-svg" id="ciL"></div><div class="ci-lg">${medLegend}</div></div>`
+      + (hasSubs ? `<div class="ci-box"><div class="ci-t">${esc(f.pg)} Sub Category Investments</div><div class="ci-svg" id="ciR"></div><div class="ci-lg">${subLegend}</div></div>` : '');
+    const L = $('ciL'); L.innerHTML = primsToSvg(ciLeft(CD, Math.max(300, L.clientWidth), Math.max(200, L.clientHeight)), Math.max(300, L.clientWidth), Math.max(200, L.clientHeight), 'ciL');
+    if (hasSubs) { const R = $('ciR'); R.innerHTML = primsToSvg(ciRight(CD, Math.max(300, R.clientWidth), Math.max(200, R.clientHeight)), Math.max(300, R.clientWidth), Math.max(200, R.clientHeight), 'ciR'); }
+    const notes = $('catCiNotes');
+    if (document.activeElement !== notes) notes.innerHTML = savedText('ci-notes', f.pg) ? cleanHtml(savedText('ci-notes', f.pg)) : ciNotesHtml(d, CD);
+  }
+  $('catCiNotes').addEventListener('focusout', () => {
+    if (!data) return;
+    const html = cleanHtml($('catCiNotes').innerHTML);
+    try { if ($('catCiNotes').textContent.trim()) localStorage.setItem(textKey('ci-notes', data.filters.pg), html); else localStorage.removeItem(textKey('ci-notes', data.filters.pg)); } catch (e) { /* storage unavailable */ }
+  });
+  $('catCiTgl').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (b && data) { ci.part = b.dataset.v; renderCi(data); } });
+  $('catCiHide').addEventListener('change', e => { ci.hideInc = e.target.checked; if (data) renderCi(data); });
+  $('catCi').addEventListener('click', e => {
+    const sp = e.target.closest('.ci-lg span[data-sub]');
+    if (!sp || !data) return;
+    const nm = sp.dataset.sub;
+    if (ci.subsOn.has(nm)) ci.subsOn.delete(nm); else ci.subsOn.add(nm);
+    try { localStorage.removeItem(textKey('ci-notes', data.filters.pg)); } catch (err) { /* storage unavailable */ }   // the notes follow the displayed sub categories
+    renderCi(data);
+  });
+
   // ---------- section navigation ----------
   $('catNav').addEventListener('click', e => {
     const b = e.target.closest('button[data-s]');
@@ -539,8 +761,8 @@
   });
   $('catScroll').addEventListener('scroll', () => {
     const sc = $('catScroll'), mid = sc.scrollTop + sc.clientHeight / 2;
-    let on = 'catS1';
-    for (const id of ['catS1', 'catS2', 'catS3']) if ($(id).offsetTop <= mid) on = id;
+    let on = 'catS0';
+    for (const id of ['catS0', 'catS1', 'catS2', 'catS3']) if ($(id).offsetTop <= mid) on = id;
     [...$('catNav').children].forEach(b => b.classList.toggle('on', b.dataset.s === on));
   });
 
@@ -626,7 +848,7 @@
   });
   const fileBase = () => `Category_${data.filters.pg.replace(/[^\w]+/g, '-')}_${labelsOf(data).cur.replace(/[^\w]+/g, '-')}`;
   const download = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); };
-  const SECTIONS = [['01_Cards', 'catS1'], ['02_Month_by_Month', 'catS2'], ['03_Sub_Categories', 'catS3']];
+  const SECTIONS = [['01_Category_Investment', 'catS0'], ['02_Cards', 'catS1'], ['03_Month_by_Month', 'catS2'], ['04_Mother_Brands', 'catS3']];
 
   // Each section as its own JPG, in a ZIP. Sections are shown in full (all cards, the whole page 3).
   async function exportJpg() {
@@ -682,7 +904,48 @@
       const growthStr = g => (g == null ? '—' : `${g > 0.5 ? '▲ ' : g < -0.5 ? '▼ ' : '■ '}${nf(g, 0)}%`);
       const growthCol = g => (g == null ? '9AA3BC' : g > 0.5 ? '14803F' : g < -0.5 ? 'D12B2B' : '8A93AD');
 
-      // ----- slide(s) 1: cards, ten to a slide -----
+      // ----- slide 1: category investment (stacked by medium, and the sub categories) -----
+      {
+        const CD = ciData(d), slide = pptx.addSlide(), hasSubs = CD.names.length > 1, f1 = 0.01, tsz = 1.25;
+        chrome(slide, txt('catTitle0'), txt('catSub0'));
+        const draw = (P, ox, oy) => P.forEach(e => {
+          if (e.t === 'r') {
+            if (e.hatch) { slide.addShape(SHAPE.rect, { x: ox + e.x * f1, y: oy + e.y * f1, w: e.w * f1, h: e.h * f1, fill: { color: 'FFFFFF', transparency: 100 }, line: { color: 'E4702A', width: 1.25, dashType: 'dash' } }); return; }
+            slide.addShape(e.rx ? SHAPE.roundRect : SHAPE.rect, { x: ox + e.x * f1, y: oy + e.y * f1, w: Math.max(0.005, e.w * f1), h: Math.max(0.005, e.h * f1), rectRadius: e.rx ? e.rx * f1 : undefined, fill: { color: e.fill }, line: e.line ? { color: e.line, width: e.lw || 1 } : { color: e.fill, width: 0 } });
+          } else if (e.t === 'l') slide.addShape(SHAPE.line, { x: ox + Math.min(e.x1, e.x2) * f1, y: oy + Math.min(e.y1, e.y2) * f1, w: Math.abs(e.x2 - e.x1) * f1, h: Math.abs(e.y2 - e.y1) * f1, line: { color: e.color, width: e.lw || 1 } });
+          else if (e.t === 'a') slide.addShape(e.dir === 'up' ? SHAPE.upArrow : SHAPE.downArrow, { x: ox + (e.x - e.w / 2) * f1, y: oy + e.y * f1, w: e.w * f1, h: e.h * f1, fill: { color: e.fill }, line: { color: e.fill, width: 0 } });
+          else if (e.t === 't') {
+            const w = (e.text.length * e.size * 0.6 + 8) * f1, h = e.size * 1.5 * f1, anchor = e.anchor || 'start';
+            const x = anchor === 'middle' ? e.x * f1 - w / 2 : anchor === 'end' ? e.x * f1 - w : e.x * f1;
+            const y = e.rot ? e.y * f1 - h / 2 : (e.y - e.size * 0.95) * f1;
+            slide.addText(e.text, { x: ox + x, y: oy + y, w, h, align: anchor === 'middle' ? 'center' : anchor === 'end' ? 'right' : 'left', valign: 'middle', fontFace: 'Calibri', fontSize: e.size * f1 * 72 * tsz, bold: !!e.bold, color: e.color, margin: 0, wrap: false, rotate: e.rot ? 270 : undefined });
+          }
+        });
+        const title = (x, w, str) => slide.addText(str, { x, y: 1.5, w, h: 0.35, align: 'center', fontFace: 'Calibri', fontSize: 15, bold: true, color: GREY, underline: { style: 'sng' }, margin: 0 });
+        const legend = (x, y, items) => { let lx = x; items.forEach(([hex, name]) => { slide.addShape(SHAPE.rect, { x: lx, y: y + 0.05, w: 0.12, h: 0.12, fill: { color: hex }, line: { color: hex, width: 0 } }); slide.addText(name, { x: lx + 0.17, y, w: 1.6, h: 0.22, fontFace: 'Calibri', fontSize: 10, bold: true, color: INK, margin: 0 }); lx += 0.4 + Math.min(1.7, name.length * 0.085 + 0.2); }); };
+        if (CD.periods.length) {
+          if (hasSubs) {
+            title(0.55, 6.2, `${f.pg} Category Investment`); title(6.85, 5.95, `${f.pg} Sub Category Investments`);
+            draw(ciLeft(CD, 620, 370), 0.55, 1.9); draw(ciRight(CD, 595, 370), 6.85, 1.9);
+            legend(2.4, 5.68, MED.map((m, k) => [MED_HEX[k], m]));
+            legend(6.95, 5.68, CD.names.map((nm, k) => [SUBC[k % SUBC.length], nm]).filter(([, nm]) => ci.subsOn.has(nm)).concat([['BFDDF4', 'Category total']]));
+          } else {
+            title(0.55, 12.2, `${f.pg} Category Investment`);
+            draw(ciLeft(CD, 1220, 370), 0.55, 1.9);
+            legend(5.2, 5.68, MED.map((m, k) => [MED_HEX[k], m]));
+          }
+          // Notes under the charts: keep the bold numbers as bold runs.
+          const doc = new DOMParser().parseFromString(`<body>${$('catCiNotes').innerHTML}</body>`, 'text/html'), runs = [];
+          doc.querySelectorAll('li').forEach(li => {
+            const parts = [...li.childNodes].map(n => ({ text: n.textContent, bold: n.nodeName === 'B' || n.nodeName === 'STRONG' })).filter(x => x.text);
+            parts.forEach((pt, i) => runs.push({ text: pt.text, options: { bold: pt.bold, fontSize: 12.5, color: INK, bullet: i === 0 ? { indent: 16 } : undefined, breakLine: i === parts.length - 1, paraSpaceAfter: 4 } }));
+          });
+          if (runs.length) slide.addText(runs, { x: 0.55, y: 5.98, w: 12.2, h: 1.4, fontFace: 'Calibri', valign: 'top', margin: 0 });
+        }
+        slide.addNotes(CD.periods.map(p => `${p.tipLabel}${p.complete ? '' : ' (incomplete)'}: total ${nf(p.total / 1000, 0)} (TV ${nf(p.tv / 1000, 0)}, Radio ${nf(p.radio / 1000, 0)}, Press ${nf(p.press / 1000, 0)})` + CD.names.map((nm, k) => `; ${nm} ${nf(p.subs[k] / 1000, 0)}`).join('')).join('\n'));
+      }
+
+      // ----- slide(s): cards, ten to a slide -----
       const colors = brandColors(d.cards);
       for (let page = 0; page * 10 < Math.max(1, d.cards.length); page++) {
         const slide = pptx.addSlide();

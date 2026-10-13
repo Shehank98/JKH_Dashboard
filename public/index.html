@@ -662,6 +662,15 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="view" id="viewCat">
   <div class="cscroll" id="catScroll">
+    <section class="cslide" id="catS0">
+      <div class="chead2">
+        <div class="ctl"><h2 class="cedit" id="catTitle0" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2><p id="catSub0"></p></div>
+        <label class="opt2 ciopt" id="catCiHideWrap"><input type="checkbox" id="catCiHide">Hide incomplete</label>
+        <div class="tgl" id="catCiTgl" title="Group by year, half year or quarter (follows Calendar / Financial year)"><button data-v="y" class="on">Years</button><button data-v="h">Halves</button><button data-v="q">Quarters</button></div>
+      </div>
+      <div class="ci-grid" id="catCi"></div>
+      <div class="ci-notes" id="catCiNotes" contenteditable="true" spellcheck="false" title="Click to edit the notes"></div>
+    </section>
     <section class="cslide" id="catS1">
       <div class="chead2">
         <div class="ctl"><h2 class="cedit" id="catTitle" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2><p id="catSub"></p></div>
@@ -684,7 +693,7 @@ tr.me .sharebar{background:#FF8A3D}
       <div class="csubs" id="catSubs"></div>
     </section>
   </div>
-  <div class="cnav" id="catNav"><button data-s="catS1" class="on" title="Cards"></button><button data-s="catS2" title="Month by month"></button><button data-s="catS3" title="Sub categories"></button></div>
+  <div class="cnav" id="catNav"><button data-s="catS0" class="on" title="Category investment"></button><button data-s="catS1" title="Cards"></button><button data-s="catS2" title="Month by month"></button><button data-s="catS3" title="Sub categories"></button></div>
   <div class="coverlay" id="catOverlay"><div class="ovcard"><h3 id="catOvTitle">Load your category file</h3><p id="catOvText"></p><label class="fbtn" for="catDrawerToggle">☰ Open Filters</label></div></div>
 </div>
 

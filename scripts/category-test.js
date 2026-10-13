@@ -42,6 +42,10 @@ const C = require('../server/category');
   assert.strictEqual(d.monthly.months[56], '2026-09');
   assert.ok(Math.abs(sunsilk.monthly.slice(d.monthly.selStart).reduce((a, b) => a + b, 0) - sunsilk.cur) < 1e-6);
   assert.ok(Math.abs(d.monthly.cat.slice(d.monthly.selStart).reduce((a, b) => a + b, 0) - d.total.cur) < 1e-6);
+  // History by medium and sub category adds up to the category month by month.
+  assert.strictEqual(d.history.tv.length, 57);
+  d.monthly.cat.forEach((c, i) => assert.ok(Math.abs(d.history.tv[i] + d.history.radio[i] + d.history.press[i] - c) < 1e-6));
+  d.monthly.cat.forEach((c, i) => assert.ok(Math.abs(d.history.subs.reduce((a, x) => a + x.values[i], 0) - c) < 1e-6));
   // Cards add up to the category when every mother brand is shown.
   const all = C.dashboard(ds, { ...F, top: 0 });
   assert.ok(Math.abs(all.cards.reduce((s, c) => s + c.cur, 0) - all.total.cur) < 1e-6);

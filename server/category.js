@@ -68,6 +68,9 @@ function dashboard(ds, f) {
   // dashboard can show months, quarters, half years or years.
   const w0 = ds.meta.minMon, nW = m1 - w0 + 1;
   const catMon = new Float64Array(nW), mbMon = new Float64Array(nMb * nW);
+  const hTv = new Float64Array(nW), hRadio = new Float64Array(nW), hPress = new Float64Array(nW);
+  const subMonSize = dicts.sub.length;
+  const subMon = new Float64Array(subMonSize * nW);
   // Sub category x mother brand, for the sub category tables.
   const nSub = dicts.sub.length;
   const sCur = new Float64Array(nSub * nMb), sYoy = new Float64Array(nSub * nMb), sPrev = new Float64Array(nSub * nMb);
@@ -81,7 +84,7 @@ function dashboard(ds, f) {
     seen[b] = 1;
     if (mine[a]) isMine[b] = 1; else if (comp[a]) isComp[b] = 1;
     const m = mon[i], t = tv[i], r = radio[i], p = press[i], v = t + r + p;
-    if (m >= w0 && m <= m1) { catMon[m - w0] += v; mbMon[b * nW + m - w0] += v; }
+    if (m >= w0 && m <= m1) { catMon[m - w0] += v; mbMon[b * nW + m - w0] += v; hTv[m - w0] += t; hRadio[m - w0] += r; hPress[m - w0] += p; subMon[sub[i] * nW + m - w0] += v; }
     const sb = sub[i] * nMb + b;
     if (m >= m0 && m <= m1) { sCur[sb] += v; cur[b] += v; cat.cur += v; med[b * 3] += t; med[b * 3 + 1] += r; med[b * 3 + 2] += p; }
     if (m >= y0 && m <= y1) { sYoy[sb] += v; yoy[b] += v; cat.yoy += v; }
@@ -146,6 +149,9 @@ function dashboard(ds, f) {
   return {
     filters: { ...f, top: f.top },
     ranges: { cur: [monthKey(m0), monthKey(m1)], yoy: [monthKey(y0), monthKey(y1)], prev: [monthKey(p0), monthKey(p1)], months: len },
+    // Category investment by medium and by sub category, month by month (the dashboard groups it into years).
+    history: { tv: Array.from(hTv), radio: Array.from(hRadio), press: Array.from(hPress),
+      subs: ds.meta.hasSub ? dicts.sub.map((name, k) => ({ name, values: Array.from(subMon.subarray(k * nW, (k + 1) * nW)) })).filter(x => x.values.some(v => v > 0)) : [] },
     monthly: { months: Array.from({ length: nW }, (_, k) => monthKey(w0 + k)), selStart: m0 - w0, cat: Array.from(catMon) },
     hasYoy, hasPrev, total: { cur: cat.cur, yoy: hasYoy ? cat.yoy : null, prev: hasPrev ? cat.prev : null },
     brandCount: ranked.length, shown: cards.length, cards,
