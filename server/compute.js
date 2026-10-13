@@ -186,6 +186,7 @@ function dashboard(ds, f) {
   const compSorted = comps.slice().sort((x, y) => advSpend[y] - advSpend[x]);
   const trend = {
     mine: Array.from(monMine),
+    categoryTotal: Array.from(monCat),
     competitors: compSorted.map(a => ({ name: dicts.adv[a], values: months.map((_, k) => monAdv[k * nAdv + a]) })),
     categoryAvg: months.map((_, k) => {
       let active = 0;

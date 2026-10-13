@@ -548,7 +548,7 @@
     const X0 = 40, X1 = W - 18, Y0 = H - 24, Y1 = 30, XR = W - 8;
     const toMn = v => v / 1e6;
     const shown = name => !hiddenSeries.has(name);
-    const series = [shown('__mine') ? d.trend.mine : [], shown('__avg') ? d.trend.categoryAvg : []]
+    const series = [shown('__mine') ? d.trend.mine : [], shown('__avg') ? d.trend.categoryAvg : [], shown('__cat') ? d.trend.categoryTotal : []]
       .concat(d.trend.competitors.filter(c => shown(c.name)).map(c => c.values));
     const max = niceMax(Math.max(0, ...series.flat().map(toMn)));
     const x = i => (n === 1 ? (X0 + X1) / 2 : X0 + (i * (X1 - X0)) / (n - 1));
@@ -562,6 +562,9 @@
     const xl = months.map((m, i) => (i % every === 0 || i === n - 1 ? `<text x="${x(i)}" y="${H - 6}">${esc(monthLabel(m, months))}</text>` : '')).join('');
     const comps = d.trend.competitors.map((c, i) => !shown(c.name) ? '' : `<path fill="none" stroke="${C.compLines[i % C.compLines.length]}" stroke-width="${i === 0 ? 2.4 : 2}" stroke-linecap="round" stroke-linejoin="round" d="${smoothPath(pts(c.values))}"></path>`).reverse().join('');
     const avg = !shown('__avg') ? '' : `<path fill="none" stroke="#B4BCD0" stroke-width="1.5" stroke-dasharray="2 4" stroke-linecap="round" d="${smoothPath(pts(d.trend.categoryAvg))}"></path>`;
+    const catOn = shown('__cat') && n > 1;
+    const cp = pts(d.trend.categoryTotal);
+    const catArea = catOn ? `<path fill="#A9B0C2" fill-opacity="0.22" stroke="#A9B0C2" stroke-width="1.2" d="${smoothPath(cp)} L${cp[n - 1][0]},${Y0} L${cp[0][0]},${Y0} Z"></path>` : '';
     const mp = pts(d.trend.mine);
     const minePath = smoothPath(mp);
     const mineOn = shown('__mine');
@@ -585,12 +588,13 @@
       if (mineOn) lines.push(`${d.mineLabel} (mine): ${mn(d.trend.mine[i])}`);
       d.trend.competitors.forEach(c => { if (shown(c.name)) lines.push(`${c.name}: ${mn(c.values[i])}`); });
       if (shown('__avg')) lines.push(`Category avg.: ${mn(d.trend.categoryAvg[i])}`);
+      if (shown('__cat')) lines.push(`Category total: ${mn(d.trend.categoryTotal[i])}`);
       lines.push('Click for month details');
       return `<rect class="hit" fill="#2F5DBF" fill-opacity="0" x="${x(i) - colW / 2}" y="${Y1 - 10}" width="${colW}" height="${Y0 - Y1 + 10}"${tipA(lines.join('\n'))}${detA({ title: `${m.label} ${m.year}`, month: m.key, tab: 'adv' })}></rect>`;
     }).join('');
     box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
       <g font-size="10" fill="#9AA3BC" stroke-width="1">${grid}</g>
-      ${area}${comps}${avg}
+      ${catArea}${area}${comps}${avg}
       ${mineOn ? `<path fill="none" stroke="${C.orange}" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" d="${minePath}"></path>` : ''}
       ${dots}${callout}${hits}
       <g font-size="10.5" fill="#8A93AD" text-anchor="middle">${xl}</g></svg>`;
@@ -598,7 +602,7 @@
   function trendLegend(d) {
     const off = k => (hiddenSeries.has(k) ? ' off' : '');
     const lgA = k => ` data-series="${esc(k)}" title="Click to show or hide"`;
-    return [`<div class="lg${off('__mine')}"${lgA('__mine')}><span class="sw" style="background:${C.orange};height:4px;width:18px"></span><strong>${esc(d.mineLabel)} (mine)</strong></div>`]
+    return [`<div class="lg${off('__mine')}"${lgA('__mine')}><span class="sw" style="background:${C.orange};height:4px;width:18px"></span><strong>${esc(d.mineLabel)} (mine)</strong></div>`, `<div class="lg${off('__cat')}"${lgA('__cat')}><span class="sw" style="background:#A9B0C2;opacity:.5;height:10px;width:18px"></span>Category total</div>`]
       .concat(d.trend.competitors.map((c, i) => `<div class="lg${off(c.name)}"${lgA(c.name)}><span class="sw" style="background:${C.compLines[i % C.compLines.length]};height:3px;width:18px"></span>${esc(c.name)}</div>`))
       .concat([`<div class="lg${off('__avg')}"${lgA('__avg')}><span class="sw" style="background:repeating-linear-gradient(90deg,#B4BCD0 0 3px,transparent 3px 6px);height:2px;width:18px"></span>Category avg.</div>`]).join('');
   }
