@@ -869,13 +869,14 @@
   $('catChart').addEventListener('click', openScope);
   $('catMixC').addEventListener('click', e => { if (!e.target.closest('.cedit')) openScope(e); });
   const detailStack = [];
+  let cmTab = 'ov', lastDetail = null;
   const closeModal = () => { $('catModal').classList.remove('on'); detailStack.length = 0; };
   $('catModal').addEventListener('click', e => { if (e.target.id === 'catModal' || e.target.closest('.x')) closeModal(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
   // Drill-down. scope can combine: mb, mbs (a set), sub, adv, brand, medium, from + to (a period), or all: true.
   // Every table row, medium chip and month in the popup goes one level deeper (Back returns).
   async function openDetail(scope, push = true) {
-    if (push) detailStack.push(scope);
+    if (push) { detailStack.push(scope); if (detailStack.length === 1) cmTab = 'ov'; }
     $('catModalBox').innerHTML = '<div class="cm-h"><h3>Loading…</h3></div>';
     $('catModal').classList.add('on');
     try {
@@ -889,8 +890,8 @@
       const medTot = d.mediumTotals[0] + d.mediumTotals[1] + d.mediumTotals[2];
       const growthCell = (c, p) => (p > 0 ? `<span class="${c >= p ? 'up' : 'down'}">${c >= p ? '▲' : '▼'} ${nf(Math.abs(((c - p) / p) * 100), 0)}%</span>` : '—');
       const pinned = { mb: !!scope.mb, adv: !!scope.adv, brand: !!scope.brand, sub: !!scope.sub };
-      const table = (title, rows, dim) => (rows.length && !pinned[dim] && !(rows.length < 2 && dim === 'sub')) ? `<div><h4 style="font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:#6B7590;margin-bottom:6px">${title}</h4><table class="cm-t"><tr><th>Name</th><th>${esc(curLabel)}</th><th>${esc(yoyLabel)}</th><th>Growth</th><th>Share</th></tr>${rows.slice(0, 15).map(r => `<tr class="link" data-dim="${dim}" data-name="${esc(r.name)}" title="Click to go deeper"><td>${esc(r.name)}</td><td>${mnNum(r.cur)}</td><td>${r.yoy > 0 ? mnNum(r.yoy) : '–'}</td><td>${growthCell(r.cur, r.yoy)}</td><td>${nf(r.share, 0)}%</td></tr>`).join('')}</table></div>` : '';
-      const tables = table('Mother brands', d.mothers, 'mb') + table('Advertisers', d.advertisers, 'adv') + table('Brands', d.brands, 'brand') + table('Sub categories', d.subs, 'sub');
+      const table = (title, rows, dim) => (rows.length && !pinned[dim] && !(rows.length < 2 && dim === 'sub')) ? { key: dim, title, n: rows.length, html: `<div class="cm-sec"><table class="cm-t"><tr><th>Name</th><th>${esc(curLabel)}</th><th>${esc(yoyLabel)}</th><th>Growth</th><th>Share</th></tr>${rows.slice(0, 50).map(r => `<tr class="link" data-dim="${dim}" data-name="${esc(r.name)}" title="Click to go deeper"><td>${esc(r.name)}</td><td>${mnNum(r.cur)}</td><td>${r.yoy > 0 ? mnNum(r.yoy) : '–'}</td><td>${growthCell(r.cur, r.yoy)}</td><td>${nf(r.share, 0)}%</td></tr>`).join('')}</table></div>` } : null;
+      const tabs = [table('Mother brands', d.mothers, 'mb'), table('Advertisers', d.advertisers, 'adv'), table('Brands', d.brands, 'brand'), table('Sub categories', d.subs, 'sub')].filter(Boolean);
       const chips = [`<span>${esc(curLabel)}</span>`];
       if (scope.sub && (scope.mb || scope.adv || scope.brand)) chips.push(`<span>${esc(scope.sub)}</span>`);
       if (scope.mb && scope.adv) chips.push(`<span>${esc(scope.adv)}</span>`);
@@ -899,6 +900,10 @@
       chips.push(`<span>${esc(data.filters.pg)}</span>`);
       const medChips = d.mediumTotals.map((v, k) => (v > 0 ? `<button type="button" class="cm-chip${scope.medium === MED[k] ? ' on' : ''}" data-med="${MED[k]}"><i style="background:${MED_COL[k]}"></i>${MED[k]} ${nf(medTot ? (v / medTot) * 100 : 0, 0)}% · ${mnTxt(v)}</button>` : '')).join('')
         + (scope.medium ? '<button type="button" class="cm-chip" data-med="">All media</button>' : '');
+      const ovHtml = `<div class="cm-sec"><h4>${d.months > 1 ? 'Month by month by medium (click a month to go deeper)' : 'By medium'}, Rs. Mn</h4>${monthlyChart(d)}
+          <div style="display:flex;gap:14px;font-size:10.5px;color:#4A5570;font-weight:600;margin:2px 0 8px">${MED.map((m, k) => `<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${MED_COL[k]};margin-right:4px"></i>${m} ${nf(medTot ? (d.mediumTotals[k] / medTot) * 100 : 0, 0)}%</span>`).join('')}<span style="margin-left:auto"><i style="display:inline-block;width:14px;border-top:2px dashed #8A93AD;margin-right:4px;vertical-align:3px"></i>${esc(yoyLabel)} total</span></div></div>`;
+      const allTabs = [{ key: 'ov', title: 'Overview' }, ...tabs];
+      if (!allTabs.some(t => t.key === cmTab)) cmTab = 'ov';
       $('catModalBox').innerHTML = `
         <div class="cm-h">${detailStack.length > 1 ? '<button type="button" class="cm-back" aria-label="Back">← Back</button>' : ''}<h3>${esc(d.name)}</h3>${mine ? '<span class="cm-tag">US</span>' : ''}<span class="cm-sub">${chips.join('')}</span><button class="x" aria-label="Close">✕</button></div>
         <div class="cm-stats">
@@ -908,17 +913,18 @@
           <div class="cm-st"><span>Share of category${scope.medium ? ' (' + esc(scope.medium) + ')' : ''}</span><b>${nf(share, 1)}%</b></div>
         </div>
         <div class="cm-meds">${medChips}</div>
-        <div class="cm-sec"><h4>${d.months > 1 ? 'Month by month by medium (click a month to go deeper)' : 'By medium'}, Rs. Mn</h4>${monthlyChart(d)}
-          <div style="display:flex;gap:14px;font-size:10.5px;color:#4A5570;font-weight:600;margin:2px 0 8px">${MED.map((m, k) => `<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${MED_COL[k]};margin-right:4px"></i>${m} ${nf(medTot ? (d.mediumTotals[k] / medTot) * 100 : 0, 0)}%</span>`).join('')}<span style="margin-left:auto"><i style="display:inline-block;width:14px;border-top:2px dashed #8A93AD;margin-right:4px;vertical-align:3px"></i>${esc(yoyLabel)} total</span></div></div>
-        <div class="cm-two">${tables}</div>`;
+        <div class="cm-tabs">${allTabs.map(t => `<button type="button" data-cmtab="${t.key}" class="${t.key === cmTab ? 'on' : ''}">${t.title}${t.n ? ' <em>' + t.n + '</em>' : ''}</button>`).join('')}</div>
+        ${cmTab === 'ov' ? ovHtml : tabs.find(t => t.key === cmTab).html}`;
     } catch (err) { $('catModalBox').innerHTML = `<div class="cm-h"><h3>Could not load</h3><button class="x">✕</button></div><div style="padding:20px">${esc(err.message)}</div>`; }
   }
   $('catModalBox').addEventListener('click', e => {
     const cur = detailStack[detailStack.length - 1];
     if (!cur) return;
     if (e.target.closest('.cm-back')) { detailStack.pop(); openDetail(detailStack[detailStack.length - 1], false); return; }
+    const tb = e.target.closest('[data-cmtab]');
+    if (tb) { cmTab = tb.dataset.cmtab; openDetail(cur, false); return; }
     const row = e.target.closest('tr[data-dim]');
-    if (row) { const next = { ...cur, [row.dataset.dim]: row.dataset.name }; delete next.title; if (row.dataset.dim === 'mb') delete next.mbs; openDetail(next); return; }
+    if (row) { cmTab = 'ov'; const next = { ...cur, [row.dataset.dim]: row.dataset.name }; delete next.title; if (row.dataset.dim === 'mb') delete next.mbs; openDetail(next); return; }
     const chip = e.target.closest('.cm-chip');
     if (chip) { const next = { ...cur }; if (chip.dataset.med) next.medium = chip.dataset.med; else delete next.medium; openDetail(next); return; }
     const mo = e.target.closest('[data-month]');

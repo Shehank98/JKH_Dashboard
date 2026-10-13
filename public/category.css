@@ -331,3 +331,8 @@ body.ro-cat #catFilterBtn,body.ro-cat .ctab[data-pane=cpFilters],body.ro-cat #cp
 .cm-chip:hover{background:#F6F8FC}
 .cm-chip.on{background:#1A1F36;color:#fff;border-color:#1A1F36}
 .cm-t tr.link:hover td{background:#F6F8FC}
+
+.cm-tabs{display:flex;gap:4px;padding:10px 20px 0;border-bottom:1px solid #EEF1F7;margin-top:10px;position:sticky;top:57px;background:#fff;z-index:1}
+.cm-tabs button{border:none;background:none;font:inherit;font-size:12px;font-weight:700;color:#8A93AD;padding:8px 12px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.cm-tabs button.on{color:#1A1F36;border-bottom-color:#FF8A3D}
+.cm-tabs em{font-style:normal;background:#EEF2FB;color:#3F5480;border-radius:10px;padding:0 6px;font-size:10px;margin-left:3px}
