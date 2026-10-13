@@ -132,3 +132,57 @@ body.mode-cat .modebtn:hover{box-shadow:0 4px 12px rgba(47,93,191,.45)}
 .cch-lg .lg2 i{width:11px;height:11px;border-radius:2px;display:inline-block}
 .cch-lg .opt2{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#4A5570;cursor:pointer;margin-left:10px}
 .cch-lg .opt2 input{accent-color:#FF8A3D}
+
+/* One scrolling page of three slide-sized sections */
+.cscroll{flex:1;min-height:0;overflow-y:auto;scroll-snap-type:y proximity;scroll-behavior:smooth;display:flex;flex-direction:column;gap:18px;padding-right:16px}
+.cscroll::-webkit-scrollbar{width:7px}.cscroll::-webkit-scrollbar-thumb{background:#D5DBE9;border-radius:4px}
+.cslide{height:100%;flex-shrink:0;display:flex;flex-direction:column;gap:10px;scroll-snap-align:start;position:relative;background:#F4F6FA}
+.cslide.auto{height:auto;min-height:100%}
+.cnav{position:absolute;right:2px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:11px;z-index:4}
+.cnav button{width:9px;height:9px;border-radius:50%;border:none;background:#C7CEDF;cursor:pointer;padding:0;transition:transform .2s,background .2s}
+.cnav button.on{background:#FF8A3D;transform:scale(1.5)}
+.cedit{outline:none}
+.cedit:hover{background:#fff}
+.cedit:focus{background:#fff;box-shadow:0 0 0 2px #FFC599}
+/* Exports: every section is shown in full and nothing scrolls */
+.exporting .cnav,.exporting .coverlay{display:none!important}
+.exporting .cedit:hover{background:none}
+
+/* Section 3 */
+.csubs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px 40px;align-items:start;padding:6px 4px 16px}
+.csubs.single{grid-template-columns:minmax(0,1fr);max-width:900px}
+.ccol{display:flex;flex-direction:column;gap:22px;min-width:0}
+.cblock-t{font-size:17px;font-weight:700;color:#1A1F36;margin:0 -4px 10px;padding:1px 4px;border-radius:5px}
+.mixrow{display:flex;align-items:center;gap:12px;margin:7px 0}
+.mixrow .lab{width:70px;font-size:12.5px;color:#6B7590;flex-shrink:0}
+.mixrow.now .lab{font-weight:800;color:#1A1F36}
+.mixbar{flex:1;display:flex;height:32px;overflow:hidden;border-radius:2px;background:#E7EBF3}
+.mixbar i{display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12.5px;font-style:normal;text-shadow:0 0 2px rgba(0,0,0,.25)}
+.mixlg{display:flex;gap:18px;margin:8px 0 0 82px;font-size:11.5px;color:#4A5570;flex-wrap:wrap}
+.mixlg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.controw{display:grid;grid-template-columns:7px minmax(90px,1.3fr) 1.4fr 80px;align-items:center;gap:14px;padding:6px 0;border-radius:6px}
+.controw>i{height:46px;border-radius:2px;display:block}
+.controw b{font-size:17px;color:#1A1F36}
+.controw .mv{font-size:16px;font-weight:700;text-align:center;color:#1A1F36;white-space:nowrap}
+.controw .gv{font-size:19px;font-weight:800;text-align:right}
+.pos{color:#14803F}.neg{color:#D12B2B}.flat{color:#8A93AD}
+.contfoot{display:grid;grid-template-columns:7px minmax(90px,1.3fr) 1.4fr 80px;gap:14px;font-size:12px;color:#6B7590;margin-top:4px}
+.contfoot u{text-underline-offset:3px}
+.contfoot .fl{display:flex;justify-content:space-between}
+.contfoot>u{text-align:right}
+.link{cursor:pointer}
+.controw.link:hover,.ttl.link:hover{background:#fff}
+.ttl{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;color:#1A1F36;margin-bottom:7px;border-radius:6px;padding:2px 4px;margin-left:-4px}
+.ttl i{width:11px;height:26px;border-radius:2px;display:block}
+.ctab2{border-collapse:collapse;width:100%;font-size:12.5px;background:#fff;border:1.5px solid #1A1F36}
+.ctab2 th{background:#4B5563;color:#fff;text-transform:uppercase;font-weight:800;padding:7px 8px;text-align:center;border:1px solid #1A1F36;white-space:nowrap}
+.ctab2 th:first-child,.ctab2 td:first-child{text-align:left}
+.ctab2 td{border:1px solid #1A1F36;padding:5px 8px;text-align:center;font-variant-numeric:tabular-nums;color:#1A1F36}
+.ctab2 td:first-child{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ctab2 td.c1{background:#E4F1FB}.ctab2 td.c2{background:#E8F4DE}.ctab2 td.c3{background:#FBE4EE}
+.ctab2 tr.mine td{font-weight:800;font-size:13.5px}
+.ctab2 tr.oth td{color:#6B7590;font-style:italic}
+.ctab2 tr.tot td{font-weight:800;background:#fff}
+.ctab2 tr.tot td:first-child{text-transform:uppercase}
+.ctab2 tr.link:hover td{filter:brightness(.96)}
+.cm-t tr.link{cursor:pointer}.cm-t tr.link:hover td{background:#F6F8FC}

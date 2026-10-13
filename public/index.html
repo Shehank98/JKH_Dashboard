@@ -573,7 +573,11 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
   <div class="chips spot-only" id="chips"></div>
   <div class="tright" id="tright">
-    <button class="fbtn light cat-only" id="catSaveBtn">Save image</button>
+    <button class="fbtn light cat-only" id="catExportBtn">Export ▾</button>
+    <div class="menu cat-only" id="catExportMenu">
+      <button data-x="jpg"><b>JPG images (ZIP)</b><span>Each section (cards, month by month, sub categories) as its own JPG</span></button>
+      <button data-x="ppt"><b>PowerPoint (PPT, editable)</b><span>Native tables, text and shapes: one slide per section</span></button>
+    </div>
     <button class="fbtn light spot-only" id="exportBtn">Export ▾</button>
     <button class="fbtn light spot-only" id="shareBtn">Share</button>
     <div class="menu spot-only" id="exportMenu">
@@ -657,14 +661,29 @@ tr.me .sharebar{background:#FF8A3D}
 </div>
 
 <div class="view" id="viewCat">
-  <div class="chead2">
-    <div class="ctl"><h2 id="catTitle" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2><p id="catSub"></p></div>
-    <div class="tgl" id="catViewTgl" title="Show the mother brand cards or the month by month chart"><button data-v="cards" class="on">Cards</button><button data-v="months">Month by month</button></div>
-    <div class="ctot"><span id="catTotLabel">TOTAL</span><b id="catTot">0 Mn</b></div>
+  <div class="cscroll" id="catScroll">
+    <section class="cslide" id="catS1">
+      <div class="chead2">
+        <div class="ctl"><h2 class="cedit" id="catTitle" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2><p id="catSub"></p></div>
+        <div class="ctot"><span id="catTotLabel">TOTAL</span><b id="catTot">0 Mn</b></div>
+      </div>
+      <div class="cgrid" id="catGrid"></div>
+      <div class="clegend" id="catLegend"></div>
+    </section>
+    <section class="cslide" id="catS2">
+      <div class="chead2">
+        <div class="ctl"><h2 class="cedit" id="catTitle2" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2><p id="catSub2"></p></div>
+      </div>
+      <div class="cchart" id="catChart"></div>
+    </section>
+    <section class="cslide auto" id="catS3">
+      <div class="chead2">
+        <div class="ctl"><h2 class="cedit" id="catTitle3" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2><p id="catSub3"></p></div>
+      </div>
+      <div class="csubs" id="catSubs"></div>
+    </section>
   </div>
-  <div class="cgrid" id="catGrid"></div>
-  <div class="cchart" id="catChart" hidden></div>
-  <div class="clegend" id="catLegend"></div>
+  <div class="cnav" id="catNav"><button data-s="catS1" class="on" title="Cards"></button><button data-s="catS2" title="Month by month"></button><button data-s="catS3" title="Sub categories"></button></div>
   <div class="coverlay" id="catOverlay"><div class="ovcard"><h3 id="catOvTitle">Load your category file</h3><p id="catOvText"></p><label class="fbtn" for="catDrawerToggle">☰ Open Filters</label></div></div>
 </div>
 

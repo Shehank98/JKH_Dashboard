@@ -13,7 +13,7 @@
 
   let overview = null, options = { advertisers: [], subs: [] }, data = null, pendingFile = null, started = false, busy = false;
   const state = { from: '', to: '', pg: '', sub: '', mine: [], comps: [], top: 10, yearType: 'CY' };
-  const ui = { view: 'cards', labels: true };   // cards or the month by month chart
+  const ui = { labels: true };                  // chart value labels on or off
   const hiddenBrands = new Set();               // brands switched off in the chart legend
 
   // ---------- month helpers ----------
@@ -149,8 +149,8 @@
     $('catOvText').textContent = 'Open the filter drawer, choose Data file and pick your category file (Month, Product Group, Mother Brand, Advertiser, Brand, Tv / Radio / Press in 000Rs). It is read on this computer only.';
     $('catOverlay').classList.add('on');
     $('viewCat').classList.add('nodata');
-    $('catTitle').textContent = ''; $('catSub').textContent = ''; $('catTot').textContent = ''; $('catTotLabel').textContent = '';
-    $('catGrid').innerHTML = ''; $('catLegend').innerHTML = ''; $('catChart').innerHTML = '';
+    for (const id of ['catTitle', 'catSub', 'catTot', 'catTotLabel', 'catTitle2', 'catSub2', 'catTitle3', 'catSub3']) $(id).textContent = '';
+    $('catGrid').innerHTML = ''; $('catLegend').innerHTML = ''; $('catChart').innerHTML = ''; $('catSubs').innerHTML = '';
     $('catPeriodText').textContent = 'No data'; $('catPeriodLen').textContent = '0 months'; $('catChips').innerHTML = '';
     showPane('cpData');
   }
@@ -263,15 +263,28 @@
       if (!state.mine.length) toast('Tip: pick your advertiser under Filters to highlight your brands');
     } catch (e) { toast(e.message); } finally { document.body.classList.remove('loading'); }
   }
-  const titleKey = pg => 'orbit-cat-title:' + (ui.view === 'months' ? 'm:' : '') + pg;
+  // Editable headlines (for writing the insight on a slide): a remembered edit wins over the computed text.
+  const SUB_COLORS = ['#F24B4B', '#8ED63D', '#1CC5D6', '#F5B400', '#7B3FA0', '#1E88E5', '#E91E63', '#455A64'];
+  const textKey = (id, pg) => `orbit-cat-text:${id}:${pg}`;
+  const savedText = (id, pg) => { try { return localStorage.getItem(textKey(id, pg)); } catch (e) { return null; } };
+  function heading(el, id, fallback) {
+    el.dataset.key = id;
+    if (document.activeElement !== el) el.textContent = (data && savedText(id, data.filters.pg)) || fallback;
+  }
+  document.addEventListener('focusout', e => {
+    const el = e.target;
+    if (!data || !el.classList || !el.classList.contains('cedit')) return;
+    const t = el.textContent.trim();
+    try { if (t) localStorage.setItem(textKey(el.dataset.key, data.filters.pg), t); else localStorage.removeItem(textKey(el.dataset.key, data.filters.pg)); } catch (err) { /* storage unavailable */ }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('cedit')) { e.preventDefault(); e.target.blur(); } });
+  const labelsOf = d => { const R = d.ranges, yt = state.yearType; return { cur: periodLabel(R.cur[0], R.cur[1], yt), yoy: periodLabel(R.yoy[0], R.yoy[1], yt), prev: periodLabel(R.prev[0], R.prev[1], yt) }; };
+
   function render() {
     const d = data, yt = state.yearType, R = d.ranges;
-    const cur = periodLabel(R.cur[0], R.cur[1], yt), yoy = periodLabel(R.yoy[0], R.yoy[1], yt), prev = periodLabel(R.prev[0], R.prev[1], yt);
+    const { cur, yoy, prev } = labelsOf(d);
     const f = d.filters;
-    const title = $('catTitle');
-    let saved = null;
-    try { saved = localStorage.getItem(titleKey(f.pg)); } catch (e) { /* storage unavailable */ }
-    if (document.activeElement !== title) title.textContent = saved || (ui.view === 'months' ? `Monthly ${f.pg} Investment by Brand` : `Leading ${f.pg} Brands by Investment`);
+    heading($('catTitle'), 's1', `Leading ${f.pg} Brands by Investment`);
     const topN = f.top === 0 ? null : Math.min(f.top, d.brandCount);
     const scope = (f.comps && f.comps.length) ? `${d.shown} mother brands (mine and selected competitors)` : topN == null ? `All ${d.brandCount} mother brands` : `Top ${topN} mother brands`;
     $('catSub').textContent = `${scope} ranked by ${cur} investment${f.sub ? ' · ' + f.sub : ''} | Investment in Rs. Mn`;
@@ -285,10 +298,8 @@
     if (f.comps && f.comps.length) chips.push(`<span class="chip">${f.comps.length} competitor${f.comps.length === 1 ? '' : 's'}</span>`);
     chips.push(`<span class="chip">${yt === 'FY' ? 'Financial year (Apr–Mar)' : 'Calendar year'}</span>`);
     $('catChips').innerHTML = chips.join('');
-    const months = ui.view === 'months';
-    $('catGrid').hidden = months; $('catChart').hidden = !months; $('catLegend').style.display = months ? 'none' : '';
-    [...$('catViewTgl').children].forEach(b => b.classList.toggle('on', b.dataset.v === ui.view));
-    if (months) { renderChart(d, cur); return; }
+    renderChart(d, cur);
+    renderSubs(d, { cur, yoy, prev });
     if (!d.cards.length) { $('catGrid').innerHTML = '<div class="nodata2">No spend found for these filters.</div>'; renderLegend(cur, yoy, prev); return; }
     const colors = brandColors(d.cards);
     sizeGrid();
@@ -324,29 +335,27 @@
   // Every card is the same size whether 5 or 10 are shown: two rows fill the screen, more rows scroll.
   function sizeGrid() {
     const g = $('catGrid');
-    if (g.hidden || !g.clientHeight) return;
+    if (!g.clientHeight) return;
     g.style.setProperty('--rowh', Math.max(215, Math.floor((g.clientHeight - 9 - 12) / 2)) + 'px');
   }
-  window.addEventListener('resize', () => { if (data && ui.view === 'cards') sizeGrid(); else if (data && ui.view === 'months') renderChart(data, null); });
-  $('catViewTgl').addEventListener('click', e => {
-    const b = e.target.closest('button');
-    if (!b || !data) return;
-    ui.view = b.dataset.v;
-    render();
-  });
+  window.addEventListener('resize', () => { if (data && document.body.classList.contains('mode-cat')) { sizeGrid(); renderChart(data, null); } });
 
   // ---------- Category behaviour, month by month ----------
   // Big green bars: the whole category each month (left axis). Small bars: the mother brands (right axis, own scale).
   const niceMax = v => { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; };
+  function chartPool(d) {
+    const pool = d.cards.filter(c => c.mine).concat(d.cards.filter(c => !c.mine)).slice(0, 8).sort((a, b) => b.cur - a.cur);
+    return { pool, colors: new Map(pool.map((c, i) => [c.name, CHART_COLORS[i % CHART_COLORS.length]])) };
+  }
   function renderChart(d, curLabel) {
     const host = $('catChart');
     // Up to 8 mother brands: ours first, then the biggest. Each gets its own colour (ours are marked with a star)
     // because several of ours can be in the chart at once.
-    const pool = d.cards.filter(c => c.mine).concat(d.cards.filter(c => !c.mine)).slice(0, 8).sort((a, b) => b.cur - a.cur);
-    const colors = new Map(pool.map((c, i) => [c.name, CHART_COLORS[i % CHART_COLORS.length]]));
-    if (!curLabel) { const R = d.ranges; curLabel = periodLabel(R.cur[0], R.cur[1], state.yearType); }
+    const { pool, colors } = chartPool(d);
+    if (!curLabel) curLabel = labelsOf(d).cur;
     const M = d.monthly, n = M.months.length;
-    $('catSub').textContent = `Category total against ${pool.length} mother brand${pool.length === 1 ? '' : 's'} · ${monLabel(M.months[0])} to ${monLabel(M.months[n - 1])}, selected period ${curLabel} shaded | Investment in Rs. Mn`;
+    heading($('catTitle2'), 's2', `Monthly ${d.filters.pg} Investment by Brand`);
+    $('catSub2').textContent = `Category total against ${pool.length} mother brand${pool.length === 1 ? '' : 's'} · ${monLabel(M.months[0])} to ${monLabel(M.months[n - 1])}, selected period ${curLabel} shaded | Investment in Rs. Mn`;
     host.innerHTML = `<div class="cch-t">Category Behaviour – Month-On-Month</div><div class="cch-box" id="cchBox"></div><div class="cch-lg" id="cchLg"></div>`;
     $('cchLg').innerHTML = pool.map(c => `<span class="lg2${hiddenBrands.has(c.name) ? ' off' : ''}" data-b="${esc(c.name)}" title="Click to show or hide"><i style="background:${colors.get(c.name)}"></i>${c.mine ? '★ ' : ''}${esc(c.name)}</span>`).join('')
       + `<span class="lg2" style="cursor:default"><i style="background:linear-gradient(#8BC34A,#E6F4D4)"></i>Category total</span>`
@@ -398,48 +407,131 @@
       <div class="li"><span class="sw" style="background:#7B4FA0"></span><div><b>Share of investment</b><small>Share of total ${esc(cur)} investment</small></div></div>
       <div class="mdots">${MED.map((m, k) => `<span><i style="background:${MED_COL[k]}"></i>${m}</span>`).join('')}</div>`;
   }
-  // The headline is editable (e.g. to write the insight for a slide); it is remembered per product group.
-  $('catTitle').addEventListener('blur', () => {
-    if (!data) return;
-    const t = $('catTitle').textContent.trim();
-    try { if (t) localStorage.setItem(titleKey(data.filters.pg), t); else localStorage.removeItem(titleKey(data.filters.pg)); } catch (e) { /* storage unavailable */ }
-    render();
+
+  // ---------- sub categories: mix, contribution and mother brand tables ----------
+  const tabLabel = l => l.replace("'", ' ');                       // Q1'25/26 -> Q1 25/26 in table headers
+  const pctCell = g => (g == null ? '' : `<span class="${g > 0.5 ? 'pos' : g < -0.5 ? 'neg' : 'flat'}">${nf(g, 0)}%</span>`);
+  const numCell = v => (v == null || v <= 0 ? '–' : mnNum(v));
+  function subsHeadline(d, L) {
+    const net = d.net;
+    if (d.contribution && net) {
+      const top = d.contribution.slice().sort((a, b) => b.part - a.part)[0];
+      return net < 0 ? `${top.name} Pullback Drives the ${L.cur} ${d.filters.pg} Decline` : `${top.name} Growth Drives the ${L.cur} ${d.filters.pg} Increase`;
+    }
+    return d.hasSubs ? `${d.filters.pg} Investment by Sub Category in ${L.cur}` : `${d.filters.pg} Investment by Mother Brand in ${L.cur}`;
+  }
+  function mixTitle(d) {
+    const m = d.mix;
+    if (!m || !m.yoy) return 'Sub category mix';
+    let best = -1, gain = 0;
+    d.tables.forEach((t, i) => { const g = m.cur[i] - m.yoy[i]; if (g > gain) { gain = g; best = i; } });
+    return best >= 0 && gain >= 1 ? `The mix is shifting toward ${d.tables[best].name}` : 'The sub category mix is broadly stable';
+  }
+  function contribTitle(d) {
+    const top = d.contribution.slice().sort((a, b) => b.part - a.part)[0];
+    return `${top.name} contributed ~${nf(Math.max(0, top.part), 0)}% of the net YoY ${d.net < 0 ? 'reduction' : 'increase'}`;
+  }
+  function tableHtml(t, color, d, L, single) {
+    const title = single ? `${esc(String(d.filters.pg).toUpperCase())}${t.growth == null ? '' : ' | ' + nf(t.growth, 0) + '% YoY'}` : `${esc(t.none ? 'UNASSIGNED' : t.name.toUpperCase())}${t.growth == null ? '' : ' | ' + nf(t.growth, 0) + '% YoY'}`;
+    const scope = single ? { all: true } : { sub: t.name };
+    const rows = t.rows.map(r => `<tr class="${r.mine ? 'mine ' : ''}${r.others ? 'oth ' : ''}${r.others ? '' : 'link'}"${r.others ? '' : ` data-mb="${esc(r.name)}"`}><td title="${esc(r.name)}">${esc(r.name)}</td><td class="c1">${numCell(r.yoy)}</td><td class="c2">${numCell(r.prev)}</td><td class="c3">${numCell(r.cur)}</td><td>${pctCell(r.growth)}</td><td>${r.cur > 0 ? nf(r.share, 0) + '%' : ''}</td></tr>`).join('');
+    return `<div class="tblock"><div class="ttl link" data-scope="${esc(JSON.stringify(scope))}" title="Click for details"><i style="background:${color}"></i><span>${title}</span></div>
+      <table class="ctab2"><tr><th>Brand</th><th>${esc(tabLabel(L.yoy))}</th><th>${esc(tabLabel(L.prev))}</th><th>${esc(tabLabel(L.cur))}</th><th>YoY</th><th>Shr.</th></tr>${rows}
+      <tr class="tot"><td>${esc(single ? String(d.filters.pg).toUpperCase() : (t.none ? 'UNASSIGNED' : t.name.toUpperCase()))}</td><td>${numCell(t.yoy)}</td><td>${numCell(t.prev)}</td><td>${numCell(t.cur)}</td><td>${pctCell(t.growth)}</td><td></td></tr></table></div>`;
+  }
+  function renderSubs(d, L) {
+    const T = d.tables, f = d.filters;
+    heading($('catTitle3'), 's3', subsHeadline(d, L));
+    $('catSub3').textContent = d.hasSubs && T.length > 1
+      ? `Sub categories of ${f.pg} · ${L.cur} against ${L.yoy} and ${L.prev} | Investment in Rs. Mn`
+      : `Mother brands in ${f.sub || f.pg} · ${L.cur} against ${L.yoy} and ${L.prev} | Investment in Rs. Mn`;
+    const host = $('catSubs');
+    if (!T.length) { host.className = 'csubs single'; host.innerHTML = '<div class="nodata2">No spend found for these filters.</div>'; return; }
+    const colors = T.map((t, i) => SUB_COLORS[i % SUB_COLORS.length]);
+    const multi = d.hasSubs && T.length > 1;
+    host.className = 'csubs' + (multi ? '' : ' single');
+    if (!multi) { host.innerHTML = tableHtml(T[0], T[0] && '#F24B4B', d, L, !d.hasSubs); return; }
+    // Mix of sub categories in each period (100% bars).
+    let mix = '';
+    if (d.mix && d.mix.yoy) {
+      const rows = [[L.yoy, d.mix.yoy], d.mix.prev ? [L.prev, d.mix.prev] : null, [L.cur, d.mix.cur, true]].filter(Boolean);
+      mix = `<div class="mixblock"><div class="cblock-t cedit" id="catMixT" contenteditable="true" spellcheck="false" data-key="mix"></div>
+        ${rows.map(([lab, arr, now]) => `<div class="mixrow${now ? ' now' : ''}"><span class="lab">${esc(lab)}</span><div class="mixbar">${arr.map((p, i) => (p > 0 ? `<i style="width:${p}%;background:${colors[i]}" title="${esc(T[i].name)} ${nf(p, 1)}%">${p >= 4 ? nf(p, 0) + '%' : ''}</i>` : '')).join('')}</div></div>`).join('')}
+        <div class="mixlg">${T.map((t, i) => `<span><i style="background:${colors[i]}"></i>${esc(t.name)}</span>`).join('')}</div></div>`;
+    }
+    let contrib = '';
+    if (d.contribution) {
+      contrib = `<div class="contblock"><div class="cblock-t cedit" id="catContT" contenteditable="true" spellcheck="false" data-key="contrib"></div>
+        ${d.contribution.map((c, i) => `<div class="controw link" data-scope="${esc(JSON.stringify({ sub: c.name }))}"><i style="background:${colors[i]}"></i><b>${esc(c.name)}</b><span class="mv">${mnNum(c.yoy)} → ${mnNum(c.cur)}</span><span class="gv ${c.growth == null ? 'flat' : c.growth > 0.5 ? 'pos' : c.growth < -0.5 ? 'neg' : 'flat'}">${c.growth == null ? '—' : nf(c.growth, 0) + '%'}</span></div>`).join('')}
+        <div class="contfoot"><span></span><span></span><span class="fl"><u>${esc(L.yoy)}</u><u>${esc(L.cur)}</u></span><u>Y-O-Y</u></div></div>`;
+    }
+    const left = [mix], right = [contrib];
+    T.forEach((t, i) => { (i === 0 || (i >= 3 && i % 2 === 1) ? right : left).push(tableHtml(t, colors[i], d, L, false)); });
+    host.innerHTML = `<div class="ccol">${left.join('')}</div><div class="ccol">${right.join('')}</div>`;
+    if (mix) heading($('catMixT'), 'mix', mixTitle(d));
+    if (contrib) heading($('catContT'), 'contrib', contribTitle(d));
+  }
+  $('catSubs').addEventListener('click', e => {
+    if (e.target.closest('.cedit')) return;
+    const r = e.target.closest('tr[data-mb]');
+    if (r) { openDetail({ mb: r.dataset.mb }); return; }
+    const sc = e.target.closest('[data-scope]');
+    if (sc) { try { openDetail(JSON.parse(sc.dataset.scope)); } catch (err) { /* bad scope */ } }
   });
-  $('catTitle').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } });
+
+  // ---------- section navigation ----------
+  $('catNav').addEventListener('click', e => {
+    const b = e.target.closest('button[data-s]');
+    if (b) $(b.dataset.s).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  $('catScroll').addEventListener('scroll', () => {
+    const sc = $('catScroll'), mid = sc.scrollTop + sc.clientHeight / 2;
+    let on = 'catS1';
+    for (const id of ['catS1', 'catS2', 'catS3']) if ($(id).offsetTop <= mid) on = id;
+    [...$('catNav').children].forEach(b => b.classList.toggle('on', b.dataset.s === on));
+  });
 
   // ---------- card detail ----------
   $('catGrid').addEventListener('click', e => {
     const card = e.target.closest('.ccard');
-    if (card) openDetail(card.dataset.mb);
+    if (card) openDetail({ mb: card.dataset.mb });
   });
   const closeModal = () => $('catModal').classList.remove('on');
   $('catModal').addEventListener('click', e => { if (e.target.id === 'catModal' || e.target.closest('.x')) closeModal(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-  async function openDetail(name) {
-    const card = data.cards.find(c => c.name === name);
+  // scope: { mb } one mother brand, { sub } one sub category, { all: true } the whole selection.
+  async function openDetail(scope) {
     $('catModalBox').innerHTML = '<div class="cm-h"><h3>Loading…</h3></div>';
     $('catModal').classList.add('on');
     try {
-      const d = await engine.call('catDetail', { filters: data.filters, scope: { mb: name } });
-      const R = data.ranges, yt = state.yearType;
-      const cur = periodLabel(R.cur[0], R.cur[1], yt), yoy = periodLabel(R.yoy[0], R.yoy[1], yt);
+      const d = await engine.call('catDetail', { filters: data.filters, scope });
+      const { cur, yoy } = labelsOf(data);
+      const card = scope.mb ? data.cards.find(c => c.name === scope.mb) : null;
+      const row = scope.mb ? data.tables.flatMap(t => t.rows).find(r => r.name === scope.mb) : null;
+      const mine = !!((card && card.mine) || (row && row.mine));
       const g = d.yoy > 0 ? ((d.cur - d.yoy) / d.yoy) * 100 : null;
-      const medTot = card.medium[0] + card.medium[1] + card.medium[2];
+      const med = d.monthly.reduce((a, m) => [a[0] + m.tv, a[1] + m.radio, a[2] + m.press], [0, 0, 0]);
+      const medTot = med[0] + med[1] + med[2];
+      const share = data.total.cur ? (d.cur / data.total.cur) * 100 : 0;
       const growthCell = (c, p) => (p > 0 ? `<span class="${c >= p ? 'up' : 'down'}">${c >= p ? '▲' : '▼'} ${nf(Math.abs(((c - p) / p) * 100), 0)}%</span>` : '—');
-      const table = (title, rows) => rows.length ? `<div><h4 style="font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:#6B7590;margin-bottom:6px">${title}</h4><table class="cm-t"><tr><th>Name</th><th>${esc(cur)}</th><th>${esc(yoy)}</th><th>Growth</th><th>Share</th></tr>${rows.slice(0, 12).map(r => `<tr><td title="${esc(r.name)}">${esc(r.name)}</td><td>${mnNum(r.cur)}</td><td>${r.yoy > 0 ? mnNum(r.yoy) : '–'}</td><td>${growthCell(r.cur, r.yoy)}</td><td>${nf(r.share, 0)}%</td></tr>`).join('')}</table></div>` : '';
+      const table = (title, rows, kind) => rows.length ? `<div><h4 style="font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:#6B7590;margin-bottom:6px">${title}</h4><table class="cm-t"><tr><th>Name</th><th>${esc(cur)}</th><th>${esc(yoy)}</th><th>Growth</th><th>Share</th></tr>${rows.slice(0, 12).map(r => `<tr${kind === 'mb' ? ` class="link" data-mb="${esc(r.name)}"` : ''}><td title="${esc(r.name)}">${esc(r.name)}</td><td>${mnNum(r.cur)}</td><td>${r.yoy > 0 ? mnNum(r.yoy) : '–'}</td><td>${growthCell(r.cur, r.yoy)}</td><td>${nf(r.share, 0)}%</td></tr>`).join('')}</table></div>` : '';
+      const where = scope.mb ? `${esc(data.filters.pg)} · ${esc(cur)}${card ? ` · rank #${card.rank} of ${data.brandCount}` : ''}` : `${esc(data.filters.pg)} · ${esc(cur)}${scope.sub ? ' · sub category' : ''}`;
+      const tables = scope.mb ? table('Advertisers', d.advertisers) + table('Brands', d.brands) + (d.subs.length > 1 ? table('Sub categories', d.subs) : '')
+        : table('Mother brands', d.mothers, 'mb') + table('Advertisers', d.advertisers) + table('Brands', d.brands);
       $('catModalBox').innerHTML = `
-        <div class="cm-h"><h3>${esc(d.name)}</h3>${card.mine ? '<span class="cm-tag">US</span>' : ''}<span style="color:#8A93AD;font-size:12px">${esc(data.filters.pg)} · ${esc(cur)} · rank #${card.rank} of ${data.brandCount}</span><button class="x">✕</button></div>
+        <div class="cm-h"><h3>${esc(d.name)}</h3>${mine ? '<span class="cm-tag">US</span>' : ''}<span style="color:#8A93AD;font-size:12px">${where}</span><button class="x">✕</button></div>
         <div class="cm-stats">
           <div class="cm-st"><span>${esc(cur)}</span><b>${mnTxt(d.cur)}</b></div>
           <div class="cm-st"><span>${esc(yoy)}</span><b>${d.yoy > 0 ? mnTxt(d.yoy) : '–'}</b></div>
           <div class="cm-st"><span>Y-o-Y growth</span><b style="color:${g == null ? '#9AA3BC' : g >= 0 ? '#14803F' : '#D12B2B'}">${g == null ? '—' : (g >= 0 ? '▲ ' : '▼ ') + nf(Math.abs(g), 0) + '%'}</b></div>
-          <div class="cm-st"><span>Share of category</span><b>${nf(card.share, 1)}%</b></div>
+          <div class="cm-st"><span>Share of category</span><b>${nf(share, 1)}%</b></div>
         </div>
         <div class="cm-sec"><h4>Monthly spend by medium (Rs. Mn)</h4>${monthlyChart(d)}
-          <div style="display:flex;gap:14px;font-size:10.5px;color:#4A5570;font-weight:600;margin:2px 0 8px">${MED.map((m, k) => `<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${MED_COL[k]};margin-right:4px"></i>${m} ${nf(medTot ? (card.medium[k] / medTot) * 100 : 0, 0)}%</span>`).join('')}<span style="margin-left:auto"><i style="display:inline-block;width:14px;border-top:2px dashed #8A93AD;margin-right:4px;vertical-align:3px"></i>${esc(yoy)} total</span></div></div>
-        <div class="cm-two">${table('Advertisers', d.advertisers)}${table('Brands', d.brands)}${d.subs.length ? table('Sub categories', d.subs) : ''}</div>`;
+          <div style="display:flex;gap:14px;font-size:10.5px;color:#4A5570;font-weight:600;margin:2px 0 8px">${MED.map((m, k) => `<span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${MED_COL[k]};margin-right:4px"></i>${m} ${nf(medTot ? (med[k] / medTot) * 100 : 0, 0)}%</span>`).join('')}<span style="margin-left:auto"><i style="display:inline-block;width:14px;border-top:2px dashed #8A93AD;margin-right:4px;vertical-align:3px"></i>${esc(yoy)} total</span></div></div>
+        <div class="cm-two">${tables}</div>`;
     } catch (err) { $('catModalBox').innerHTML = `<div class="cm-h"><h3>Could not load</h3><button class="x">✕</button></div><div style="padding:20px">${esc(err.message)}</div>`; }
   }
+  $('catModalBox').addEventListener('click', e => { const r = e.target.closest('tr[data-mb]'); if (r) openDetail({ mb: r.dataset.mb }); });
   function monthlyChart(d) {
     const W = 840, H = 190, X0 = 38, Y0 = H - 24, Y1 = 12, n = d.monthly.length;
     const tot = m => m.tv + m.radio + m.press;
@@ -462,22 +554,249 @@
     return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${grid}${bars}${hasY ? `<path d="${line}" fill="none" stroke="#8A93AD" stroke-width="1.8" stroke-dasharray="5 4"></path>` : ''}</svg>`;
   }
 
-  // ---------- save image ----------
-  $('catSaveBtn').addEventListener('click', async () => {
-    if (!data) { toast('Nothing to save yet'); return; }
-    try {
-      if (!window.htmlToImage) await new Promise((ok, fail) => { const el = document.createElement('script'); el.src = 'vendor/html-to-image/html-to-image.js'; el.onload = ok; el.onerror = () => fail(new Error('Could not load the image tool')); document.head.appendChild(el); });
-      const node = $('viewCat');
-      node.classList.add('exporting');
-      const url = await window.htmlToImage.toPng(node, { pixelRatio: 2, backgroundColor: '#F4F6FA', filter: n => !(n.classList && n.classList.contains('coverlay')) });
-      node.classList.remove('exporting');
-      const a = document.createElement('a');
-      const R = data.ranges;
-      a.href = url; a.download = `Category_${data.filters.pg}_${periodLabel(R.cur[0], R.cur[1], state.yearType)}`.replace(/[^A-Za-z0-9_'-]+/g, '_') + '.png';
-      a.click();
-      toast('Image saved');
-    } catch (e) { toast('Could not save the image: ' + e.message); }
+  // ---------- export ----------
+  const menu = $('catExportMenu');
+  $('catExportBtn').addEventListener('click', e => { e.stopPropagation(); menu.classList.toggle('on'); });
+  document.addEventListener('click', e => { if (!menu.contains(e.target)) menu.classList.remove('on'); });
+  menu.addEventListener('click', e => {
+    const b = e.target.closest('button[data-x]');
+    if (!b) return;
+    menu.classList.remove('on');
+    if (!data) return toast('Nothing to export yet');
+    ({ jpg: exportJpg, ppt: exportPpt })[b.dataset.x]();
   });
+  const loadScript = src => new Promise((ok, fail) => {
+    if (document.querySelector(`script[src="${src}"]`)) return ok();
+    const el = document.createElement('script');
+    el.src = src; el.onload = ok; el.onerror = () => fail(new Error('Could not load ' + src));
+    document.head.appendChild(el);
+  });
+  const fileBase = () => `Category_${data.filters.pg.replace(/[^\w]+/g, '-')}_${labelsOf(data).cur.replace(/[^\w]+/g, '-')}`;
+  const download = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); };
+  const SECTIONS = [['01_Cards', 'catS1'], ['02_Month_by_Month', 'catS2'], ['03_Sub_Categories', 'catS3']];
+
+  // Each section as its own JPG, in a ZIP. Sections are shown in full (all cards, the whole page 3).
+  async function exportJpg() {
+    toast('Preparing JPG images');
+    const root = $('viewCat'), scroll = $('catScroll');
+    const saved = scroll.scrollTop;
+    try {
+      await Promise.all([loadScript('vendor/html-to-image/html-to-image.js'), loadScript('vendor/jszip/jszip.min.js')]);
+      $('catDrawerToggle').checked = false;
+      scroll.style.scrollBehavior = 'auto';
+      root.classList.add('exporting');
+      const zip = new window.JSZip();
+      for (const [name, id] of SECTIONS) {
+        const el = $(id);
+        el.scrollIntoView({ block: 'start' });
+        await new Promise(r => setTimeout(r, 120));
+        const grid = $('catGrid');
+        const extra = id === 'catS1' ? Math.max(0, grid.scrollHeight - grid.clientHeight) : 0;
+        const prevH = el.style.height;
+        if (extra) el.style.height = (el.offsetHeight + extra) + 'px';
+        if (extra) { grid.style.overflow = 'visible'; grid.style.flex = 'none'; }
+        const w = el.offsetWidth, h = el.offsetHeight;
+        const url = await window.htmlToImage.toJpeg(el, { quality: 0.95, pixelRatio: 2, backgroundColor: '#F4F6FA', width: w, height: h, style: { transform: 'none' } });
+        el.style.height = prevH; grid.style.overflow = ''; grid.style.flex = '';
+        zip.file(`${name}.jpg`, url.split(',')[1], { base64: true });
+      }
+      download(await zip.generateAsync({ type: 'blob' }), fileBase() + '_JPG.zip');
+      toast('JPG images downloaded');
+    } catch (e) { toast('Export failed: ' + e.message); } finally {
+      root.classList.remove('exporting'); scroll.scrollTop = saved; scroll.style.scrollBehavior = '';
+      if (data) { sizeGrid(); renderChart(data, null); }
+    }
+  }
+  // Editable PowerPoint: real text, shapes, tables and a real chart, one slide per section (more if a section is long).
+  async function exportPpt() {
+    toast('Preparing PowerPoint');
+    try {
+      await loadScript('vendor/pptxgenjs/pptxgen.bundle.js');
+      const d = data, L = labelsOf(d), f = d.filters;
+      const pptx = new window.PptxGenJS();
+      pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 in
+      pptx.title = `${f.pg} category`; pptx.company = 'Ogilvy'; pptx.author = 'Ogilvy Orbit Chub';
+      const W = 13.33, H = 7.5, INK = '1A1F36', GREY = '6B7590';
+      const hex = c => c.replace('#', '');
+      const txt = id => ($(id).textContent || '').trim();
+      const SHAPE = pptx.ShapeType;
+      const chrome = (slide, headline, sub, wide = true) => {
+        slide.background = { color: 'FFFFFF' };
+        slide.addText(headline, { x: 0.55, y: 0.2, w: wide ? 12.2 : 9.3, h: 0.9, fontFace: 'Georgia', fontSize: 26, color: INK, valign: 'top', margin: 0, fit: 'shrink' });
+        if (sub) slide.addText(sub, { x: 0.55, y: 1.1, w: wide ? 12.2 : 9.3, h: 0.3, fontFace: 'Calibri', fontSize: 12, color: GREY, margin: 0 });
+        slide.addText('OGILVY', { x: -0.42, y: 3.4, w: 1.2, h: 0.3, rotate: 270, fontFace: 'Calibri', fontSize: 9, color: '9AA3BC', charSpacing: 3, align: 'center', margin: 0 });
+      };
+      const growthStr = g => (g == null ? '—' : `${g > 0.5 ? '▲ ' : g < -0.5 ? '▼ ' : '■ '}${nf(g, 0)}%`);
+      const growthCol = g => (g == null ? '9AA3BC' : g > 0.5 ? '14803F' : g < -0.5 ? 'D12B2B' : '8A93AD');
+
+      // ----- slide(s) 1: cards, ten to a slide -----
+      const colors = brandColors(d.cards);
+      for (let page = 0; page * 10 < Math.max(1, d.cards.length); page++) {
+        const slide = pptx.addSlide();
+        const more = d.cards.length > 10;
+        chrome(slide, txt('catTitle') + (page ? ' (cont.)' : ''), txt('catSub'), false);
+        slide.addText(`${L.cur} TOTAL`, { x: 10.3, y: 0.3, w: 2.5, h: 0.25, align: 'right', fontFace: 'Calibri', fontSize: 9, bold: true, color: '8A93AD', charSpacing: 1, margin: 0 });
+        slide.addText(mnTxt(d.total.cur), { x: 10.3, y: 0.55, w: 2.5, h: 0.5, align: 'right', fontFace: 'Calibri', fontSize: 26, bold: true, color: INK, margin: 0 });
+        const batch = d.cards.slice(page * 10, page * 10 + 10);
+        const gx = 0.55, gy = 1.6, gap = 0.17, cw = (W - 1.1 - 4 * gap) / 5, ch = 2.45;
+        batch.forEach((c, i) => {
+          const x = gx + (i % 5) * (cw + gap), y = gy + Math.floor(i / 5) * (ch + gap), col = hex(colors.get(c.name));
+          const medTot = c.medium[0] + c.medium[1] + c.medium[2];
+          slide.addShape(SHAPE.roundRect, { x, y, w: cw, h: ch, rectRadius: 0.12, fill: { color: c.mine ? 'FFF6EE' : 'FFFFFF' }, line: { color: col, width: c.mine ? 3 : 1.75 } });
+          slide.addShape(SHAPE.rect, { x: x + 0.12, y, w: cw - 0.24, h: 0.07, fill: { color: col }, line: { color: col, width: 0 } });
+          if (c.mine) { slide.addShape(SHAPE.rect, { x: x + cw - 0.62, y: y + 0.04, w: 0.5, h: 0.2, fill: { color: 'FF8A3D' }, line: { color: 'FF8A3D', width: 0 } }); slide.addText('US', { x: x + cw - 0.62, y: y + 0.04, w: 0.5, h: 0.2, align: 'center', valign: 'middle', fontFace: 'Calibri', fontSize: 8, bold: true, color: 'FFFFFF', margin: 0 }); }
+          slide.addShape(SHAPE.ellipse, { x: x + 0.14, y: y + 0.22, w: 0.4, h: 0.4, fill: { color: col }, line: { color: col, width: 0 } });
+          slide.addText(initials(c.name), { x: x + 0.14, y: y + 0.22, w: 0.4, h: 0.4, align: 'center', valign: 'middle', fontFace: 'Calibri', fontSize: 9, bold: true, color: 'FFFFFF', margin: 0 });
+          slide.addText(c.name.toUpperCase(), { x: x + 0.62, y: y + 0.2, w: cw - 0.75, h: 0.44, valign: 'middle', fontFace: 'Calibri', fontSize: 12, bold: true, color: INK, margin: 0, fit: 'shrink' });
+          slide.addShape(SHAPE.line, { x: x + 0.14, y: y + 0.7, w: cw - 0.28, h: 0, line: { color: 'E9EDF5', width: 1 } });
+          slide.addText(L.cur, { x: x + 0.14, y: y + 0.76, w: 1.3, h: 0.2, fontFace: 'Calibri', fontSize: 8, bold: true, color: GREY, margin: 0 });
+          slide.addText(mnTxt(c.cur), { x: x + 0.14, y: y + 0.94, w: cw * 0.58, h: 0.42, fontFace: 'Calibri', fontSize: 20, bold: true, color: INK, margin: 0, valign: 'middle' });
+          slide.addText('Y-O-Y GROWTH', { x: x + cw - 1.2, y: y + 0.76, w: 1.06, h: 0.2, align: 'right', fontFace: 'Calibri', fontSize: 7, bold: true, color: GREY, margin: 0 });
+          slide.addText(growthStr(c.growth), { x: x + cw - 1.2, y: y + 0.98, w: 1.06, h: 0.32, align: 'right', fontFace: 'Calibri', fontSize: 13, bold: true, color: growthCol(c.growth), margin: 0, valign: 'middle' });
+          const bw = (cw - 0.28 - 0.1) / 2;
+          [[L.yoy, c.yoy], [L.prev, c.prev]].forEach(([lab, v], k) => {
+            const bx = x + 0.14 + k * (bw + 0.1);
+            slide.addShape(SHAPE.roundRect, { x: bx, y: y + 1.45, w: bw, h: 0.52, rectRadius: 0.07, fill: { color: 'F3F5F9' }, line: { color: 'E9EDF5', width: 1 } });
+            slide.addText(lab, { x: bx, y: y + 1.48, w: bw, h: 0.18, align: 'center', fontFace: 'Calibri', fontSize: 7.5, color: GREY, margin: 0 });
+            slide.addText(v == null || v <= 0 ? '–' : mnNum(v), { x: bx, y: y + 1.65, w: bw, h: 0.3, align: 'center', valign: 'middle', fontFace: 'Calibri', fontSize: 13, bold: true, color: INK, margin: 0 });
+          });
+          slide.addText(`${L.cur} SHARE`, { x: x + 0.14, y: y + 2.03, w: cw - 0.9, h: 0.18, fontFace: 'Calibri', fontSize: 7, bold: true, color: GREY, margin: 0 });
+          slide.addText(`${nf(c.share, 0)}%`, { x: x + cw - 0.8, y: y + 1.99, w: 0.66, h: 0.22, align: 'right', fontFace: 'Calibri', fontSize: 11, bold: true, color: col, margin: 0 });
+          slide.addShape(SHAPE.roundRect, { x: x + 0.14, y: y + 2.24, w: cw - 0.28, h: 0.07, rectRadius: 0.03, fill: { color: 'E7EBF3' }, line: { color: 'E7EBF3', width: 0 } });
+          slide.addShape(SHAPE.roundRect, { x: x + 0.14, y: y + 2.24, w: Math.max(0.05, (cw - 0.28) * Math.min(1, c.share / 100)), h: 0.07, rectRadius: 0.03, fill: { color: col }, line: { color: col, width: 0 } });
+          let mx = x + 0.14;
+          c.medium.forEach((v, k) => { const w2 = medTot ? (cw - 0.28) * (v / medTot) : 0; if (w2 > 0.01) { slide.addShape(SHAPE.rect, { x: mx, y: y + 2.35, w: w2, h: 0.04, fill: { color: hex(MED_COL[k]) }, line: { color: hex(MED_COL[k]), width: 0 } }); mx += w2; } });
+        });
+        // Legend strip
+        slide.addShape(SHAPE.roundRect, { x: 0.55, y: 6.78, w: W - 1.1, h: 0.5, rectRadius: 0.08, fill: { color: 'FAFBFD' }, line: { color: 'E5E9F2', width: 1 } });
+        [['2F6FD3', 'Investment amount', `${L.yoy}, ${L.prev} and ${L.cur} (Rs. Mn)`], ['1E8E4E', 'Y-o-Y growth', `${L.cur} versus ${L.yoy}`], ['7B4FA0', 'Share of investment', `Share of total ${L.cur} investment`]].forEach(([col, a, b], k) => {
+          const lx = 0.8 + k * 3.7;
+          slide.addShape(SHAPE.roundRect, { x: lx, y: 6.86, w: 0.09, h: 0.34, rectRadius: 0.04, fill: { color: col }, line: { color: col, width: 0 } });
+          slide.addText([{ text: a, options: { bold: true, fontSize: 10, color: INK, breakLine: true } }, { text: b, options: { fontSize: 8.5, color: GREY } }], { x: lx + 0.18, y: 6.82, w: 3.3, h: 0.42, fontFace: 'Calibri', margin: 0, valign: 'middle' });
+        });
+        MED.forEach((m, k) => { slide.addShape(SHAPE.rect, { x: 11.0 + k * 0.7, y: 6.99, w: 0.1, h: 0.1, fill: { color: hex(MED_COL[k]) }, line: { color: hex(MED_COL[k]), width: 0 } }); slide.addText(m, { x: 11.13 + k * 0.7, y: 6.94, w: 0.55, h: 0.2, fontFace: 'Calibri', fontSize: 8.5, bold: true, color: '4A5570', margin: 0 }); });
+        void more;
+      }
+
+      // ----- slide: Category behaviour, month by month (a real combo chart on two axes) -----
+      {
+        const slide = pptx.addSlide();
+        const M = d.monthly, n = M.months.length;
+        const { pool, colors: cc } = chartPool(d);
+        const shown = pool.filter(c => !hiddenBrands.has(c.name));
+        chrome(slide, txt('catTitle2'), txt('catSub2'));
+        slide.addText('Category Behaviour – Month-On-Month', { x: 3.2, y: 1.5, w: 7, h: 0.35, align: 'center', fontFace: 'Calibri', fontSize: 16, bold: true, color: GREY, underline: { style: 'sng' }, margin: 0 });
+        const labels = M.months.map(k => monLabel(k).replace('-', " '"));
+        const maxCat = niceMax(Math.max(0, ...M.cat) / 1000), maxBr = niceMax(Math.max(0, ...shown.flatMap(c => c.monthly)) / 1000);
+        const catSeries = [{ name: 'Category total', labels, values: M.cat.map(v => Math.round(v / 1000)) }];
+        const brSeries = shown.map(c => ({ name: (c.mine ? '★ ' : '') + c.name, labels, values: c.monthly.map(v => Math.round(v / 1000)) }));
+        const common = { barDir: 'col', barGrouping: 'clustered', showValue: ui.labels, dataLabelFontSize: 8, dataLabelFontBold: true, dataLabelPosition: 'outEnd', dataLabelFormatCode: '#,##0', dataLabelColor: '111111' };
+        slide.addChart([
+          { type: pptx.charts.BAR, data: catSeries, options: { ...common, chartColors: ['A9D96C'], barGapWidthPct: 8 } },
+          { type: pptx.charts.BAR, data: brSeries, options: { ...common, chartColors: shown.map(c => hex(cc.get(c.name))), barGapWidthPct: 70, secondaryValAxis: true, secondaryCatAxis: true } },
+        ], {
+          x: 0.6, y: 1.9, w: W - 1.2, h: 5.35, showLegend: true, legendPos: 'b', legendFontSize: 11, legendFontBold: true, legendColor: INK,
+          valAxes: [
+            { showValAxisTitle: true, valAxisTitle: 'Investments in (Rs. in Mn)', valAxisTitleFontSize: 10, valAxisMinVal: 0, valAxisMaxVal: maxCat, valAxisLabelFontSize: 10, valAxisLabelFormatCode: '#,##0', valGridLine: { color: 'EEF1F7', size: 0.5 } },
+            { showValAxisTitle: true, valAxisTitle: 'Investments in (Rs. in Mn)', valAxisTitleFontSize: 10, valAxisMinVal: 0, valAxisMaxVal: maxBr, valAxisLabelFontSize: 10, valAxisLabelFormatCode: '#,##0', valGridLine: { style: 'none' } },
+          ],
+          catAxes: [{ catAxisLabelFontSize: 10, catAxisLabelFontBold: true }, { catAxisHidden: true }],
+        });
+        slide.addNotes(`Month by month investment, Rs. Mn. Selected period ${L.cur} (${monLabel(d.ranges.cur[0])} to ${monLabel(d.ranges.cur[1])}). Left axis: category total. Right axis: mother brands.\n` +
+          M.months.map((k, i) => `${monLabel(k)}: category ${nf(M.cat[i] / 1000, 0)}; ` + shown.map(c => `${c.name} ${nf(c.monthly[i] / 1000, 0)}`).join(', ')).join('\n'));
+      }
+
+      // ----- slides: sub categories (mix, contribution, tables) -----
+      {
+        const T = d.tables, multi = d.hasSubs && T.length > 1;
+        const headline = txt('catTitle3'), sub = txt('catSub3');
+        const subColors = T.map((t, i) => hex(SUB_COLORS[i % SUB_COLORS.length]));
+        let slide = pptx.addSlide();
+        chrome(slide, headline, sub);
+        const COLX = [0.55, 6.85], COLW = [6.0, 5.95], BOTTOM = 7.4;
+        let y = [1.6, 1.6];
+        const title = (sl, x, yy, w, str, col, color) => {
+          sl.addShape(SHAPE.rect, { x, y: yy + 0.03, w: 0.1, h: 0.28, fill: { color: col }, line: { color: col, width: 0 } });
+          sl.addText(str, { x: x + 0.2, y: yy, w: w - 0.2, h: 0.34, fontFace: 'Calibri', fontSize: 14, bold: true, color: color || INK, margin: 0, valign: 'middle' });
+        };
+        if (multi) {
+          // Mix of sub categories
+          if (d.mix && d.mix.yoy) {
+            slide.addText(txt('catMixT'), { x: COLX[0], y: y[0], w: COLW[0], h: 0.34, fontFace: 'Calibri', fontSize: 15, bold: true, color: INK, margin: 0 });
+            let yy = y[0] + 0.45;
+            const rows = [[L.yoy, d.mix.yoy], d.mix.prev ? [L.prev, d.mix.prev] : null, [L.cur, d.mix.cur, true]].filter(Boolean);
+            rows.forEach(([lab, arr, now]) => {
+              slide.addText(lab, { x: COLX[0], y: yy, w: 0.95, h: 0.34, fontFace: 'Calibri', fontSize: 10.5, bold: !!now, color: now ? INK : GREY, margin: 0, valign: 'middle' });
+              let bx = COLX[0] + 1.0; const bwAll = COLW[0] - 1.0;
+              arr.forEach((p, i) => {
+                if (p <= 0) return;
+                const w2 = bwAll * (p / 100);
+                slide.addShape(SHAPE.rect, { x: bx, y: yy, w: w2, h: 0.34, fill: { color: subColors[i] }, line: { color: 'FFFFFF', width: 0.5 } });
+                if (p >= 4) slide.addText(`${nf(p, 0)}%`, { x: bx, y: yy, w: w2, h: 0.34, align: 'center', valign: 'middle', fontFace: 'Calibri', fontSize: 10.5, bold: true, color: 'FFFFFF', margin: 0 });
+                bx += w2;
+              });
+              yy += 0.42;
+            });
+            let lx = COLX[0] + 1.0;
+            T.forEach((t, i) => { slide.addShape(SHAPE.rect, { x: lx, y: yy + 0.06, w: 0.12, h: 0.12, fill: { color: subColors[i] }, line: { color: subColors[i], width: 0 } }); slide.addText(t.name, { x: lx + 0.17, y: yy, w: 1.3, h: 0.24, fontFace: 'Calibri', fontSize: 9.5, color: '4A5570', margin: 0 }); lx += 0.35 + Math.min(1.4, t.name.length * 0.085 + 0.2); });
+            y[0] = yy + 0.4;
+          }
+          // Contribution
+          if (d.contribution) {
+            slide.addText(txt('catContT'), { x: COLX[1], y: y[1], w: COLW[1], h: 0.34, fontFace: 'Calibri', fontSize: 15, bold: true, color: INK, margin: 0 });
+            let yy = y[1] + 0.45;
+            d.contribution.forEach((c, i) => {
+              slide.addShape(SHAPE.rect, { x: COLX[1], y: yy, w: 0.08, h: 0.42, fill: { color: subColors[i] }, line: { color: subColors[i], width: 0 } });
+              slide.addText(c.name, { x: COLX[1] + 0.25, y: yy, w: 1.9, h: 0.42, fontFace: 'Calibri', fontSize: 14, bold: true, color: INK, margin: 0, valign: 'middle' });
+              slide.addText(`${mnNum(c.yoy)}  →  ${mnNum(c.cur)}`, { x: COLX[1] + 2.2, y: yy, w: 2.3, h: 0.42, align: 'center', fontFace: 'Calibri', fontSize: 13, bold: true, color: INK, margin: 0, valign: 'middle' });
+              slide.addText(c.growth == null ? '—' : `${nf(c.growth, 0)}%`, { x: COLX[1] + 4.7, y: yy, w: 1.2, h: 0.42, align: 'right', fontFace: 'Calibri', fontSize: 15, bold: true, color: growthCol(c.growth), margin: 0, valign: 'middle' });
+              yy += 0.46;
+            });
+            [[L.yoy, COLX[1] + 2.2, 1.1, 'left'], [L.cur, COLX[1] + 3.4, 1.1, 'right'], ['Y-O-Y', COLX[1] + 4.7, 1.2, 'right']].forEach(([lab, xx, w2, al]) => slide.addText(lab, { x: xx, y: yy, w: w2, h: 0.22, align: al, fontFace: 'Calibri', fontSize: 9.5, color: GREY, underline: { style: 'sng' }, margin: 0 }));
+            y[1] = yy + 0.4;
+          }
+        }
+        // Tables, packed into the two columns; a new slide starts when both are full.
+        const rowH = 0.25;
+        const place = (t, ti, pref) => {
+          const single = !multi;
+          const colsOrder = single ? [0] : [pref, 1 - pref];
+          const hgt = 0.4 + (t.rows.length + 2) * rowH + 0.2;
+          let col = colsOrder.find(c => y[c] + hgt <= BOTTOM);
+          if (col === undefined) {
+            slide = pptx.addSlide(); chrome(slide, headline + ' (cont.)', sub); y = [1.6, 1.6];
+            col = 0;
+          }
+          const x = COLX[col], w = single ? 9.2 : COLW[col];
+          const name = single ? String(f.pg).toUpperCase() : (t.none ? 'UNASSIGNED' : t.name.toUpperCase());
+          title(slide, x, y[col], w, `${name}${t.growth == null ? '' : ' | ' + nf(t.growth, 0) + '% YoY'}`, subColors[ti] || 'F24B4B');
+          const border = { type: 'solid', color: INK, pt: 0.75 };
+          const hdr = txt => ({ text: txt, options: { bold: true, color: 'FFFFFF', fill: { color: '4B5563' }, align: 'center', fontSize: 9.5 } });
+          const tint = ['E4F1FB', 'E8F4DE', 'FBE4EE'];
+          const num = (v, k, o = {}) => ({ text: v == null || v <= 0 ? '–' : mnNum(v), options: { align: 'center', fill: { color: tint[k] }, ...o } });
+          const rows = [[{ text: 'BRAND', options: { bold: true, color: 'FFFFFF', fill: { color: '4B5563' }, fontSize: 9.5 } }, hdr(tabLabel(L.yoy)), hdr(tabLabel(L.prev)), hdr(tabLabel(L.cur)), hdr('YoY'), hdr('SHR.')]];
+          t.rows.forEach(r => {
+            const o = { bold: !!r.mine, fontSize: r.mine ? 11 : 10, italic: !!r.others, color: r.others ? '6B7590' : INK };
+            rows.push([{ text: r.name, options: { ...o, align: 'left' } }, num(r.yoy, 0, o), num(r.prev, 1, o), num(r.cur, 2, o),
+              { text: r.growth == null ? '' : `${nf(r.growth, 0)}%`, options: { ...o, align: 'center', color: growthCol(r.growth) } },
+              { text: r.cur > 0 ? `${nf(r.share, 0)}%` : '', options: { ...o, align: 'center' } }]);
+          });
+          const tb = { bold: true, fontSize: 10.5, color: INK };
+          rows.push([{ text: name, options: { ...tb, align: 'left' } }, { text: t.yoy > 0 ? mnNum(t.yoy) : '–', options: { ...tb, align: 'center' } }, { text: t.prev > 0 ? mnNum(t.prev) : '–', options: { ...tb, align: 'center' } }, { text: t.cur > 0 ? mnNum(t.cur) : '–', options: { ...tb, align: 'center' } },
+            { text: t.growth == null ? '' : `${nf(t.growth, 0)}%`, options: { ...tb, align: 'center', color: growthCol(t.growth) } }, { text: '', options: tb }]);
+          const first = single ? 3.0 : w * 0.33;
+          const rest = (w - first) / 5;
+          slide.addTable(rows, { x, y: y[col] + 0.4, w, colW: [first, rest, rest, rest, rest, rest], rowH, fontFace: 'Calibri', fontSize: 10, border, valign: 'middle', margin: [0, 0.06, 0, 0.06] });
+          y[col] += hgt;
+        };
+        T.forEach((t, i) => place(t, i, (i === 0 || (i >= 3 && i % 2 === 1)) ? 1 : 0));
+        if (!T.length) slide.addText('No spend found for these filters.', { x: 0.55, y: 2, w: 8, h: 0.4, fontFace: 'Calibri', fontSize: 14, color: GREY });
+      }
+      const out = await pptx.write({ outputType: 'blob' });
+      download(out, fileBase() + '.pptx');
+      toast('PowerPoint downloaded');
+    } catch (e) { console.error(e); toast('Export failed: ' + e.message); }
+  }
 
   // ---------- switching between the two dashboards ----------
   function applyModeText() { $('modeTxt').textContent = document.body.classList.contains('mode-cat') ? 'Switch to Spot Log' : 'Switch to Category'; }

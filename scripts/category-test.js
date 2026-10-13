@@ -47,6 +47,21 @@ const C = require('../server/category');
   assert.ok(Math.abs(all.cards.reduce((s, c) => s + c.share, 0) - 100) < 1e-6);
   // Medium split adds up to the card total.
   for (const c of all.cards) assert.ok(Math.abs(c.medium[0] + c.medium[1] + c.medium[2] - c.cur) < 1e-6);
+  // Sub category tables: one per sub category, totals add up to the category, shares add up within a table.
+  assert.strictEqual(d.hasSubs, true);
+  assert.deepStrictEqual(d.tables.map(t => t.name).sort(), ['Conditioner', 'Hair Oil', 'Hair Colour', 'Shampoo'].sort());
+  assert.ok(Math.abs(d.tables.reduce((a, t) => a + t.cur, 0) - d.total.cur) < 1e-6);
+  for (const t of d.tables) {
+    assert.ok(Math.abs(t.rows.reduce((a, r) => a + r.cur, 0) - t.cur) < 1e-6, 'rows add up to the sub category');
+    assert.ok(t.rows.length <= 9 + 4, 'Others folds the long tail');
+    assert.ok(Math.abs(t.rows.reduce((a, r) => a + r.share, 0) - 100) < 1e-6);
+  }
+  assert.ok(d.tables.every((t, i) => i === 0 || d.tables[i - 1].cur >= t.cur), 'biggest first');
+  assert.ok(Math.abs(d.mix.cur.reduce((a, b) => a + b, 0) - 100) < 1e-6);
+  assert.ok(Math.abs(d.contribution.reduce((a, c) => a + c.part, 0) - 100) < 1e-6, 'contributions add up to 100% of the net change');
+  const sh = C.detail(ds, F, { sub: 'Shampoo' });
+  assert.ok(Math.abs(sh.cur - d.tables.find(t => t.name === 'Shampoo').cur) < 1e-6);
+  assert.ok(sh.mothers.length > 1 && sh.kind === 'sub');
   // Competitor filter keeps only picked advertisers' brands plus ours.
   const comp = C.dashboard(ds, { ...F, comps: ['Marico Lanka'] });
   assert.ok(comp.cards.every(c => c.mine || c.name === 'Parachute'));
@@ -57,6 +72,13 @@ const C = require('../server/category');
   const early = C.dashboard(ds, { ...F, from: '2022-01', to: '2022-03' });
   assert.strictEqual(early.hasYoy, false);
   assert.strictEqual(early.cards[0].growth, null);
+  // Without sub categories there is one table of mother brands and no mix or contribution.
+  const plain = new Blob([buf.toString().split('\n').map(l => l.replace(/^([^,]*,[^,]*,[^,]*,[^,]*,[^,]*,)[^,]*,/, '$1')).join('\n')]);
+  plain.name = 'plain.csv';
+  const dsPlain = await readCategoryFile(plain, () => {});
+  const one = C.dashboard(dsPlain, F);
+  assert.ok(!one.hasSubs && one.tables.length === 1 && one.mix === null && one.contribution === null);
+  assert.strictEqual(one.tables[0].name, 'Hair Care');
   // Detail adds up to the card.
   const det = C.detail(ds, F, { mb: 'Sunsilk' });
   assert.ok(Math.abs(det.cur - sunsilk.cur) < 1e-6);
