@@ -2,7 +2,7 @@
 // Optional slide notes written by a local Ollama model. The server only relays: it sends the text that is visible on a
 // slide and returns a few short bullet points. Nothing is sent anywhere else, and nothing is stored.
 const BASE = (process.env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/+$/, '');
-const DEFAULT_MODEL = process.env.OLLAMA_MODEL || '';
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:3b';
 const timeout = (ms) => AbortSignal.timeout(ms);
 
 async function models() {
