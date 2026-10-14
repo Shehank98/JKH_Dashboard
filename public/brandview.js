@@ -12,7 +12,7 @@
   
   let stack = [];        // [{ scope, label }]: the trail
   let d = null;          // the brand view data for the top of the stack
-  let ui = { metric: 'spend', cmp: 'yoy', ctab: 'C', allCh: false, tab: 'advertisers' };
+  let ui = { metric: 'spend', cmp: 'yoy', ctab: 'C', tab: 'advertisers', page: 0, pageSize: 8 };
   let seq = 0;
 
   // ---------- number formats (spend arrives in thousand rupees) ----------
@@ -52,7 +52,7 @@
   }
   function open(scope) {
     stack = [{ scope: { ...scope }, label: '' }];
-    ui = { ...ui, ctab: 'C', allCh: false, tab: 'advertisers' };
+    ui = { ...ui, ctab: 'C', tab: 'advertisers', page: 0 };
     root.classList.add('on'); document.body.classList.add('bv-open');
     root.innerHTML = '<div class="bv-wrap"><div class="bv-loading">Loading…</div></div>';
     load();
@@ -76,8 +76,10 @@
   function push(add, label) {
     const base = stack[stack.length - 1].scope, next = { ...base };
     for (const [k, v] of Object.entries(add)) { if (v == null) delete next[k]; else next[k] = v; }
-    stack.push({ scope: next, label: label || '' });
-    root.querySelector('.bv-scroll') && (root.querySelector('.bv-scroll').scrollTop = 0);
+    const [tab, note] = landing(add, label);
+    stack.push({ scope: next, label: label || '', note });
+    ui.tab = tab; ui.page = 0;
+    if (add.vt) ui.ctab = add.vt;
     load();
   }
   function labelFor(add) {
@@ -94,7 +96,8 @@
   }
 
   // ---------- drawing ----------
-  // One tab at a time, like the Spot Log click-through: the tabs stay under the top bar, so there is nothing to scroll to.
+  // The whole view fits the window: nothing scrolls. Long lists are paged, and the page size follows the window height.
+  const ROWH = { advertisers: 44, channels: 44, campaigns: 50, children: 52, months: 44 };
   function tabList() {
     const kids = d.childKind === 'mb' ? 'Mother brands' : 'Brands';
     return [
@@ -107,12 +110,32 @@
       ['months', 'Months', d.monthsList.length],
     ];
   }
+  // Rows for the current page and the pager under them.
+  function paged(rows) {
+    const size = Math.max(3, ui.pageSize), pages = Math.max(1, Math.ceil(rows.length / size));
+    ui.page = Math.min(ui.page, pages - 1);
+    const from = ui.page * size, slice = rows.slice(from, from + size);
+    const pager = `<div class="bv-pager"><span>${rows.length ? `${from + 1}–${from + slice.length} of ${rows.length}` : ''}</span>${pages > 1 ? `<button class="bv-btn" data-act="page" data-v="-1" ${ui.page ? '' : 'disabled'}>‹ Prev</button><b>${ui.page + 1} / ${pages}</b><button class="bv-btn" data-act="page" data-v="1" ${ui.page < pages - 1 ? '' : 'disabled'}>Next ›</button>` : ''}</div>`;
+    return { slice, pager };
+  }
+  const rowsBox = (tab, html) => `<div class="bv-rows" id="bvRows" data-rh="${ROWH[tab]}">${html}</div>`;
+
+  // Where a click lands, and what the person is told, so the next screen is never a surprise.
+  function landing(add, label) {
+    if (add.vt) return ['campaigns', `Showing the <b>${esc(label)}</b> campaigns.`];
+    if (add.theme) return ['channels', `Showing the channels <b>${esc(label)}</b> ran on.`];
+    if (add.ch) return ['campaigns', `Showing the campaigns that ran on <b>${esc(label)}</b>.`];
+    if (add.medium) return ['channels', `Showing the channels that carried <b>${esc(label)}</b>.`];
+    if (add.dur) return ['channels', `Showing the channels that carried <b>${esc(label)}</b>.`];
+    if (add.from) return ['medium', `Showing the medium split for <b>${esc(label)}</b>.`];
+    return ['advertisers', `Showing who runs <b>${esc(label)}</b>.`];
+  }
 
   function draw() {
     const H = O.catHelp, rg = d.ranges, yt = H.yearType();
-    const curLabel = H.periodLabel(rg.cur[0], rg.cur[1], yt), baseRange = ui.cmp === 'prev' ? rg.prev : rg.yoy;
+    const curLabel = H.periodLabel(rg.cur[0], rg.cur[1], yt);
     const baseWord = ui.cmp === 'prev' ? 'previous' : 'last year';
-    const h = d.head, scope = stack[stack.length - 1].scope;
+    const h = d.head, scope = stack[stack.length - 1].scope, top = stack[stack.length - 1];
     const bBase = ui.cmp === 'prev' ? h.prev : h.yoy;
     const sosBase = ui.cmp === 'prev' ? h.sos.prev : h.sos.yoy;
     const chips = d.parts.filter(p => !['mb', 'brand', 'adv', 'ch', 'theme', 'sub', 'mbs'].includes(p.k) || p.v !== d.name);
@@ -122,55 +145,64 @@
     if (!tabs.some(t => t[0] === ui.tab)) ui.tab = tabs[0][0];
     const split = h.split;
     const pane = { advertisers: advertisersPane, medium: mediumPane, channels: channelsPane, duration: durationPane, children: childrenPane, campaigns: campaignsPane, months: monthsPane }[ui.tab];
-    const rivals = d.sos.ranking.filter(r => !r.self).slice(0, 5);
+    const rivals = d.sos.ranking.filter(r => !r.self).slice(0, 4);
+    const tabName = (tabs.find(t => t[0] === ui.tab) || [])[1];
 
-    root.innerHTML = `<div class="bv-wrap"><div class="bv-scroll" id="bvScroll"><div id="bvBody">
-      <div class="bv-sticky">
-        <div class="bv-bar">
-          <button class="bv-btn" data-act="back">${stack.length > 1 ? '← Back' : '← Back to dashboard'}</button>
-          <div class="bv-trail"><button class="bv-crumb" data-act="trail" data-i="0">Category</button><span>›</span>${H.pg() ? `<span>${esc(H.pg())}</span><span>›</span>` : ''}${trail.join('<span>›</span>')}</div>
-          <div class="bv-ctl">
-            <span class="bv-lbl">PERIOD</span><span class="bv-pill">${esc(curLabel)}${d.months > 1 ? ` · ${esc(H.monLabel(rg.cur[0]))} to ${esc(H.monLabel(rg.cur[1]))}` : ` · ${esc(H.monLabel(rg.cur[0]))}`}</span>
-            <span class="bv-seg"><button class="${ui.cmp === 'yoy' ? 'on' : ''}" data-act="cmp" data-v="yoy">vs last year</button><button class="${ui.cmp === 'prev' ? 'on' : ''}" data-act="cmp" data-v="prev">vs previous</button></span>
-            <span class="bv-seg"><button class="${scope.medium ? '' : 'on'}"${setA({ medium: null })}>All media</button>${MED.map(m => `<button class="${scope.medium === m ? 'on' : ''}"${setA({ medium: m })}>${m}</button>`).join('')}</span>
-            <button class="bv-btn" data-act="jpg" title="Download this view as a picture">Export JPG</button>
-          </div>
+    root.innerHTML = `<div class="bv-wrap" id="bvBody">
+      <div class="bv-bar">
+        <button class="bv-btn" data-act="back">${stack.length > 1 ? '← Back' : '← Back to dashboard'}</button>
+        <div class="bv-trail"><button class="bv-crumb" data-act="trail" data-i="0">Category</button><span>›</span>${H.pg() ? `<span>${esc(H.pg())}</span><span>›</span>` : ''}${trail.join('<span>›</span>')}</div>
+        <div class="bv-ctl">
+          <span class="bv-pill">${esc(curLabel)}${d.months > 1 ? ` · ${esc(H.monLabel(rg.cur[0]))} to ${esc(H.monLabel(rg.cur[1]))}` : ` · ${esc(H.monLabel(rg.cur[0]))}`}</span>
+          <span class="bv-seg"><button class="${ui.cmp === 'yoy' ? 'on' : ''}" data-act="cmp" data-v="yoy">vs last year</button><button class="${ui.cmp === 'prev' ? 'on' : ''}" data-act="cmp" data-v="prev">vs previous</button></span>
+          <span class="bv-seg"><button class="${scope.medium ? '' : 'on'}"${setA({ medium: null })}>All media</button>${MED.map(m => `<button class="${scope.medium === m ? 'on' : ''}"${setA({ medium: m })}>${m}</button>`).join('')}</span>
+          <button class="bv-btn" data-act="jpg" title="Download this view as a picture">Export JPG</button>
         </div>
-        <div class="bv-tabs bv-main-tabs" role="tablist">${tabs.map(([k, n, c], i) => `${i === 5 ? '<span class="bv-tsep"></span>' : ''}<button role="tab" aria-selected="${ui.tab === k}" class="${ui.tab === k ? 'on' : ''}" data-act="tab" data-v="${k}">${n}${c != null ? ` <em>${c}</em>` : ''}</button>`).join('')}</div>
       </div>
+      <div class="bv-tabs bv-main-tabs" role="tablist">${tabs.map(([k, n, c], i) => `${i === 5 ? '<span class="bv-tsep"></span>' : ''}<button role="tab" aria-selected="${ui.tab === k}" class="${ui.tab === k ? 'on' : ''}" data-act="tab" data-v="${k}">${n}${c != null ? ` <em>${c}</em>` : ''}</button>`).join('')}</div>
 
-      <div class="bv-title"><span class="bv-av">${esc(initial)}</span><div>
-        <div class="bv-h1"><span>${esc(d.name)}</span>${usTag(d.us)}</div>
-        <div class="bv-sub">${esc(d.kind)} · ${esc(H.pg())}${chips.length ? ' · ' + chips.map(c => esc(c.v)).join(' · ') : ''}</div></div>
-        ${d.siblings && d.siblings.length > 1 ? `<div class="bv-sib"><span class="bv-lbl">SWITCH BRAND</span>${d.siblings.map(s => `<button class="bv-chip${s.self ? ' on' : ''}"${s.self ? '' : go({ brand: s.name })}>${esc(s.name)}</button>`).join('')}</div>` : ''}
+      <div class="bv-head">
+        <div class="bv-title"><span class="bv-av">${esc(initial)}</span><div>
+          <div class="bv-h1"><span>${esc(d.name)}</span>${usTag(d.us)}</div>
+          <div class="bv-sub">${esc(d.kind)} · ${esc(H.pg())}${chips.length ? ' · ' + chips.map(c => esc(c.v)).join(' · ') : ''}</div></div></div>
+        <div class="bv-kpis">
+          <div class="bv-card bv-kpi"><div class="bv-kl">INVESTMENT · ${esc(curLabel)}</div><div class="bv-kv">${mnTxt(h.cur)}</div><div class="bv-ks">${growth(h.cur, bBase)} vs ${bBase > 0 ? mnTxt(bBase) : '–'} ${baseWord}</div></div>
+          <div class="bv-card bv-kpi"><div class="bv-kl">SHARE OF SPEND</div><div class="bv-kv">${pctS(h.sos.cur, 1)}</div><div class="bv-ks">${h.rank ? `Rank <b>#${h.rank}</b> of ${h.rankOf}` : sosBase != null && h.sos.cur != null ? `<span class="${h.sos.cur >= sosBase ? 'up' : 'down'}">${h.sos.cur >= sosBase ? '▲' : '▼'} ${nf(Math.abs(h.sos.cur - sosBase), 1)} pp</span> vs ${baseWord}` : '&nbsp;'}</div></div>
+          <div class="bv-card bv-kpi"><div class="bv-kl">COMMERCIALS : VALUE ADD.</div><div class="bv-kv">${ratioTxt(split)}</div>${ratioBar(split)}</div>
+          <div class="bv-card bv-kpi"><div class="bv-kl">CHANNELS · ADVERTISERS</div><div class="bv-kv">${h.channels} · ${d.advertisers.length}</div><div class="bv-ks">${h.topChannel ? `Top: <b>${esc(h.topChannel.name)}</b> ${pctS(h.topChannel.share)}` : '&nbsp;'}</div></div>
+        </div>
       </div>
+      ${rivals.length || (d.siblings && d.siblings.length > 1) ? `<div class="bv-rivals">${d.siblings && d.siblings.length > 1 ? `<span class="bv-lbl">SWITCH BRAND</span>${d.siblings.map(s => `<button class="bv-chip${s.self ? ' on' : ''}"${s.self ? '' : go({ brand: s.name })}>${esc(s.name)}</button>`).join('')}` : ''}${rivals.length ? `<span class="bv-lbl" style="margin-left:${d.siblings && d.siblings.length > 1 ? 14 : 0}px">COMPARE WITH</span>${rivals.map(r => `<button class="bv-chip"${go(d.entKind === 'brand' ? { brand: r.key, mb: null } : d.entKind === 'adv' ? { adv: r.key, mb: null, brand: null } : { mb: r.key, brand: null, adv: null })}>${esc(r.key)} <em>${pctS(r.share, 1)}</em></button>`).join('')}` : ''}</div>` : ''}
+      ${top.note ? `<div class="bv-note"><span>▸ You opened <b>${esc(top.label || d.name)}</b>. ${top.note}</span><button data-act="dismiss" aria-label="Dismiss">✕</button></div>` : ''}
 
-      <div class="bv-kpis">
-        <div class="bv-card bv-kpi"><div class="bv-kl">INVESTMENT · ${esc(curLabel)}</div><div class="bv-kv">${mnTxt(h.cur)}</div><div class="bv-ks">${growth(h.cur, bBase)} vs ${bBase > 0 ? mnTxt(bBase) : '–'} ${baseWord}</div></div>
-        <div class="bv-card bv-kpi"><div class="bv-kl">SHARE OF SPEND (SOS)</div><div class="bv-kv">${pctS(h.sos.cur, 1)}</div><div class="bv-ks">${h.rank ? `Rank <b>#${h.rank}</b> of ${h.rankOf} ${h.rankKind === 'mb' ? 'mother brands' : h.rankKind === 'brand' ? 'brands' : 'advertisers'}` : sosBase != null && h.sos.cur != null ? `<span class="${h.sos.cur >= sosBase ? 'up' : 'down'}">${h.sos.cur >= sosBase ? '▲' : '▼'} ${nf(Math.abs(h.sos.cur - sosBase), 1)} pp</span> vs ${baseWord}` : ''}</div></div>
-        <div class="bv-card bv-kpi"><div class="bv-kl">COMMERCIALS : VALUE ADDITIONS</div><div class="bv-kv">${ratioTxt(split)}</div>${ratioBar(split)}</div>
-        <div class="bv-card bv-kpi"><div class="bv-kl">REACH OF THE BRAND</div><div class="bv-kv">${h.channels}<small> channels</small></div><div class="bv-ks">${d.advertisers.length} advertiser${d.advertisers.length === 1 ? '' : 's'}${h.topChannel ? ` · top <b>${esc(h.topChannel.name)}</b> (${pctS(h.topChannel.share)})` : ''}</div></div>
-      </div>
-      ${rivals.length ? `<div class="bv-rivals"><span class="bv-lbl">COMPARE WITH</span>${rivals.map(r => `<button class="bv-chip"${go(d.entKind === 'brand' ? { brand: r.key, mb: null } : d.entKind === 'adv' ? { adv: r.key, mb: null, brand: null } : { mb: r.key, brand: null, adv: null })}>${esc(r.key)} <em>${pctS(r.share, 1)}</em></button>`).join('')}</div>` : ''}
-
-      <section class="bv-card bv-sec bv-tabcard" id="bv-tab-${ui.tab}">${pane(baseWord)}</section>
-      <div class="bv-foot">Spend in Rs Mn. Value additions follow the Spot Log list (-BB, Com Break, DJ, Time Check…); Tag is counted as a <b>${d.tagCommercial ? 'commercial' : 'value addition'}</b>, as ticked in the Spot Log filters. Share of spend compares like with like: a medium, channel, ad length or ad type you pick narrows the category too.</div>
-    </div></div></div>`;
+      <section class="bv-card bv-tabcard" id="bv-tab-${ui.tab}" data-tab="${ui.tab}" aria-label="${esc(tabName || '')}">${pane(baseWord)}</section>
+      <div class="bv-foot">Rs Mn · Value additions follow the Spot Log list; Tag counts as a <b>${d.tagCommercial ? 'commercial' : 'value addition'}</b> (Spot Log tick box) · A medium, channel, ad length or ad type you pick narrows the category too.</div>
+    </div>`;
+    requestAnimationFrame(fit);
   }
+
+  // Page size from the room the list really has, so the page never needs a scroll bar.
+  function fit() {
+    const box = $('bvRows');
+    if (!box) return;
+    const size = Math.max(3, Math.floor(box.clientHeight / Number(box.dataset.rh || 44)));
+    if (size !== ui.pageSize) { ui.pageSize = size; draw(); }
+  }
+  window.addEventListener('resize', () => { if (root.classList.contains('on')) { clearTimeout(fit.t); fit.t = setTimeout(fit, 120); } });
 
   const metricToggle = () => `<span class="bv-seg"><button class="${ui.metric === 'spend' ? 'on' : ''}" data-act="metric" data-v="spend">Spend</button><button class="${ui.metric === 'spots' ? 'on' : ''}" data-act="metric" data-v="spots">Spots</button></span>`;
   const paneHead = (title, hint, right) => `<div class="bv-sh"><h3>${title}</h3><span class="bv-hint">${hint}</span>${right || ''}</div>`;
 
   // 1. Who runs the brand.
   function advertisersPane() {
-    const rows = d.advertisers;
+    const { slice, pager } = paged(d.advertisers);
     return `${paneHead('Advertisers', 'Click an advertiser to see only what it runs', metricToggle())}
       <div class="bv-th bv-th-a"><span>ADVERTISER</span><span class="r">RS MN</span><span class="r">SHARE</span><span class="r">${ui.cmp === 'prev' ? 'VS PREV' : 'VS LY'}</span><span>COMMERCIALS : VA</span><span></span></div>
-      ${rows.map(r => `<div class="bv-tr bv-tr-a"${go({ adv: r.name })}><b>${esc(r.name)}${usTag(r.us)}</b><b class="r">${mnNum(r.cur)}</b><span class="r">${pctS(r.share)}</span><b class="r">${growth(r.cur, baseOf(r))}</b><span class="bv-rt">${ratioBar(r)}<b>${ratioTxt(r)}</b></span><span class="bv-go">›</span></div>`).join('') || '<div class="bv-empty">No advertisers in this selection</div>'}
-      <div class="bv-hint" style="margin-top:8px">If a brand is run by more than one advertiser, each gets its own row.</div>`;
+      ${rowsBox('advertisers', slice.map(r => `<div class="bv-tr bv-tr-a"${go({ adv: r.name })}><b>${esc(r.name)}${usTag(r.us)}</b><b class="r">${mnNum(r.cur)}</b><span class="r">${pctS(r.share)}</span><b class="r">${growth(r.cur, baseOf(r))}</b><span class="bv-rt">${ratioBar(r)}<b>${ratioTxt(r)}</b></span><span class="bv-go">›</span></div>`).join('') || '<div class="bv-empty">No advertisers in this selection</div>')}
+      ${pager}`;
   }
 
-  // 2. Medium split: TV, Radio, Press as three big cards.
+  // 2. Medium split: TV, Radio, Press.
   function mediumPane() {
     const rows = d.mediums, tot = d.head.cur;
     return `${paneHead('Medium split', 'Click a medium to narrow the whole view to it', metricToggle())}
@@ -185,23 +217,19 @@
         <div class="bv-mrow"><span>Commercials : VA</span><b>${ratioTxt(m)}</b></div>${ratioBar(m)}` : ''}</button>`).join('')}</div>`;
   }
 
-  // 3. Channel mix, with how it compares with the category's own mix.
+  // 3. Channel mix, next to how the category itself splits.
   function channelsPane() {
-    const rows = d.channels, top = ui.allCh ? rows : rows.slice(0, 10), rest = rows.slice(10);
-    const tot = d.head.cur, restSum = rest.reduce((a, r) => a + r.cur, 0);
-    const rowHtml = (r, i) => { const k = MED.indexOf(r.medium), idx = r.catShare > 0 && r.share != null ? (r.share / r.catShare) * 100 : null;
-      return `<div class="bv-tr bv-tr-c"${go({ ch: r.key })}><span class="mut">${i + 1}</span><span><b>${esc(r.name)}</b> ${medTag(r.medium)}</span><b class="r">${mnNum(r.cur)}</b>
-      <span class="bv-bw"><span class="bv-bt"><i style="width:${rows[0].cur ? (r.cur / rows[0].cur) * 100 : 0}%;background:${MED_COL[k]}"></i></span><b>${pctS(r.share)}</b></span>
-      <span class="r mut">${pctS(r.catShare)}</span><span class="r">${idx == null ? '–' : `<b class="${idx >= 110 ? 'up' : idx <= 90 ? 'down' : 'flat'}">${nf(idx, 0)}</b>`}</span>
-      <span class="bv-rt">${ratioBar(r)}<b>${ratioTxt(r)}</b></span><b class="r bv-sosl"${go({ ch: r.key, mb: null, brand: null, adv: null, theme: null })} title="Who leads on this channel">${pctS(r.sosHere)}</b><b class="r">${growth(r.cur, baseOf(r))}</b><span class="bv-go">›</span></div>`; };
-    return `${paneHead('Channel mix', `Click a channel to see ${esc(d.name)} on it. Click its SOS to see who leads there.`, metricToggle())}
-      <div class="bv-th bv-th-c"><span>#</span><span>CHANNEL</span><span class="r">RS MN</span><span>SHARE OF ${esc(d.name.toUpperCase().slice(0, 16))}</span><span class="r">CATEGORY MIX</span><span class="r" title="Brand share divided by category share, x100">INDEX</span><span>COMMERCIALS : VA</span><span class="r">SOS HERE</span><span class="r">${ui.cmp === 'prev' ? 'VS PREV' : 'VS LY'}</span><span></span></div>
-      ${top.map(rowHtml).join('') || '<div class="bv-empty">No channels in this selection</div>'}
-      ${!ui.allCh && rest.length ? `<button class="bv-more" data-act="allch">Other channels (${rest.length}) · ${mnTxt(restSum)} · ${pctS(tot ? (restSum / tot) * 100 : 0)} — show all</button>` : ui.allCh && rest.length ? '<button class="bv-more" data-act="allch">Show fewer</button>' : ''}
-      <div class="bv-hint" style="margin-top:8px">Index above 100 means the brand leans on that channel more than the category does. SOS here is the brand's share of everything on that channel.</div>`;
+    const { slice, pager } = paged(d.channels), top = d.channels[0];
+    return `${paneHead('Channel mix', `Click a channel to see ${esc(d.name)} on it`, metricToggle())}
+      <div class="bv-th bv-th-c"><span>#</span><span>CHANNEL</span><span class="r">RS MN</span><span>SHARE OF ${esc(d.name.toUpperCase().slice(0, 16))}</span><span class="r">CATEGORY MIX</span><span>COMMERCIALS : VA</span><span class="r">${ui.cmp === 'prev' ? 'VS PREV' : 'VS LY'}</span><span></span></div>
+      ${rowsBox('channels', slice.map((r, i) => { const k = MED.indexOf(r.medium), n = ui.page * Math.max(3, ui.pageSize) + i + 1;
+        return `<div class="bv-tr bv-tr-c"${go({ ch: r.key })}><span class="mut">${n}</span><span><b>${esc(r.name)}</b> ${medTag(r.medium)}</span><b class="r">${mnNum(r.cur)}</b>
+        <span class="bv-bw"><span class="bv-bt"><i style="width:${top && top.cur ? (r.cur / top.cur) * 100 : 0}%;background:${MED_COL[k]}"></i></span><b>${pctS(r.share)}</b></span>
+        <span class="r mut">${pctS(r.catShare)}</span><span class="bv-rt">${ratioBar(r)}<b>${ratioTxt(r)}</b></span><b class="r">${growth(r.cur, baseOf(r))}</b><span class="bv-go">›</span></div>`; }).join('') || '<div class="bv-empty">No channels in this selection</div>')}
+      ${pager}`;
   }
 
-  // 4. Duration mix, the same way the Spot Log shows it (TV and Radio ads by length), next to the category.
+  // 4. Duration mix, the way the Spot Log shows it, next to the category.
   function durationPane() {
     const u = d.duration, bs = u.buckets;
     const tb = u.brand.counts.reduce((a, b) => a + b, 0), tc = u.cat.counts.reduce((a, b) => a + b, 0);
@@ -214,40 +242,43 @@
         <span class="bv-dn"><b>${esc(d.name)}</b><small>${nf(tb)} ads</small></span>${u.brand.counts.map((c, i) => `<button class="bv-dc me"${go({ dur: bs[i] })}><b>${nf(c)}</b><small>${tb ? nf((c / tb) * 100, 0) : 0}%</small></button>`).join('')}<span class="bv-acd me">${u.brand.acd == null ? 'n/a' : Math.round(u.brand.acd) + 's'}</span>
         <span class="bv-dn"><b>Category</b><small>${nf(tc)} ads</small></span>${u.cat.counts.map((c, i) => `<button class="bv-dc"${go({ dur: bs[i], mb: null, brand: null, adv: null })}><b>${nf(c)}</b><small>${tc ? nf((c / tc) * 100, 0) : 0}%</small></button>`).join('')}<span class="bv-acd">${u.cat.acd == null ? 'n/a' : Math.round(u.cat.acd) + 's'}</span>
       </div>
-      <div class="bv-mini" style="margin-top:16px">SHARE OF ADS BY LENGTH</div>
+      <div class="bv-mini" style="margin-top:12px">SHARE OF ADS BY LENGTH</div>
       <div class="bv-dbars">${bs.map((b, i) => { const a = tb ? u.brand.counts[i] / tb : 0, c = tc ? u.cat.counts[i] / tc : 0; return `<div class="bv-db"><div class="bv-dbb"><i style="height:${(a / mx) * 100}%;background:#E4702A" title="${esc(d.name)} ${nf(a * 100, 0)}%"></i><i style="height:${(c / mx) * 100}%;background:#9AA6C4" title="Category ${nf(c * 100, 0)}%"></i></div><span>${b}</span></div>`; }).join('')}</div>
       <div class="bv-legend"><span><i style="background:#E4702A"></i>${esc(d.name)}</span><span><i style="background:#9AA6C4"></i>Category</span><span class="mut">ACD = average commercial duration (value additions count as 5s when no length is given)</span></div>`;
   }
 
   // 5. The brands (or mother brands) inside, with Commercials and Value additions and the ratio.
   function childrenPane() {
-    const rows = d.children, kids = d.childKind === 'mb' ? 'mother brand' : 'brand';
+    const kids = d.childKind === 'mb' ? 'mother brand' : 'brand';
     const sp = d.head.split, [cS, vS] = cvOf(sp), tS = cS + vS, pc = tS ? (cS / tS) * 100 : 0;
     const fmt = v => (ui.metric === 'spots' ? `${nf(v)} spots` : mnTxt(v));
-    return `${paneHead(`${d.childKind === 'mb' ? 'Mother brands' : 'Brands'} in ${esc(d.name)}`, `Click a ${kids} to open its own full view`, metricToggle())}
+    const { slice, pager } = paged(d.children);
+    return `${paneHead(`${d.childKind === 'mb' ? 'Mother brands' : 'Brands'} in ${esc(d.name)}`, `Click a ${kids} to open its own full view. Click the bar to see only those ads.`, metricToggle())}
       <div class="bv-bigbar"><button class="bv-bp" style="width:${Math.max(pc, 14)}%;background:${CC};color:#fff"${go({ vt: 'C' })}>Commercials · ${fmt(cS)} · ${nf(pc, 0)}%</button><button class="bv-bp" style="width:${Math.max(100 - pc, 14)}%;background:${VC};color:#1A1F36"${go({ vt: 'V' })}>Value additions · ${fmt(vS)} · ${nf(100 - pc, 0)}%</button></div>
-      <div class="bv-hint" style="margin:6px 0 12px">Click either part of the bar to see only those ads and their campaigns.</div>
-      <div class="bv-t bv-t-ch"><div class="bv-th"><span>${kids.toUpperCase()}</span><span class="r">${esc(O.catHelp.short(d.ranges.cur))}</span><span class="r">${ui.cmp === 'prev' ? 'PREVIOUS' : 'LAST YEAR'}</span><span class="r">GROWTH</span><span class="r">SHARE</span><span class="r">${ui.metric === 'spots' ? 'COMM. SPOTS' : 'COMMERCIALS'}</span><span class="r">${ui.metric === 'spots' ? 'VA SPOTS' : 'VALUE ADD.'}</span><span>RATIO</span><span>MONTH BY MONTH</span><span></span></div>
-      ${rows.map(r => `<div class="bv-tr"${go(d.childKind === 'mb' ? { mb: r.name, brand: null, adv: null } : { brand: r.name })}>
+      <div class="bv-th bv-t-chh" style="margin-top:8px"><span>${kids.toUpperCase()}</span><span class="r">${esc(O.catHelp.short(d.ranges.cur))}</span><span class="r">${ui.cmp === 'prev' ? 'PREVIOUS' : 'LAST YEAR'}</span><span class="r">GROWTH</span><span class="r">SHARE</span><span class="r">${ui.metric === 'spots' ? 'COMM. SPOTS' : 'COMMERCIALS'}</span><span class="r">${ui.metric === 'spots' ? 'VA SPOTS' : 'VALUE ADD.'}</span><span>RATIO</span><span>MONTH BY MONTH</span><span></span></div>
+      ${rowsBox('children', slice.map(r => `<div class="bv-tr bv-t-chh"${go(d.childKind === 'mb' ? { mb: r.name, brand: null, adv: null } : { brand: r.name })}>
         <span class="bv-nm"><b>${esc(r.name)}</b>${usTag(r.us)}${r.sub ? `<br><small>${esc(r.sub)}</small>` : ''}</span>
         <b class="r">${mnNum(r.cur)}</b><span class="r mut">${baseOf(r) > 0 ? mnNum(baseOf(r)) : '–'}</span><b class="r">${growth(r.cur, baseOf(r))}</b><b class="r">${pctS(r.share)}</b>
         <span class="r">${ui.metric === 'spots' ? nf(r.Cn) : mnNum(r.C)}</span><span class="r">${ui.metric === 'spots' ? nf(r.Vn) : mnNum(r.V)}</span>
-        <span class="bv-rt">${ratioBar(r, 110)}<b>${ratioTxt(r)}</b></span><span>${spark(r.monthly, 110, 30)}</span><span class="bv-go">›</span></div>`).join('') || '<div class="bv-empty">No spend in this selection</div>'}</div>
-      <div class="bv-legend"><span><i style="background:${CC}"></i>Commercials</span><span><i style="background:${VC}"></i>Value additions</span><span class="mut">Ratio by ${ui.metric}. Compared with ${ui.cmp === 'prev' ? 'the previous period' : 'last year'}.</span></div>`;
+        <span class="bv-rt">${ratioBar(r, 100)}<b>${ratioTxt(r)}</b></span><span>${spark(r.monthly, 100, 28)}</span><span class="bv-go">›</span></div>`).join('') || '<div class="bv-empty">No spend in this selection</div>')}
+      ${pager}`;
   }
 
   function campaignsPane() {
-    const rows = d.campaigns[ui.ctab], n = d.adType.counts;
-    return `${paneHead('Campaigns', 'Click a campaign to see where and when it ran', `<span class="bv-seg"><button class="${ui.ctab === 'C' ? 'on c' : ''}" data-act="ctab" data-v="C">Commercials ${n.C}</button><button class="${ui.ctab === 'V' ? 'on v' : ''}" data-act="ctab" data-v="V">Value additions ${n.V}</button></span>`)}
+    const all = d.campaigns[ui.ctab], n = d.adType.counts;
+    const { slice, pager } = paged(all);
+    return `${paneHead('Campaigns', 'Click a campaign to see where it ran', `<span class="bv-seg"><button class="${ui.ctab === 'C' ? 'on c' : ''}" data-act="ctab" data-v="C">Commercials ${n.C}</button><button class="${ui.ctab === 'V' ? 'on v' : ''}" data-act="ctab" data-v="V">Value additions ${n.V}</button></span>`)}
       <div class="bv-th bv-th-k"><span>${ui.ctab === 'C' ? 'COMMERCIAL' : 'VALUE ADDITION'} (ADVT_THEME)</span><span class="r">RS MN</span><span class="r">SHARE</span><span class="r">SPOTS</span><span></span></div>
-      ${rows.map(r => `<div class="bv-tr bv-tr-k"${go({ theme: r.name, adv: r.advertiser })}><span><b>${esc(r.name)}</b>${usTag(r.us)}<br><small>${esc(r.advertiser)}</small></span><b class="r">${mnNum(r.cur)}</b><span class="r">${pctS(r.share)}</span><span class="r">${nf(r.spots)}</span><span class="bv-go">›</span></div>`).join('') || `<div class="bv-empty">No ${ui.ctab === 'C' ? 'commercials' : 'value additions'} in this selection</div>`}
-      ${n[ui.ctab] > 50 ? `<div class="bv-hint" style="margin-top:6px">Top 50 of ${n[ui.ctab]} shown.</div>` : ''}`;
+      ${rowsBox('campaigns', slice.map(r => `<div class="bv-tr bv-tr-k"${go({ theme: r.name, adv: r.advertiser })}><span><b>${esc(r.name)}</b>${usTag(r.us)}<br><small>${esc(r.advertiser)}</small></span><b class="r">${mnNum(r.cur)}</b><span class="r">${pctS(r.share)}</span><span class="r">${nf(r.spots)}</span><span class="bv-go">›</span></div>`).join('') || `<div class="bv-empty">No ${ui.ctab === 'C' ? 'commercials' : 'value additions'} in this selection</div>`)}
+      ${pager}`;
   }
 
   function monthsPane() {
-    const ms = d.monthsList;
-    return `${paneHead('Months', ms.length === 1 ? 'Already narrowed to one month' : 'Click a month to narrow the whole view to it', metricToggle())}
-      <div class="bv-mtiles">${ms.map(m => { const [c, v] = ui.metric === 'spots' ? [m.Cn, m.Vn] : [m.C, m.V], t = c + v; return `<button class="bv-mt2"${go({ from: m.key, to: m.key })}><span class="mut">${esc(m.label)} ${m.year}</span><b>${mnNum(m.spend)}</b> ${growth(m.spend, m.yoy)}<small>SOS ${pctS(m.sos, 1)} · ${t ? `${nf((c / t) * 100, 0)} : ${nf((v / t) * 100, 0)}` : '–'}</small></button>`; }).join('')}</div>`;
+    const { slice, pager } = paged(d.monthsList);
+    return `${paneHead('Months', d.monthsList.length === 1 ? 'Already narrowed to one month' : 'Click a month to narrow the whole view to it', metricToggle())}
+      <div class="bv-th bv-th-m"><span>MONTH</span><span class="r">RS MN</span><span class="r">${ui.cmp === 'prev' ? 'SAME MONTH LY' : 'SAME MONTH LY'}</span><span class="r">GROWTH</span><span class="r">SOS</span><span>COMMERCIALS : VA</span><span></span></div>
+      ${rowsBox('months', slice.map(m => { const [c, v] = ui.metric === 'spots' ? [m.Cn, m.Vn] : [m.C, m.V], t = c + v; return `<div class="bv-tr bv-th-m"${go({ from: m.key, to: m.key })}><b>${esc(m.label)} ${m.year}</b><b class="r">${mnNum(m.spend)}</b><span class="r mut">${m.yoy > 0 ? mnNum(m.yoy) : '–'}</span><b class="r">${growth(m.spend, m.yoy)}</b><span class="r">${pctS(m.sos, 1)}</span><span class="bv-rt">${ratioBar({ C: m.C, V: m.V, Cn: m.Cn, Vn: m.Vn })}<b>${t ? `${nf((c / t) * 100, 0)} : ${nf((v / t) * 100, 0)}` : '–'}</b></span><span class="bv-go">›</span></div>`; }).join('') || '<div class="bv-empty">No months</div>')}
+      ${pager}`;
   }
 
   // ---------- clicks ----------
@@ -257,7 +288,7 @@
     try {
       if (!window.htmlToImage) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = '/vendor/html-to-image/html-to-image.js'; s.onload = res; s.onerror = () => rej(new Error('Could not load the picture tool')); document.head.appendChild(s); });
       O.toast('Preparing picture…');
-      const url = await window.htmlToImage.toJpeg(node, { quality: 0.92, backgroundColor: '#F4F6FA', pixelRatio: 1.5, filter: n => !(n.classList && n.classList.contains('bv-sticky')) });
+      const url = await window.htmlToImage.toJpeg(node, { quality: 0.92, backgroundColor: '#F4F6FA', pixelRatio: 1.5, filter: n => !(n.classList && n.classList.contains('bv-bar')) });
       const a = document.createElement('a');
       a.href = url; a.download = `Brand_view_${(d.name || 'view').replace(/[^A-Za-z0-9]+/g, '_')}.jpg`; a.click();
     } catch (e) { O.toast('Export failed: ' + e.message); }
@@ -268,27 +299,30 @@
     if (act) {
       const a = act.dataset.act, v = act.dataset.v;
       if (a === 'close') close();
-      else if (a === 'back') { if (stack.length > 1) { stack.pop(); load(); } else close(); }
-      else if (a === 'trail') { stack.length = Number(act.dataset.i) + 1; load(); }
+      else if (a === 'back') { if (stack.length > 1) { stack.pop(); ui.page = 0; load(); } else close(); }
+      else if (a === 'trail') { stack.length = Number(act.dataset.i) + 1; ui.page = 0; load(); }
       else if (a === 'cmp') { ui.cmp = v; draw(); }
+      else if (a === 'page') { ui.page = Math.max(0, ui.page + Number(v)); draw(); }
+      else if (a === 'dismiss') { stack[stack.length - 1].note = ''; draw(); }
       else if (a === 'metric') { ui.metric = v; draw(); }
-      else if (a === 'ctab') { ui.ctab = v; draw(); }
-      else if (a === 'allch') { ui.allCh = !ui.allCh; draw(); }
+      else if (a === 'ctab') { ui.ctab = v; ui.page = 0; draw(); }
       else if (a === 'jpg') exportJpg();
-      else if (a === 'tab') { ui.tab = v; draw(); }
+      else if (a === 'tab') { ui.tab = v; ui.page = 0; stack[stack.length - 1].note = ''; draw(); }
       return;
     }
     const g = t.closest('[data-go]');
     if (g) {
       const add = JSON.parse(g.dataset.go);
-      if (add.vt) { ui.ctab = add.vt; ui.tab = 'campaigns'; }
       push(add, labelFor(add));
       return;
     }
     const st = t.closest('[data-set]');
     if (st) {
       const top = stack[stack.length - 1];
-      for (const [k, v] of Object.entries(JSON.parse(st.dataset.set))) { if (v == null) delete top.scope[k]; else top.scope[k] = v; }
+      const set = JSON.parse(st.dataset.set);
+      for (const [k, v] of Object.entries(set)) { if (v == null) delete top.scope[k]; else top.scope[k] = v; }
+      top.note = set.medium ? `Narrowed to <b>${esc(set.medium)}</b>: every tab now shows ${esc(set.medium)} only.` : 'Showing all media again.';
+      ui.page = 0;
       load();
     }
   });
