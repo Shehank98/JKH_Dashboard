@@ -177,16 +177,34 @@
     setUploadStatus(`Reading ${file.name} on this computer…`);
     busyChip('Reading file · 0%');
     try {
-      const r = await engine.call('ingest', { file }, p => {
+      const onProg = p => {
         const pct = Math.round(p.pct * 100);
         setProgress(pct);
         setUploadStatus(p.saving ? `Saving ${nf(p.rows)} rows in this browser…` : `Reading ${file.name}: ${pct}% · ${nf(p.rows)} rows`);
         busyChip(`Reading file · ${pct}%`);
-      });
+      };
+      let r = await engine.call('ingest', { file }, onProg);
+      if (r.needsMap) {
+        // Every brand must have a mother brand in the shared Brand Map before the file is loaded.
+        setProgress(-1);
+        setUploadStatus('Checking brands against the shared Brand Map…');
+        busyChip('Checking brands');
+        let map;
+        try { map = await window.BRANDMAP.confirm(r.pairs, file.name); } catch (e) { await engine.call('cancelIngest'); throw new Error('Could not check brands with the shared Brand Map: ' + e.message); }
+        if (!map) {
+          await engine.call('cancelIngest');
+          setUploadStatus('Cancelled. Nothing was loaded, your current data is unchanged.');
+          $('uploadBtn').disabled = false;
+          return;
+        }
+        r = await engine.call('commitIngest', { map: map.rows, version: map.version }, onProg);
+        if (r.category) document.dispatchEvent(new CustomEvent('orbit:catrefresh', { detail: { dataset: r.category.dataset, fresh: true } }));
+      }
       pendingFile = null; $('fileInput').value = '';
       $('dropText').textContent = 'Drop .xlsx or .csv here, or click to choose';
       renderDataFile(r.dataset);
       setUploadStatus(`Loaded ${nf(r.dataset.rows)} rows in ${nf(r.dataset.parseMs / 1000, 1)}s.` +
+        (r.needsMap === false ? ' This file has no Product column, so the Category dashboard was not updated.' : '') +
         (r.saved ? '' : ' It could not be saved in this browser, so it will be gone after you close the tab.'), !r.saved);
       await loadOverview(true);
     } catch (e) {

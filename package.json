@@ -15,7 +15,8 @@
     "check": "node scripts/check-drilldowns.js samples/sample_420000.csv",
     "verify": "node scripts/verify-drilldowns.js samples/sample_420000.csv",
     "test:category": "node scripts/category-test.js",
-    "sample:category": "node scripts/generate-category-sample.js"
+    "sample:category": "node scripts/generate-category-sample.js",
+    "test:brandmap": "node scripts/brandmap-test.js"
   },
   "engines": {
     "node": "22.x"

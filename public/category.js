@@ -88,9 +88,9 @@
       <div class="row"><span>${nf(ds.rows)} rows</span><span>${ds.size ? nf(ds.size / 1048576, 1) + ' MB' : ''}</span></div>
       <div class="row"><span>${monLabel(ds.minMonth)} to ${monLabel(ds.maxMonth)}</span></div>
       <div class="row"><span>Loaded ${new Date(ds.uploadedAt).toLocaleString()}</span></div>
-      <div class="row"><span>Saved in this browser only</span></div>
+      <div class="row"><span>${ds.derived ? 'Built from your main file and the Brand Map' : 'Saved in this browser only'}</span></div>
       ${ds.skipped ? `<div class="row"><span>${nf(ds.skipped)} rows skipped (invalid month)</span></div>` : ''}</div>`
-      : '<div class="dfile" style="color:#6E7A99">No category file loaded</div>';
+      : '<div class="dfile" style="color:#6E7A99">No category data yet. Load your main data file (Spot Log) and it is built from that.</div>';
     $('cDeleteBtn').disabled = !ds;
     $('catDataDot').style.display = ds ? 'none' : '';
   }
@@ -1311,10 +1311,16 @@
       renderFile(s.dataset);
       started = true;
       if (s.dataset) await loadOverview(false); else { showEmpty(); }
+      if (window.BRANDMAP) window.BRANDMAP.sync();
       let mode = shared ? 'cat' : null;
       if (!shared) { try { mode = localStorage.getItem(MODE); } catch (e) { /* storage unavailable */ } }
       if (mode === 'cat') { document.body.classList.add('mode-cat'); applyModeText(); ensureStarted(); }
     } catch (e) { toast('Category data: ' + e.message); }
   }
+  // The main file was loaded (or the shared Brand Map changed): the Category data was rebuilt, so show it.
+  document.addEventListener('orbit:catrefresh', async e => {
+    renderFile(e.detail.dataset);
+    if (started) { try { await loadOverview(!!e.detail.fresh); } catch (err) { toast('Category data: ' + err.message); } }
+  });
   if (O.ready) boot(); else document.addEventListener('orbit:ready', boot, { once: true });
 })();

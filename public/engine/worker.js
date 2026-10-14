@@ -7,7 +7,7 @@
 importScripts('/vendor/jszip/jszip.min.js');
 
 // ---- a tiny CommonJS loader for the shared modules ----
-const LIB = ['derive', 'builder', 'compute', 'planning', 'competitor', 'category-builder', 'category', 'browser-readers'];
+const LIB = ['derive', 'brand-derive', 'builder', 'compute', 'planning', 'competitor', 'category-builder', 'category', 'browser-readers'];
 const SRC = {}, CACHE = {};
 function requireLib(name) {
   if (name === 'jszip') return self.JSZip;
@@ -53,6 +53,7 @@ async function idbDo(mode, fn) {
 
 let owner = 'local';
 let dataset = null;
+let pending = null; // a file that has been read but whose brands are not confirmed yet
 let catDataset = null; // the Category file, saved under the same person with a ':category' suffix
 const isoDay = d => new Date(d * 86400000).toISOString().slice(0, 10);
 const describe = ds => (ds ? { ...ds.meta, minDate: isoDay(ds.meta.minDay), maxDate: isoDay(ds.meta.maxDay), storedIn: 'browser' } : null);
@@ -66,14 +67,58 @@ const handlers = {
     if (saved && saved.cols && saved.dicts && saved.meta) dataset = saved;
     return { dataset: describe(dataset), storageError };
   },
+  // Step 1 of loading a main file: read it and list its brands. Nothing is saved until commitIngest, because the
+  // brands must first be confirmed in the shared Brand Map. A file with no Product column loads straight away.
   async ingest({ file }, progress) {
     const { readSpotFile } = requireLib('browser-readers');
     const ds = await readSpotFile(file, (pct, rows) => progress({ pct, rows }));
-    dataset = ds;
-    let saved = true, storageError = null;
-    progress({ pct: 1, rows: ds.meta.rows, saving: true });
-    try { await idbDo('readwrite', s => s.put(ds, owner)); } catch (e) { saved = false; storageError = e.message; }
-    return { dataset: describe(ds), saved, storageError };
+    if (!ds.meta.hasProduct) {
+      pending = null;
+      return { needsMap: false, ...(await saveSpot(ds, progress)) };
+    }
+    pending = ds;
+    const { dicts, cols } = ds;
+    const seen = new Set(), pairs = [];
+    const nProd = dicts.product.length;
+    for (let i = 0; i < cols.pg.length; i++) {
+      const k = cols.pg[i] * nProd + cols.product[i];
+      if (seen.has(k)) continue;
+      seen.add(k);
+      pairs.push([dicts.pg[cols.pg[i]], dicts.product[cols.product[i]]]);
+    }
+    return { needsMap: true, pairs, rows: ds.meta.rows, fileName: ds.meta.fileName };
+  },
+  // Step 2: the brands are confirmed. Save the file, then build the Category data from it with the confirmed map.
+  async commitIngest({ map, version }, progress) {
+    if (!pending) throw new Error('No file is waiting to be loaded. Please choose the file again.');
+    const ds = pending;
+    pending = null;
+    const out = await saveSpot(ds, progress);
+    const cat = await buildCategory(map, version);
+    return { ...out, category: cat };
+  },
+  // What the Category data currently is, so the page can tell when the Brand Map has moved on.
+  catStatus() { return { derived: !!(catDataset && catDataset.meta.derived), mapVersion: catDataset ? catDataset.meta.mapVersion : null, canDerive: !!(dataset && dataset.dicts.product) }; },
+  async cancelIngest() { pending = null; return { ok: true }; },
+  // The Brand Map changed (someone edited it): rebuild the Category data from the saved main file.
+  async rederiveCategory({ map, version }) {
+    if (!dataset || !dataset.dicts.product) return { category: null };
+    return { category: await buildCategory(map, version) };
+  },
+  // Reads a Category file only to list its product group, brand, mother brand and sub category (to fill the Brand Map).
+  async readMapping({ file }, progress) {
+    const { readCategoryFile } = requireLib('browser-readers');
+    const ds = await readCategoryFile(file, (pct, rows) => progress({ pct, rows }));
+    const { dicts, cols } = ds;
+    const seen = new Set(), rows = [];
+    for (let i = 0; i < cols.mb.length; i++) {
+      const k = cols.pg[i] * 1e8 + cols.brand[i];
+      if (seen.has(k)) continue;
+      seen.add(k);
+      const brand = dicts.brand[cols.brand[i]], sub = dicts.sub[cols.sub[i]];
+      rows.push([dicts.pg[cols.pg[i]], brand, dicts.mb[cols.mb[i]], !sub || sub === '(none)' ? '' : sub]);
+    }
+    return { rows, skipped: ds.meta.skipped };
   },
   async clear() {
     dataset = null;
@@ -120,6 +165,27 @@ const handlers = {
 };
 const monKey = m => `${Math.floor(m / 12)}-${String((m % 12) + 1).padStart(2, '0')}`;
 const describeCat = ds => (ds ? { ...ds.meta, minMonth: monKey(ds.meta.minMon), maxMonth: monKey(ds.meta.maxMon), storedIn: 'browser' } : null);
+
+async function saveSpot(ds, progress) {
+  dataset = ds;
+  let saved = true, storageError = null;
+  progress({ pct: 1, rows: ds.meta.rows, saving: true });
+  try { await idbDo('readwrite', s => s.put(ds, owner)); } catch (e) { saved = false; storageError = e.message; }
+  return { dataset: describe(ds), saved, storageError };
+}
+// Category data derived from the saved main file, using the shared Brand Map (rows of [pg, brand, mother, sub]).
+async function buildCategory(map, version) {
+  const { deriveCategory, keyOf } = requireLib('brand-derive');
+  const lookup = new Map();
+  for (const r of map || []) lookup.set(keyOf(r[0], r[1]), { mother: r[2], sub: r[3] });
+  const m = dataset.meta;
+  const cat = deriveCategory(dataset, (pg, brand) => lookup.get(keyOf(pg, brand)) || null,
+    { fileName: m.fileName, size: m.size, uploadedAt: m.uploadedAt, mapVersion: version });
+  catDataset = cat;
+  let saved = true, storageError = null;
+  try { await idbDo('readwrite', s => s.put(cat, owner + ':category')); } catch (e) { saved = false; storageError = e.message; }
+  return { dataset: describeCat(cat), saved, storageError };
+}
 function needCat() {
   if (!catDataset) throw new Error('No category file loaded yet. Open Filters, Data file, and choose your category file.');
   return catDataset;

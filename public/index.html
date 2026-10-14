@@ -372,6 +372,7 @@ tr.me .sharebar{background:#FF8A3D}
 .exporting .acc{overflow:hidden}
 </style>
 <link rel="stylesheet" href="category.css?v=1">
+<link rel="stylesheet" href="brandmap.css?v=1">
 </head>
 <body>
 
@@ -530,7 +531,8 @@ tr.me .sharebar{background:#FF8A3D}
         <div class="btnrow"><button class="btn ghost" id="cDeleteBtn" disabled>Remove data</button></div>
       </div>
       <div class="sec">
-        <div class="sech">Load a file</div>
+        <div class="sech">Load a Category file (optional)</div>
+        <div class="cnote">The Category dashboard is built automatically from your main data file once its brands are confirmed in the Brand Map. Load a separate Category file only if you want to use your own.</div>
         <label class="drop" id="cDrop" for="cFileInput">
           <span id="cDropText">Drop .xlsx or .csv here, or click to choose</span>
           <small>Read on this computer, never sent to the server · only you see it</small>
@@ -559,6 +561,7 @@ tr.me .sharebar{background:#FF8A3D}
     <img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub">
   </div>
   <button class="modebtn" id="modeBtn" title="Switch between the spot log dashboard and the category dashboard"><span class="mi">⇄</span><span id="modeTxt">Switch to Category</span></button>
+  <button class="modebtn bmbtn" data-open-brandmap title="Mother brand and sub category for every brand (shared by everyone)"><span class="mi">🏷</span><span>Brand map</span></button>
   <label class="fbtn spot-only" for="drawerToggle" id="filterBtn">☰ Filters</label>
   <label class="fbtn cat-only" for="catDrawerToggle" id="catFilterBtn">☰ Filters</label>
   <div class="daterange cat-only">
@@ -759,9 +762,12 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
+<div class="bmmodal" id="bmConfirm"></div>
+<div class="bmmodal" id="bmPage"></div>
 <div class="cmodal" id="catModal"><div class="cmbox" id="catModalBox"></div></div>
 
-<script src="app.js?v=32"></script>
-<script src="category.js?v=1"></script>
+<script src="app.js?v=33"></script>
+<script src="brandmap.js?v=1"></script>
+<script src="category.js?v=2"></script>
 </body>
 </html>
