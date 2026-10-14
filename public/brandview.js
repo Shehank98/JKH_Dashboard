@@ -78,7 +78,8 @@
     for (const [k, v] of Object.entries(add)) { if (v == null) delete next[k]; else next[k] = v; }
     const [tab, note] = landing(add, label);
     stack.push({ scope: next, label: label || '', note });
-    ui.tab = tab; ui.page = 0;
+    if (tab) ui.tab = tab;
+    ui.page = 0;
     if (add.vt) ui.ctab = add.vt;
     load();
   }
@@ -128,7 +129,8 @@
     if (add.medium) return ['channels', `Showing the channels that carried <b>${esc(label)}</b>.`];
     if (add.dur) return ['channels', `Showing the channels that carried <b>${esc(label)}</b>.`];
     if (add.from) return ['medium', `Showing the medium split for <b>${esc(label)}</b>.`];
-    return ['advertisers', `Showing who runs <b>${esc(label)}</b>.`];
+    // A brand, mother brand, advertiser or rival: stay on the tab you are on, now for that one.
+    return [null, `Staying on <b>{tab}</b>.`];
   }
 
   function draw() {
@@ -158,6 +160,7 @@
           <span class="bv-seg"><button class="${ui.cmp === 'yoy' ? 'on' : ''}" data-act="cmp" data-v="yoy">vs last year</button><button class="${ui.cmp === 'prev' ? 'on' : ''}" data-act="cmp" data-v="prev">vs previous</button></span>
           <span class="bv-seg"><button class="${scope.medium ? '' : 'on'}"${setA({ medium: null })}>All media</button>${MED.map(m => `<button class="${scope.medium === m ? 'on' : ''}"${setA({ medium: m })}>${m}</button>`).join('')}</span>
           <button class="bv-btn" data-act="jpg" title="Download this view as a picture">Export JPG</button>
+          <button class="bv-x" data-act="close" aria-label="Close" title="Close">✕</button>
         </div>
       </div>
       <div class="bv-tabs bv-main-tabs" role="tablist">${tabs.map(([k, n, c], i) => `${i === 5 ? '<span class="bv-tsep"></span>' : ''}<button role="tab" aria-selected="${ui.tab === k}" class="${ui.tab === k ? 'on' : ''}" data-act="tab" data-v="${k}">${n}${c != null ? ` <em>${c}</em>` : ''}</button>`).join('')}</div>
@@ -174,7 +177,7 @@
         </div>
       </div>
       ${jumpRow()}
-      ${top.note ? `<div class="bv-note"><span>▸ You opened <b>${esc(top.label || d.name)}</b>. ${top.note}</span><button data-act="dismiss" aria-label="Dismiss">✕</button></div>` : ''}
+      ${top.note ? `<div class="bv-note"><span>▸ You opened <b>${esc(top.label || d.name)}</b>. ${top.note.replace('{tab}', esc(tabName || ''))}</span><button data-act="dismiss" aria-label="Dismiss">✕</button></div>` : ''}
 
       <section class="bv-card bv-tabcard" id="bv-tab-${ui.tab}" data-tab="${ui.tab}" aria-label="${esc(tabName || '')}">${pane(baseWord)}</section>
       <div class="bv-foot">Rs Mn · Value additions follow the Spot Log list; Tag counts as a <b>${d.tagCommercial ? 'commercial' : 'value addition'}</b> (Spot Log tick box) · A medium, channel, ad length or ad type you pick narrows the category too.</div>
@@ -184,9 +187,11 @@
 
   // Page size from the room the list really has, so the page never needs a scroll bar.
   function fit() {
-    const box = $('bvRows');
-    if (!box) return;
-    const size = Math.max(3, Math.floor(box.clientHeight / Number(box.dataset.rh || 44)));
+    const box = $('bvRows'), wrap = $('bvBody');
+    if (!box || !wrap) return;
+    // The card is as tall as its content, up to the window; the rows get what is left once everything else is placed.
+    const maxH = Math.floor(window.innerHeight * 0.95), others = wrap.scrollHeight - box.offsetHeight;
+    const size = Math.max(3, Math.floor((maxH - others - 6) / Number(box.dataset.rh || 44)));
     if (size !== ui.pageSize) { ui.pageSize = size; draw(); }
   }
   window.addEventListener('resize', () => { if (root.classList.contains('on')) { clearTimeout(fit.t); fit.t = setTimeout(fit, 120); } });
@@ -308,6 +313,7 @@
   }
   root.addEventListener('click', e => {
     const t = e.target;
+    if (t === root) { close(); return; }
     const act = t.closest('[data-act]');
     if (act) {
       const a = act.dataset.act, v = act.dataset.v;
