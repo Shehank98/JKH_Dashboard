@@ -69,6 +69,7 @@ function start(auth, brandmap, shares) {
   });
 
   app.use('/api/brandmap', brandmap.router(express));
+  app.use('/api/ai', require('./server/ai').router(express));
 
   // Signed-in check for the page (data lives in the browser, not here).
   app.get('/api/status', (req, res) => res.json({ ok: true, data: 'browser' }));
