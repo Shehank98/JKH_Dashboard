@@ -5,6 +5,7 @@ const express = require('express');
 const compression = require('compression');
 const { createAuth } = require('./server/auth');
 const { createBrandMap } = require('./server/brandmap');
+const { createShares } = require('./server/shares');
 
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, 'data'));
@@ -13,21 +14,25 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 // Spot-log files are read and analysed in each person's browser (public/engine/worker.js), so people never
 // see or overwrite each other's data and the server holds no datasets. The server handles sign-in and
 // serves the app, including the shared calculation code the browser runs.
-const ENGINE_LIB = ['derive', 'brand-derive', 'builder', 'compute', 'planning', 'competitor', 'category-builder', 'category', 'browser-readers'];
+const ENGINE_LIB = ['derive', 'brand-derive', 'cube', 'builder', 'compute', 'planning', 'competitor', 'category-builder', 'category', 'browser-readers'];
 // Where "Send to planning tool" opens. The planning tool must list this dashboard's address as allowed.
 const PLANNING_TOOL_URL = (process.env.PLANNING_TOOL_URL || 'https://media-planing-v2-copy-production.up.railway.app').replace(/\/+$/, '');
 
 // Sign-in is on unless AUTH_DISABLED=1 (local development and automated tests only).
 const AUTH_DISABLED = process.env.AUTH_DISABLED === '1';
 // Routes are set up once the sign-in store has loaded (Postgres when DATABASE_URL is set).
-function start(auth, brandmap) {
+function start(auth, brandmap, shares) {
   const app = express();
   app.set('trust proxy', 1); // Railway terminates HTTPS in front of the app; needed for secure cookies
   app.use(compression());
-  app.use(express.json({ limit: '8mb' }));
+  const json = express.json({ limit: '8mb' });
+  app.use((req, res, next) => (req.path.startsWith('/api/shared-dashboards') ? next() : json(req, res, next)));
   const PUBLIC_DIR = path.join(__dirname, 'public');
   app.get('/healthz', (req, res) => res.json({ ok: true, accounts: auth ? auth.storage : 'off' })); // Railway health check, open without sign-in
   const sendPage = name => (req, res) => { res.setHeader('Cache-Control', 'no-cache'); res.sendFile(path.join(PUBLIC_DIR, name)); };
+  // Shared client dashboards: the link itself is the credential (the agency routes check sign-in inside).
+  app.use('/api/shared-dashboards', shares.router(express, auth));
+  app.get('/share/:token', sendPage('index.html'));
   if (auth) {
     app.use('/api/auth', auth.router(express));
     app.use('/api/admin', auth.adminRouter(express));
@@ -103,5 +108,13 @@ function start(auth, brandmap) {
     console.error('Could not open the Brand Map store:', e.message);
     process.exit(1);
   }
-  start(auth, brandmap);
+  let shares;
+  try {
+    shares = await createShares(DATA_DIR);
+    console.log(`Shared dashboards are stored in ${shares.storage}`);
+  } catch (e) {
+    console.error('Could not open the shared dashboards store:', e.message);
+    process.exit(1);
+  }
+  start(auth, brandmap, shares);
 })();

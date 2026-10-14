@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ogilvy Orbit – Chub</title>
-<link rel="icon" href="favicon.png">
-<link rel="stylesheet" href="vendor/inter/400.css">
-<link rel="stylesheet" href="vendor/inter/500.css">
-<link rel="stylesheet" href="vendor/inter/600.css">
-<link rel="stylesheet" href="vendor/inter/700.css">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/vendor/inter/400.css">
+<link rel="stylesheet" href="/vendor/inter/500.css">
+<link rel="stylesheet" href="/vendor/inter/600.css">
+<link rel="stylesheet" href="/vendor/inter/700.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{background:#F4F6FA;overflow:hidden}
@@ -371,8 +371,9 @@ tr.me .sharebar{background:#FF8A3D}
 .exporting .card{opacity:1}
 .exporting .acc{overflow:hidden}
 </style>
-<link rel="stylesheet" href="category.css?v=1">
-<link rel="stylesheet" href="brandmap.css?v=1">
+<link rel="stylesheet" href="/category.css?v=1">
+<link rel="stylesheet" href="/brandmap.css?v=1">
+<link rel="stylesheet" href="/share.css?v=1">
 </head>
 <body>
 
@@ -381,7 +382,7 @@ tr.me .sharebar{background:#FF8A3D}
 <div class="drawer" id="drawer">
   <div class="dhead">
     <label class="closeX" for="drawerToggle">✕</label>
-    <div class="brand"><img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"></div>
+    <div class="brand"><img src="/ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"></div>
     <div class="tabs">
       <button class="tab on" data-pane="paneFilters">Filters</button>
       <button class="tab" data-pane="paneData">Data file<span class="dot" id="dataDot" style="display:none"></span></button>
@@ -436,8 +437,15 @@ tr.me .sharebar{background:#FF8A3D}
         </div>
         <div class="flabel">Channel</div>
         <select class="inp" id="fChannel"></select>
-        <div class="flabel">Daypart</div>
-        <select class="inp" id="fDaypart"></select>
+        <div id="fDaypartWrap"><div class="flabel">Daypart</div>
+        <select class="inp" id="fDaypart"></select></div>
+      </div>
+      <div class="sec" id="secBrand" style="display:none">
+        <div class="sech"><span class="n">4</span> Brands</div>
+        <div class="flabel">Mother brand</div>
+        <select class="inp" id="fMb"></select>
+        <div id="fSubWrap"><div class="flabel">Sub category</div>
+        <select class="inp" id="fSub"></select></div>
       </div>
     </div>
 
@@ -478,7 +486,7 @@ tr.me .sharebar{background:#FF8A3D}
 <div class="drawer" id="catDrawer">
   <div class="dhead">
     <label class="closeX" for="catDrawerToggle">✕</label>
-    <div class="brand"><img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"></div>
+    <div class="brand"><img src="/ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"></div>
     <div class="brandsub">Category dashboard</div>
     <div class="tabs">
       <button class="ctab on" data-pane="cpFilters">Filters</button>
@@ -558,9 +566,10 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="topbar">
   <div class="logo">
-    <img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub">
+    <img src="/ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub">
   </div>
   <button class="modebtn" id="modeBtn" title="Switch between the spot log dashboard and the category dashboard"><span class="mi">⇄</span><span id="modeTxt">Switch to Category</span></button>
+  <div class="sharebanner" id="shareBanner"></div>
   <button class="modebtn bmbtn" data-open-brandmap title="Mother brand and sub category for every brand (shared by everyone)"><span class="mi">🏷</span><span>Brand map</span></button>
   <label class="fbtn spot-only" for="drawerToggle" id="filterBtn">☰ Filters</label>
   <label class="fbtn cat-only" for="catDrawerToggle" id="catFilterBtn">☰ Filters</label>
@@ -731,7 +740,7 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="overlay" id="overlay">
   <div class="ovcard">
-    <img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub" class="ovlogo">
+    <img src="/ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub" class="ovlogo">
     <h2 id="ovTitle">No data uploaded yet</h2>
     <p id="ovText">Open the filter drawer and upload your spot log as .xlsx or .csv. Large files (400k+ rows) take up to a minute to process.</p>
     <label class="fbtn" for="drawerToggle" id="ovBtn">☰ Open Filters</label>
@@ -762,12 +771,14 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
+<div class="bmmodal" id="shareModal"></div>
 <div class="bmmodal" id="bmConfirm"></div>
 <div class="bmmodal" id="bmPage"></div>
 <div class="cmodal" id="catModal"><div class="cmbox" id="catModalBox"></div></div>
 
-<script src="app.js?v=33"></script>
-<script src="brandmap.js?v=1"></script>
-<script src="category.js?v=2"></script>
+<script src="/app.js?v=34"></script>
+<script src="/brandmap.js?v=1"></script>
+<script src="/share.js?v=1"></script>
+<script src="/category.js?v=2"></script>
 </body>
 </html>

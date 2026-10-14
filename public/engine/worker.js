@@ -7,7 +7,7 @@
 importScripts('/vendor/jszip/jszip.min.js');
 
 // ---- a tiny CommonJS loader for the shared modules ----
-const LIB = ['derive', 'brand-derive', 'builder', 'compute', 'planning', 'competitor', 'category-builder', 'category', 'browser-readers'];
+const LIB = ['derive', 'brand-derive', 'cube', 'builder', 'compute', 'planning', 'competitor', 'category-builder', 'category', 'browser-readers'];
 const SRC = {}, CACHE = {};
 function requireLib(name) {
   if (name === 'jszip') return self.JSZip;
@@ -96,6 +96,21 @@ const handlers = {
     const out = await saveSpot(ds, progress);
     const cat = await buildCategory(map, version);
     return { ...out, category: cat };
+  },
+  // ---- shared client dashboards ----
+  // The data cube for the loaded file: monthly records only (see cube.js), with mother brand and sub category from the Brand Map.
+  buildCube({ map, pg, level }) {
+    const { keyOf } = requireLib('brand-derive');
+    const lookup = new Map();
+    for (const r of map || []) lookup.set(keyOf(r[0], r[1]), { mother: r[2], sub: r[3] });
+    const t = Date.now();
+    const cube = requireLib('cube').buildCube(need(), (g, b) => lookup.get(keyOf(g, b)) || null, { pg: pg || '', level });
+    return { cube, ms: Date.now() - t };
+  },
+  // The client's side: a cube replaces the dataset in memory only (nothing is saved in this browser).
+  initShared({ cube }) {
+    dataset = requireLib('cube').unpackCube(cube);
+    return { dataset: describe(dataset) };
   },
   // What the Category data currently is, so the page can tell when the Brand Map has moved on.
   catStatus() { return { derived: !!(catDataset && catDataset.meta.derived), mapVersion: catDataset ? catDataset.meta.mapVersion : null, canDerive: !!(dataset && dataset.dicts.product) }; },

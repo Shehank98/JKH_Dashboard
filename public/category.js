@@ -992,7 +992,7 @@
     const root = $('viewCat'), savedCi = flips.ci, savedBr = flips.br, savedSlide = slideM;
     const grid = $('catGrid'), s3 = $('catS3'), subs = $('catSubs');
     try {
-      await Promise.all([loadScript('vendor/html-to-image/html-to-image.js'), loadScript('vendor/jszip/jszip.min.js')]);
+      await Promise.all([loadScript('/vendor/html-to-image/html-to-image.js'), loadScript('/vendor/jszip/jszip.min.js')]);
       $('catDrawerToggle').checked = false;
       root.classList.add('exporting');
       const zip = new window.JSZip(), settle = () => new Promise(r => setTimeout(r, 150));
@@ -1035,7 +1035,7 @@
   async function exportPpt() {
     toast('Preparing PowerPoint');
     try {
-      await Promise.all([loadScript('vendor/pptxgenjs/pptxgen.bundle.js'), loadScript('vendor/html-to-image/html-to-image.js')]);
+      await Promise.all([loadScript('/vendor/pptxgenjs/pptxgen.bundle.js'), loadScript('/vendor/html-to-image/html-to-image.js')]);
       // A picture of the screen as it is now (current filters), added after the editable slides.
       $('catDrawerToggle').checked = false;
       await new Promise(r => setTimeout(r, 320));
