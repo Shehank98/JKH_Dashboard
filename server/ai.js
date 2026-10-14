@@ -3,6 +3,9 @@
 // slide and returns a few short bullet points. Nothing is sent anywhere else, and nothing is stored.
 const BASE = (process.env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/+$/, '');
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:3b';
+// CPU threads for the model. Ollama picks every core the host machine has (48 in your log), but a container is usually allowed far fewer, and
+// that mismatch makes it crawl. Set OLLAMA_THREADS to the vCPUs your Ollama service really has.
+const THREADS = Math.max(1, Number(process.env.OLLAMA_THREADS) || 8);
 const timeout = (ms) => AbortSignal.timeout(ms);
 
 async function models() {
@@ -25,10 +28,10 @@ function clean(s) {
 }
 
 // Streams the answer, so a slow CPU never trips a "no response headers" timeout while the model is still thinking.
-async function chat(model, messages, ms = 300000) {
+async function chat(model, messages, ms = 160000) {
   const resp = await fetch(BASE + '/api/chat', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: timeout(ms),
-    body: JSON.stringify({ model: String(model), stream: true, keep_alive: '30m', options: { temperature: 0.2, num_predict: 200, num_ctx: 3072 }, messages }),
+    body: JSON.stringify({ model: String(model), stream: true, keep_alive: '30m', options: { temperature: 0.2, num_predict: 150, num_ctx: 2048, num_thread: THREADS }, messages }),
   });
   if (!resp.ok) {
     let why = ''; try { why = (await resp.json()).error || ''; } catch (e) { /* no body */ }
@@ -69,7 +72,7 @@ function router(express) {
     const { model, title, text, context } = req.body || {};
     if (!model || !text) return res.status(400).json({ error: 'model and text are needed' });
     try {
-      const reply = await chat(model, [{ role: 'system', content: SYSTEM }, { role: 'user', content: `${context ? 'Report context: ' + String(context).slice(0, 600) + '\n' : ''}Slide: ${String(title || '').slice(0, 200)}\n\nVisible text:\n${String(text).slice(0, 2600)}` }]);
+      const reply = await chat(model, [{ role: 'system', content: SYSTEM }, { role: 'user', content: `${context ? 'Report context: ' + String(context).slice(0, 600) + '\n' : ''}Slide: ${String(title || '').slice(0, 200)}\n\nVisible text:\n${String(text).slice(0, 1400)}` }]);
       res.json({ notes: clean(reply) });
     } catch (e) { console.error('[ai/notes]', e.message); res.status(502).json({ error: e.message }); }
   });

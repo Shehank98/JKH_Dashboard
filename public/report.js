@@ -41,7 +41,7 @@
           <label class="sh-ck"><input type="checkbox" id="rpAdv" ${advs.length ? 'checked' : 'disabled'}><span><b>2 · Advertiser analysis</b> <small>${advs.length ? `the category's advertisers, then Commercials, Value additions, Channels and Months for each of` : '(pick advertisers in Filters first)'} <select class="rp-sel" id="rpAdvN" ${advs.length ? '' : 'disabled'}>${advs.map((_, i) => `<option value="${i + 1}"${i + 1 === advs.length ? ' selected' : ''}>${i + 1 === advs.length ? `all ${advs.length} selected` : `the first ${i + 1}`}</option>`).join('') || '<option>0</option>'}</select></small></span></label>
           <label class="sh-ck${brandOk ? '' : ' off'}"><input type="checkbox" id="rpBr" ${brandOk ? 'checked' : 'disabled'}><span><b>3 · Brand analysis</b> <small>${brandOk ? 'for each of the top' : '(needs the Category data built from your main file)'} <select class="rp-sel" id="rpBrN" ${brandOk ? '' : 'disabled'}>${[3, 5, 8, 10].filter(n => n <= Math.max(3, cards.length)).map(n => `<option value="${n}"${n === Math.min(5, cards.length || 5) ? ' selected' : ''}>${n}</option>`).join('')}</select> mother brands: Advertisers, Medium split, Channel mix, Duration mix, Brands, Campaigns</small></span></label>
         </div>
-        <label class="sh-ck${ai.ok ? '' : ' off'}"><input type="checkbox" id="rpAi" ${ai.ok ? 'checked' : 'disabled'}><span><b>Short note using AI on each slide</b> <small>${ai.ok ? 'writes 2–3 lines about what the slide shows, from the numbers on screen' : `(not available: ${esc(ai.error || 'the AI service did not answer')}. The report still works without it, but the slides will have no notes.)`}</small></span></label><input type="hidden" id="rpAiModel" value="${esc(ai.model || '')}">
+        <label class="sh-ck${ai.ok ? '' : ' off'}"><input type="checkbox" id="rpAi" ${ai.ok ? 'checked' : 'disabled'}><span><b>Short note using AI on each slide</b> <small>${ai.ok ? 'writes 2–3 lines about what the slide shows, from the numbers on screen. <select class="rp-sel" id="rpAiScope"><option value="key" selected>Key slides only (faster)</option><option value="all">Every slide (slow)</option></select>' : `(not available: ${esc(ai.error || 'the AI service did not answer')}. The report still works without it, but the slides will have no notes.)`}</small></span></label><input type="hidden" id="rpAiModel" value="${esc(ai.model || '')}">
         <div class="sh-status" id="rpInfo"></div>
         <div class="rp-prog" id="rpProg" hidden><div class="rp-bar"><i id="rpBar"></i></div><div class="rp-step" id="rpStep"></div></div>
         <p class="sh-note">While it runs the dashboard will flip and change on its own; keep this tab open and it puts everything back at the end. Bigger reports take longer (about a second per slide).</p>
@@ -55,12 +55,13 @@
     adv: $('rpAdv').checked && !$('rpAdv').disabled, advN: Number($('rpAdvN').value) || 0,
     br: $('rpBr').checked && !$('rpBr').disabled, brN: Number($('rpBrN').value) || 0,
     ai: $('rpAi').checked && !$('rpAi').disabled ? $('rpAiModel').value : '',
+    aiAll: !!$('rpAiScope') && $('rpAiScope').value === 'all',
   });
   function estimate(o) { return (o.ai ? 0 : 0) + 3 + (o.spot ? 29 : 0) + (o.cat ? 17 : 0) + (o.adv ? 1 + 4 * o.advN : 0) + (o.br ? 6 * o.brN : 0); }
   function info() {
     const o = optsNow(), n = estimate(o);
-    const secs = Math.round(n * 1.1 + (o.ai ? n * 6 : 0));
-    $('rpInfo').innerHTML = `About <b>${n}</b> slides · takes about <b>${secs >= 120 ? Math.round(secs / 60) + ' minutes' : Math.max(10, secs) + ' seconds'}</b>${o.ai ? ' (notes make it slower)' : ''}`;
+    const secs = Math.round(n * 1.1 + (o.ai ? n * (o.aiAll ? 1 : 0.45) * 25 : 0));
+    $('rpInfo').innerHTML = `About <b>${n}</b> slides · takes about <b>${secs >= 120 ? Math.round(secs / 60) + ' minutes' : Math.max(10, secs) + ' seconds'}</b>${o.ai ? ' (AI insights make it slower)' : ''}`;
   }
   root.addEventListener('change', info);
   root.addEventListener('click', async e => {
@@ -170,7 +171,7 @@
     deck.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 in
     deck.title = title; deck.company = 'Ogilvy'; deck.author = 'Ogilvy';
     let n = 0;
-    const pics = [];
+    const pics = [], seen = new Set();
     const frame = (s, dark) => { // the quiet furniture of the format: OGILVY up the left edge, page number on the right
       s.addText('OGILVY', { x: 0.02, y: 3.1, w: 0.3, h: 1.3, vert: 'vert270', fontFace: SANS, fontSize: 8, charSpacing: 2, color: dark ? 'FFFFFF' : BLACK, align: 'center', margin: 0 });
       s.addText(String(n), { x: 12.9, y: 3.55, w: 0.35, h: 0.3, fontFace: SANS, fontSize: 9, color: dark ? 'FFFFFF' : BLACK, align: 'center', margin: 0 });
@@ -223,7 +224,10 @@
         s.addText(head, { x: 0.85, y: 0.3, w: 11.7, h: 0.8, fontFace: SERIF, fontSize: 30, color: BLACK, margin: 0, valign: 'top', fit: 'shrink' });
         s.addText(subs, { x: 0.85, y: 1.1, w: 11.7, h: 0.3, fontFace: SANS, fontSize: 12.5, color: RED, margin: 0 });
         s.addText(`Source: ${sourceText}`, { x: 0.85, y: 7.08, w: 9, h: 0.25, fontFace: SANS, fontSize: 8, color: '777777', margin: 0 });
-        pics.push({ s, im, headline: head, text: im.text, notes: '' });
+        const base = head.split(/[:,]/)[0].toLowerCase().trim(), tail = (head.split(': ')[1] || '').toLowerCase();
+        const minor = /^(value additions|channels|months)$/.test(tail) || /^(medium split|duration mix|campaigns)$/.test(tail);
+        const key = !minor && !seen.has(base); seen.add(base);
+        pics.push({ s, im, headline: head, text: im.text, notes: '', key });
       },
       pending: pics, // slides still waiting for their insights
       finish() {
@@ -412,32 +416,35 @@
 
       if (o.ai && B.pending.length) {
         const aiContext = `Our advertiser (the client, "mine"): ${st.mine.join(', ') || 'not set'}. Competitors: ${st.comps.join(', ') || 'none selected'}. Category: ${pgName}. Period: ${spotPeriod}. Currency LKR. Write from our advertiser's side.`;
-        total += B.pending.length + 1; let failed = 0, written = 0, firstErr = '';
+        total += B.pending.filter(p => p.text && (o.aiAll || p.key)).length + 1; let failed = 0, written = 0, firstErr = '';
         const ask = async (title, text) => {
-          const ctl2 = new AbortController(), t = setTimeout(() => ctl2.abort(), 330000);
+          const ctl2 = new AbortController(), t = setTimeout(() => ctl2.abort(), 170000);
           try {
             const r = await fetch('/api/ai/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl2.signal, body: JSON.stringify({ model: o.ai, title, text, context: aiContext }) });
             let j = {}; try { j = await r.json(); } catch (e) { throw new Error(`the server answered ${r.status} (not JSON)`); }
             if (!r.ok) throw new Error(j.error || `the server answered ${r.status}`);
             if (!j.notes) throw new Error('the model returned an empty note');
             return j.notes;
-          } catch (e) { throw new Error(e.name === 'AbortError' ? 'the model took longer than 5 minutes' : e.message); } finally { clearTimeout(t); }
+          } catch (e) { throw new Error(e.name === 'AbortError' ? 'the model took longer than 2 minutes for one slide (the AI service is too slow: give it more CPU, set OLLAMA_THREADS to its vCPU count, or use a smaller model)' : e.message); } finally { clearTimeout(t); }
         };
         // the first call loads the model into memory, which can take a minute or two on a small server
         step('Starting the AI model (the first note is the slowest)');
-        try { await ask('warm up', 'Spend 100 Mn. Share 20%.'); } catch (e) { if (e.message === 'Stopped') throw e; firstErr = e.message; }
-        for (let i = 0; i < B.pending.length && !(failed >= 3); i++) {
+        let warmErr = '';
+        try { await ask('warm up', 'Spend 100 Mn. Share 20%.'); } catch (e) { if (e.message === 'Stopped') throw e; firstErr = warmErr = e.message; }
+        // if even the warm-up note fails, the service cannot do this job: skip the AI step now instead of waiting on every slide
+        for (let i = 0; i < B.pending.length && !(failed >= 2) && !warmErr; i++) {
           const p = B.pending[i];
           step(`Writing insights: slide ${i + 1} of ${B.pending.length}${written ? ` (${written} done)` : ''}`);
-          if (!p.text) continue;
+          if (!p.text || (!o.aiAll && !p.key)) continue;
           let notes = '';
-          for (let tryNo = 0; tryNo < 2 && !notes; tryNo++) {
+          for (let tryNo = 0; tryNo < 1 && !notes; tryNo++) {
             try { notes = await ask(p.headline, p.text); } catch (e) { if (e.message === 'Stopped') throw e; firstErr = firstErr || e.message; }
           }
           if (!notes) { failed++; continue; }
           failed = 0; written++; p.notes = notes;
         }
-        aiNote = written === B.pending.length ? '' : written ? `AI notes written on ${written} of ${B.pending.length} slides. The rest failed: ${firstErr}` : `No AI notes were written: ${firstErr || 'the model did not answer'}`;
+        const wanted = B.pending.filter(p => p.text && (o.aiAll || p.key)).length;
+        aiNote = written === wanted ? '' : written ? `AI notes written on ${written} of ${wanted} slides. The rest failed: ${firstErr}` : `No AI notes were written: ${firstErr || 'the model did not answer'}`;
       }
       B.closing('Thank you');
       B.finish();

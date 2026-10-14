@@ -27,3 +27,10 @@ Without Docker: install Ollama, then `ollama pull llama3.2:3b` and `ollama pull 
    - `OLLAMA_MODEL` = `llama3.2:3b` (optional, the model chosen first in the dialog)
 
 First start takes a few minutes while the models download; the dialog shows the notes option once `/api/ai/status` can see them.
+
+## Speed (important on a CPU-only server)
+Ollama starts one thread per core of the *host machine* (your log showed `n_threads = 48`), but a Railway container is only allowed a few vCPUs. That mismatch makes the model crawl (about 13 tokens a second just to read the slide, then minutes to write it).
+- In the **dashboard** service set `OLLAMA_THREADS` to the vCPUs your Ollama service really has (default 8).
+- Give the Ollama service as many vCPUs as the plan allows. Notes take roughly 10–30 seconds each on 8 vCPUs.
+- In the Full report dialog leave **Key slides only** selected unless you can wait; **Every slide** can take a long time.
+- If it is still too slow, a smaller model is about 3x faster: add `llama3.2:1b` to `PRELOAD_MODELS` and set `OLLAMA_MODEL=llama3.2:1b` on the dashboard.
