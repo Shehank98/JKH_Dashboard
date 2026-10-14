@@ -35,11 +35,11 @@ function router(express) {
     if (!model || !text) return res.status(400).json({ error: 'model and text are needed' });
     try {
       const resp = await fetch(BASE + '/api/chat', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: timeout(90000),
-        body: JSON.stringify({ model: String(model), stream: false, options: { temperature: 0.2, num_predict: 280 },
-          messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `${context ? 'Report context: ' + String(context).slice(0, 600) + '\n' : ''}Slide: ${String(title || '').slice(0, 200)}\n\nVisible text:\n${String(text).slice(0, 4000)}` }] }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: timeout(300000),
+        body: JSON.stringify({ model: String(model), stream: false, keep_alive: '30m', options: { temperature: 0.2, num_predict: 200, num_ctx: 3072 },
+          messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `${context ? 'Report context: ' + String(context).slice(0, 600) + '\n' : ''}Slide: ${String(title || '').slice(0, 200)}\n\nVisible text:\n${String(text).slice(0, 2600)}` }] }),
       });
-      if (!resp.ok) return res.status(502).json({ error: 'Ollama answered ' + resp.status });
+      if (!resp.ok) { let why = ''; try { why = (await resp.json()).error || ''; } catch (e) { /* no body */ } return res.status(502).json({ error: 'Ollama answered ' + resp.status + (why ? ': ' + why : '') }); }
       const j = await resp.json();
       res.json({ notes: clean(j.message && j.message.content) });
     } catch (e) { res.status(502).json({ error: 'Could not reach Ollama: ' + e.message }); }

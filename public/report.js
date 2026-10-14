@@ -163,7 +163,7 @@
     let done = 0;
     const step = label => { done++; $('rpBar').style.width = Math.min(100, Math.round((done / total) * 100)) + '%'; $('rpStep').textContent = label; if (ctl.cancel) throw new Error('Stopped'); };
     const before = snapshot();
-    let ok = false;
+    let ok = false, aiNote = '';
     try {
       step('Loading the picture and PowerPoint tools');
       await Promise.all([window.htmlToImage ? 0 : loadScript('/vendor/html-to-image/html-to-image.js'), window.PptxGenJS ? 0 : loadScript('/vendor/pptxgenjs/pptxgen.bundle.js')]);
@@ -323,25 +323,39 @@
 
       if (o.ai && B.pending.length) {
         const aiContext = `Our advertiser (the client, "mine"): ${st.mine.join(', ') || 'not set'}. Competitors: ${st.comps.join(', ') || 'none selected'}. Category: ${pgName}. Period: ${spotPeriod}. Currency LKR. Write from our advertiser's side.`;
-        total += B.pending.length; let failed = 0;
-        for (let i = 0; i < B.pending.length; i++) {
-          const { s, headline, text } = B.pending[i];
-          step(`Writing notes: slide ${i + 1} of ${B.pending.length}`);
+        total += B.pending.length + 1; let failed = 0, written = 0, firstErr = '';
+        const ask = async (title, text) => {
+          const ctl2 = new AbortController(), t = setTimeout(() => ctl2.abort(), 330000);
           try {
-            const r = await fetch('/api/ai/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: o.ai, title: headline, text, context: aiContext }) });
-            const j = await r.json();
-            if (!r.ok || !j.notes) throw new Error(j.error || 'no notes');
-            s.addShape('rect', { x: 0.45, y: 6.12, w: 0.06, h: 0.95, fill: { color: 'FF8A3D' }, line: { color: 'FF8A3D', width: 0 } });
-            s.addText(j.notes, { x: 0.62, y: 6.12, w: 12.2, h: 0.95, fontFace: 'Calibri', fontSize: 11.5, color: INK, valign: 'middle', margin: 0, fit: 'shrink', paraSpaceAfter: 2 });
-            s.addNotes(j.notes);
-            failed = 0;
-          } catch (e) { if (e.message === 'Stopped') throw e; if (++failed >= 3) { O.toast('The AI notes stopped, so the rest of the slides have no note'); break; } }
+            const r = await fetch('/api/ai/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl2.signal, body: JSON.stringify({ model: o.ai, title, text, context: aiContext }) });
+            let j = {}; try { j = await r.json(); } catch (e) { throw new Error(`the server answered ${r.status} (not JSON)`); }
+            if (!r.ok) throw new Error(j.error || `the server answered ${r.status}`);
+            if (!j.notes) throw new Error('the model returned an empty note');
+            return j.notes;
+          } catch (e) { throw new Error(e.name === 'AbortError' ? 'the model took longer than 5 minutes' : e.message); } finally { clearTimeout(t); }
+        };
+        // the first call loads the model into memory, which can take a minute or two on a small server
+        step('Starting the AI model (the first note is the slowest)');
+        try { await ask('warm up', 'Spend 100 Mn. Share 20%.'); } catch (e) { if (e.message === 'Stopped') throw e; firstErr = e.message; }
+        for (let i = 0; i < B.pending.length && !(failed >= 3); i++) {
+          const { s, headline, text } = B.pending[i];
+          step(`Writing notes: slide ${i + 1} of ${B.pending.length}${written ? ` (${written} done)` : ''}`);
+          let notes = '';
+          for (let tryNo = 0; tryNo < 2 && !notes; tryNo++) {
+            try { notes = await ask(headline, text); } catch (e) { if (e.message === 'Stopped') throw e; firstErr = firstErr || e.message; }
+          }
+          if (!notes) { failed++; continue; }
+          failed = 0; written++;
+          s.addShape('rect', { x: 0.45, y: 6.12, w: 0.06, h: 0.95, fill: { color: 'FF8A3D' }, line: { color: 'FF8A3D', width: 0 } });
+          s.addText(notes, { x: 0.62, y: 6.12, w: 12.2, h: 0.95, fontFace: 'Calibri', fontSize: 11.5, color: INK, valign: 'middle', margin: 0, fit: 'shrink', paraSpaceAfter: 2 });
+          s.addNotes(notes);
         }
+        aiNote = written === B.pending.length ? '' : written ? `AI notes written on ${written} of ${B.pending.length} slides. The rest failed: ${firstErr}` : `No AI notes were written: ${firstErr || 'the model did not answer'}`;
       }
       step('Writing the PowerPoint file');
       const file = `${pgName.replace(/[^A-Za-z0-9]+/g, '_')}_Full_report_${new Date().toISOString().slice(0, 10)}.pptx`;
       await B.deck.writeFile({ fileName: file });
-      O.toast(`Report downloaded: ${B.count()} slides`);
+      O.toast(`Report downloaded: ${B.count()} slides${aiNote ? ', but some AI notes failed' : ''}`);
       ok = true;
     } catch (e) {
       $('rpErr').textContent = e.message === 'Stopped' ? 'Stopped. Nothing was downloaded.' : 'Could not finish the report: ' + e.message;
@@ -351,7 +365,7 @@
       await restore(before);
       ctl = null;
       $('rpGo').disabled = false; $('rpCancel').textContent = 'Close';
-      if (ok) { $('rpProg').hidden = true; root.classList.remove('on'); } else $('rpStep').textContent = '';
+      if (ok && !aiNote) { $('rpProg').hidden = true; root.classList.remove('on'); } else if (ok) { $('rpProg').hidden = true; $('rpErr').textContent = aiNote; } else $('rpStep').textContent = '';
     }
   }
 
