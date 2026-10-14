@@ -338,3 +338,9 @@ body.ro-cat #catFilterBtn,body.ro-cat .ctab[data-pane=cpFilters],body.ro-cat #cp
 .cm-tabs em{font-style:normal;background:#EEF2FB;color:#3F5480;border-radius:10px;padding:0 6px;font-size:10px;margin-left:3px}
 
 .cnote{font-size:11px;line-height:1.45;color:#6B7590;background:#F6F8FC;border-radius:8px;padding:8px 10px;margin-bottom:8px}
+
+.pchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;max-height:132px;overflow:auto}
+.pchip{border:1px solid #DDE3EF;background:#fff;color:#1A1F36;font:inherit;font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:16px;cursor:pointer}
+.pchip:hover{background:#F6F8FC}
+.pchip.on{background:#1A1F36;border-color:#1A1F36;color:#fff}
+.psel{font-size:11px;font-weight:600;color:#4A5570;margin-top:6px;line-height:1.4}

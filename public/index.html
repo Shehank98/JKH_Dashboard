@@ -506,8 +506,10 @@ tr.me .sharebar{background:#FF8A3D}
         <div class="sech"><span class="n">1</span> Period and category</div>
         <div class="flabel">Month range</div>
         <div class="dateRow"><select class="inp" id="cFrom" aria-label="From month"></select><select class="inp" id="cTo" aria-label="To month"></select></div>
-        <div class="flabel">Quarter, half or year <span class="cnt">available in your data</span></div>
-        <select class="inp" id="cQuick"></select>
+        <div class="flabel">Quarter, half or year <span class="cnt">tick several to add them up</span></div>
+        <div class="segbar" id="cPickKind"><button class="seg on" data-v="q">Quarters</button><button class="seg" data-v="h">Halves</button><button class="seg" data-v="y">Years</button></div>
+        <div class="pchips" id="cPchips"></div>
+        <div class="psel" id="cPsel"></div>
         <div class="flabel">Year type <span class="cnt">for quarters, halves, years</span></div>
         <div class="segbar" id="cYearType">
           <button class="seg on" data-v="CY">Calendar (Jan–Dec)</button>

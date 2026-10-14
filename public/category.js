@@ -12,7 +12,7 @@
   const MED = ['TV', 'Radio', 'Press'], MED_COL = ['#2F5DBF', '#FF8A3D', '#1FA97A'];
 
   let overview = null, options = { advertisers: [], subs: [] }, data = null, pendingFile = null, started = false, busy = false;
-  const state = { from: '', to: '', pg: '', sub: '', mine: [], comps: [], top: 10, yearType: 'CY' };
+  const state = { from: '', to: '', periods: null, pg: '', sub: '', mine: [], comps: [], top: 10, yearType: 'CY' }; // periods: several quarters / halves / years added up (null = just from to to)
   const ui = { labels: true, part: 'm', hideInc: false };   // chart: value labels, months / quarters / halves / years, hide incomplete
   const ci = { part: 'y', hideInc: false, subsOn: new Set(), subKey: '' };   // category investment section
   const hiddenBrands = new Set();               // brands switched off in the chart legend
@@ -49,21 +49,28 @@
     const list = periodsAvailable()[{ 3: 'q', 6: 'h', 12: 'y' }[len]];
     return list.length ? list[0] : [overview.minMonth, overview.maxMonth];
   }
+  // The ranges selected now: the ticked quarters / halves / years, or the plain month range.
+  const curRanges = () => (state.periods && state.periods.length ? state.periods : [[state.from, state.to]]);
+  const sameRange = (r, a, b) => r[0] === a && r[1] === b;
+  // Ranges named for people: "Q1'26/27 + Q3'26/27". Last year's ranges name the same quarters a year earlier.
+  const rangesLabel = (list, yt) => list.map(([a, b]) => periodLabel(a, b, yt || state.yearType)).join(' + ');
+  function setRanges(list) {
+    const sorted = list.slice().sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
+    state.periods = sorted.length > 1 ? sorted : null;
+    state.from = sorted[0][0]; state.to = sorted.reduce((m, r) => (r[1] > m ? r[1] : m), sorted[0][1]);
+    if (sorted.length === 1) { state.from = sorted[0][0]; state.to = sorted[0][1]; }
+    $('cFrom').value = state.from; $('cTo').value = state.to;
+  }
+  // Quarter / half / year buttons: tick as many as you like; they are added up as one period.
   function buildQuick() {
     if (!overview) return;
-    const P = periodsAvailable(), yt = state.yearType;
-    const opt = ([a, b]) => `<option value="${a}|${b}">${esc(periodLabel(a, b, yt))} · ${monLabel(a)} to ${monLabel(b)}</option>`;
-    $('cQuick').innerHTML = '<option value="">Custom (use the month boxes)</option>'
-      + (P.q.length ? `<optgroup label="Quarters">${P.q.map(opt).join('')}</optgroup>` : '')
-      + (P.h.length ? `<optgroup label="Half years">${P.h.map(opt).join('')}</optgroup>` : '')
-      + (P.y.length ? `<optgroup label="Full years">${P.y.map(opt).join('')}</optgroup>` : '');
-    syncQuick();
+    const P = periodsAvailable(), yt = state.yearType, kind = ui.pick || 'q', list = P[kind] || [], cur = curRanges();
+    [...$('cPickKind').children].forEach(b => b.classList.toggle('on', b.dataset.v === kind));
+    $('cPchips').innerHTML = list.map(([a, b]) => `<button type="button" class="pchip${cur.some(r => sameRange(r, a, b)) ? ' on' : ''}" data-a="${a}" data-b="${b}" title="${esc(monLabel(a))} to ${esc(monLabel(b))}">${esc(periodLabel(a, b, yt))}</button>`).join('') || '<span class="cnt">None complete in your data</span>';
+    const months = cur.reduce((n, r) => n + idx(r[1]) - idx(r[0]) + 1, 0);
+    $('cPsel').textContent = cur.length > 1 ? `Added up: ${rangesLabel(cur)} · ${months} months` : `${rangesLabel(cur)} · ${months} month${months === 1 ? '' : 's'}`;
   }
-  function syncQuick() {
-    const want = `${state.from}|${state.to}`;
-    const q = $('cQuick');
-    q.value = [...q.options].some(o => o.value === want) ? want : '';
-  }
+  const syncQuick = buildQuick;
 
   // ---------- formatting (spend is in thousand rupees) ----------
   const mnNum = v => { const x = v / 1000; return nf(x, Math.abs(x) >= 10 ? 0 : 1); };
@@ -187,7 +194,8 @@
     else Object.assign(state, { pg: groups[0], sub: '', mine: [], comps: [], top: 10 });
     // Keep dates inside the data; a new file starts on its latest quarter.
     const inside = k => k && k >= overview.minMonth && k <= overview.maxMonth;
-    if (!(inside(state.from) && inside(state.to) && state.from <= state.to) || (fresh && !useShared)) { [state.from, state.to] = latest(3); }
+    if (!(inside(state.from) && inside(state.to) && state.from <= state.to) || (fresh && !useShared)) { [state.from, state.to] = latest(3); state.periods = null; }
+    if (state.periods) { state.periods = state.periods.filter(r => Array.isArray(r) && inside(r[0]) && inside(r[1]) && r[0] <= r[1]); if (state.periods.length < 2) { if (state.periods.length === 1) [state.from, state.to] = state.periods[0]; state.periods = null; } }
     if (useShared) {
       sharedApplied = true;
       const u = shared.ui || {};
@@ -244,14 +252,20 @@
   };
   $('cMineList').addEventListener('change', onList); $('cCompList').addEventListener('change', onList);
   $('cMineSearch').addEventListener('input', renderLists); $('cCompSearch').addEventListener('input', renderLists);
-  $('cFrom').addEventListener('change', e => { state.from = e.target.value; if (state.from > state.to) { state.to = state.from; $('cTo').value = state.to; } syncQuick(); });
-  $('cTo').addEventListener('change', e => { state.to = e.target.value; if (state.from > state.to) { state.from = state.to; $('cFrom').value = state.from; } syncQuick(); });
+  $('cFrom').addEventListener('change', e => { state.periods = null; state.from = e.target.value; if (state.from > state.to) { state.to = state.from; $('cTo').value = state.to; } syncQuick(); });
+  $('cTo').addEventListener('change', e => { state.periods = null; state.to = e.target.value; if (state.from > state.to) { state.from = state.to; $('cFrom').value = state.from; } syncQuick(); });
   $('cPg').addEventListener('change', async e => { state.pg = e.target.value; state.sub = ''; await loadOptions(true); writeForm(); });
   $('cSub').addEventListener('change', async e => { state.sub = e.target.value; await loadOptions(false); writeForm(); });
-  $('cQuick').addEventListener('change', e => {
-    if (!e.target.value) return;
-    [state.from, state.to] = e.target.value.split('|');
-    $('cFrom').value = state.from; $('cTo').value = state.to;
+  $('cPickKind').addEventListener('click', e => { const b = e.target.closest('.seg'); if (!b) return; ui.pick = b.dataset.v; buildQuick(); });
+  $('cPchips').addEventListener('click', e => {
+    const b = e.target.closest('.pchip');
+    if (!b) return;
+    const a = b.dataset.a, z = b.dataset.b, cur = curRanges();
+    const has = cur.some(r => sameRange(r, a, z));
+    if (has && cur.length === 1) { toast('Keep at least one period ticked'); return; }
+    // Starting from a plain month range that is not one of the buttons, the first tick replaces it.
+    const base = has ? cur.filter(r => !sameRange(r, a, z)) : (state.periods ? cur : (periodsAvailable()[ui.pick || 'q'].some(r => sameRange(r, cur[0][0], cur[0][1])) ? cur : [])).concat([[a, z]]);
+    setRanges(base); buildQuick();
   });
   $('cYearType').addEventListener('click', e => {
     const b = e.target.closest('.seg');
@@ -269,7 +283,7 @@
   $('cResetBtn').addEventListener('click', async () => {
     if (!overview) return;
     Object.assign(state, { sub: '', top: 10 });
-    [state.from, state.to] = latest(3);
+    [state.from, state.to] = latest(3); state.periods = null;
     $('cMineSearch').value = ''; $('cCompSearch').value = '';
     await loadOptions(true); writeForm();
   });
@@ -303,7 +317,7 @@
     try { if (t) localStorage.setItem(textKey(el.dataset.key, data.filters.pg), t); else localStorage.removeItem(textKey(el.dataset.key, data.filters.pg)); } catch (err) { /* storage unavailable */ }
   });
   document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('cedit')) { e.preventDefault(); e.target.blur(); } });
-  const labelsOf = d => { const R = d.ranges, yt = state.yearType; return { cur: periodLabel(R.cur[0], R.cur[1], yt), yoy: periodLabel(R.yoy[0], R.yoy[1], yt), prev: periodLabel(R.prev[0], R.prev[1], yt) }; };
+  const labelsOf = d => { const R = d.ranges, yt = state.yearType; return { cur: rangesLabel(R.curList || [R.cur], yt), yoy: rangesLabel(R.yoyList || [R.yoy], yt), prev: rangesLabel(R.prevList || [R.prev], yt) }; };
 
   function render() {
     const d = data, yt = state.yearType, R = d.ranges;
@@ -315,7 +329,7 @@
     $('catSub').textContent = `${scope} ranked by ${cur} investment${f.sub ? ' · ' + f.sub : ''} | Investment in Rs. Mn`;
     $('catTotLabel').textContent = `${cur} TOTAL`;
     $('catTot').textContent = mnTxt(d.total.cur);
-    $('catPeriodText').textContent = `${monLabel(R.cur[0])} → ${monLabel(R.cur[1])}`;
+    $('catPeriodText').textContent = R.curList && R.curList.length > 1 ? cur : `${monLabel(R.cur[0])} → ${monLabel(R.cur[1])}`;
     $('catPeriodLen').textContent = `${R.months} month${R.months === 1 ? '' : 's'}`;
     const chips = [`<span class="chip">${esc(f.pg)}</span>`];
     if (f.sub) chips.push(`<span class="chip">${esc(f.sub)}</span>`);
@@ -568,7 +582,7 @@
     else if (tr.dataset.mb) sc.mb = tr.dataset.mb;
     else if (!tr.dataset.sub) sc.all = true;
     const per = el.closest('td[data-per]');
-    if (per) { const r = data.ranges[per.dataset.per]; sc.from = r[0]; sc.to = r[1]; sc.label = labelsOf(data)[per.dataset.per]; }
+    if (per) { const r = data.ranges[per.dataset.per]; sc.from = r[0]; sc.to = r[1]; sc.label = labelsOf(data)[per.dataset.per]; const L = data.ranges[per.dataset.per + 'List']; if (L && L.length > 1) sc.periods = L; }
     return sc;
   }
   function renderSubs(d, L) {
@@ -863,7 +877,7 @@
     if (!card) return;
     const base = { mb: card.dataset.mb };
     const per = e.target.closest('[data-per]'), med = e.target.closest('[data-med]');
-    if (per) { const r = data.ranges[per.dataset.per]; openDetail({ ...base, from: r[0], to: r[1], label: per.dataset.label }); }
+    if (per) { const r = data.ranges[per.dataset.per], L = data.ranges[per.dataset.per + 'List']; openDetail({ ...base, from: r[0], to: r[1], label: per.dataset.label, ...(L && L.length > 1 ? { periods: L } : {}) }); }
     else if (med) openDetail({ ...base, medium: MED[Number(med.dataset.med)] });
     else openDetail(base);
   });
@@ -889,7 +903,7 @@
       const d = await engine.call('catDetail', { filters: data.filters, scope });
       const yt = state.yearType, L0 = labelsOf(data);
       const curLabel = scope.from ? (scope.label || periodLabel(d.from, d.to, yt)) : L0.cur;
-      const yoyLabel = scope.from ? periodLabel(keyOf(idx(d.from) - 12), keyOf(idx(d.to) - 12), yt) : L0.yoy;
+      const yoyLabel = scope.from ? rangesLabel((d.periods || [[d.from, d.to]]).map(([a, b]) => [keyOf(idx(a) - 12), keyOf(idx(b) - 12)]), yt) : L0.yoy;
       const g = d.yoy > 0 ? ((d.cur - d.yoy) / d.yoy) * 100 : null;
       const share = d.catCur ? (d.cur / d.catCur) * 100 : 0;
       const mine = (scope.mb && (data.cards.some(c => c.name === scope.mb && c.mine) || data.tables.some(t => t.rows.some(r => r.name === scope.mb && r.mine)))) || (scope.adv && (data.filters.mine || []).includes(scope.adv));
@@ -1327,7 +1341,7 @@
   // For the brand view (brandview.js): the dashboard's filters and period names.
   O.catHelp = {
     filters: () => data.filters, yearType: () => state.yearType, pg: () => (data ? data.filters.pg : state.pg),
-    periodLabel: (a, b, yt) => periodLabel(a, b, yt), monLabel: key => monLabel(key), short: r => periodLabel(r[0], r[1], state.yearType),
+    periodLabel: (a, b, yt) => periodLabel(a, b, yt), monLabel: key => monLabel(key), short: r => periodLabel(r[0], r[1], state.yearType), rangesLabel: list => rangesLabel(list, state.yearType),
   };
   // The main file was loaded (or the shared Brand Map changed): the Category data was rebuilt, so show it.
   document.addEventListener('orbit:catrefresh', async e => {

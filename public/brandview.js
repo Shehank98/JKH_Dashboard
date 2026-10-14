@@ -133,7 +133,7 @@
 
   function draw() {
     const H = O.catHelp, rg = d.ranges, yt = H.yearType();
-    const curLabel = H.periodLabel(rg.cur[0], rg.cur[1], yt);
+    const curLabel = H.rangesLabel(rg.curList || [rg.cur]);
     const baseWord = ui.cmp === 'prev' ? 'previous' : 'last year';
     const h = d.head, scope = stack[stack.length - 1].scope, top = stack[stack.length - 1];
     const bBase = ui.cmp === 'prev' ? h.prev : h.yoy;
@@ -154,7 +154,7 @@
         <button class="bv-btn" data-act="back">${stack.length > 1 ? '← Back' : '← Back to dashboard'}</button>
         <div class="bv-trail"><button class="bv-crumb" data-act="trail" data-i="0">Category</button><span>›</span>${H.pg() ? `<span>${esc(H.pg())}</span><span>›</span>` : ''}${trail.join('<span>›</span>')}</div>
         <div class="bv-ctl">
-          <span class="bv-pill">${esc(curLabel)}${d.months > 1 ? ` · ${esc(H.monLabel(rg.cur[0]))} to ${esc(H.monLabel(rg.cur[1]))}` : ` · ${esc(H.monLabel(rg.cur[0]))}`}</span>
+          <span class="bv-pill">${esc(curLabel)}${rg.curList && rg.curList.length > 1 ? ` · ${d.months} months` : d.months > 1 ? ` · ${esc(H.monLabel(rg.cur[0]))} to ${esc(H.monLabel(rg.cur[1]))}` : ` · ${esc(H.monLabel(rg.cur[0]))}`}</span>
           <span class="bv-seg"><button class="${ui.cmp === 'yoy' ? 'on' : ''}" data-act="cmp" data-v="yoy">vs last year</button><button class="${ui.cmp === 'prev' ? 'on' : ''}" data-act="cmp" data-v="prev">vs previous</button></span>
           <span class="bv-seg"><button class="${scope.medium ? '' : 'on'}"${setA({ medium: null })}>All media</button>${MED.map(m => `<button class="${scope.medium === m ? 'on' : ''}"${setA({ medium: m })}>${m}</button>`).join('')}</span>
           <button class="bv-btn" data-act="jpg" title="Download this view as a picture">Export JPG</button>
@@ -267,7 +267,7 @@
     const { slice, pager } = paged(d.children);
     return `${paneHead(`${d.childKind === 'mb' ? 'Mother brands' : 'Brands'} in ${esc(d.name)}`, `Click a ${kids} to open its own full view. Click the bar to see only those ads.`, metricToggle())}
       <div class="bv-bigbar"><button class="bv-bp" style="width:${Math.max(pc, 14)}%;background:${CC};color:#fff"${go({ vt: 'C' })}>Commercials · ${fmt(cS)} · ${nf(pc, 0)}%</button><button class="bv-bp" style="width:${Math.max(100 - pc, 14)}%;background:${VC};color:#1A1F36"${go({ vt: 'V' })}>Value additions · ${fmt(vS)} · ${nf(100 - pc, 0)}%</button></div>
-      <div class="bv-th bv-t-chh" style="margin-top:8px"><span>${kids.toUpperCase()}</span><span class="r">${esc(O.catHelp.short(d.ranges.cur))}</span><span class="r">${ui.cmp === 'prev' ? 'PREVIOUS' : 'LAST YEAR'}</span><span class="r">GROWTH</span><span class="r">SHARE</span><span class="r">${ui.metric === 'spots' ? 'COMM. SPOTS' : 'COMMERCIALS'}</span><span class="r">${ui.metric === 'spots' ? 'VA SPOTS' : 'VALUE ADD.'}</span><span>RATIO</span><span>MONTH BY MONTH</span><span></span></div>
+      <div class="bv-th bv-t-chh" style="margin-top:8px"><span>${kids.toUpperCase()}</span><span class="r">${esc(curLabel.length > 12 ? 'SELECTED' : curLabel)}</span><span class="r">${ui.cmp === 'prev' ? 'PREVIOUS' : 'LAST YEAR'}</span><span class="r">GROWTH</span><span class="r">SHARE</span><span class="r">${ui.metric === 'spots' ? 'COMM. SPOTS' : 'COMMERCIALS'}</span><span class="r">${ui.metric === 'spots' ? 'VA SPOTS' : 'VALUE ADD.'}</span><span>RATIO</span><span>MONTH BY MONTH</span><span></span></div>
       ${rowsBox('children', slice.map(r => `<div class="bv-tr bv-t-chh"${go(d.childKind === 'mb' ? { mb: r.name, brand: null, adv: null } : { brand: r.name })}>
         <span class="bv-nm"><b>${esc(r.name)}</b>${usTag(r.us)}${r.sub ? `<br><small>${esc(r.sub)}</small>` : ''}</span>
         <b class="r">${mnNum(r.cur)}</b><span class="r mut">${baseOf(r) > 0 ? mnNum(baseOf(r)) : '–'}</span><b class="r">${growth(r.cur, baseOf(r))}</b><b class="r">${pctS(r.share)}</b>

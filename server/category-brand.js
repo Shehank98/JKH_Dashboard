@@ -12,6 +12,7 @@
 const D = require('./derive');
 const { guessMother, clean } = require('./brand-derive');
 const { excludedThemes } = require('./compute');
+const { periodsOf, windows } = require('./periods');
 
 const MONTHS = D.MONTHS, MED = D.MEDIA;
 const keyToMon = k => { const [y, m] = String(k).split('-').map(Number); return y * 12 + m - 1; };
@@ -32,11 +33,12 @@ function brandView(ds, lookup, f, scope, opts) {
   if (!dicts.product || !cols.product) throw new Error('This data file was loaded before brands were read. Please load it again.');
   const pgId = dicts.pg.indexOf(f.pg);
   if (pgId < 0) throw new Error('Unknown product group');
-  const m0 = keyToMon(scope.from || f.from), m1 = keyToMon(scope.to || f.to);
-  if (!(m1 >= m0)) throw new Error('Invalid period');
-  const len = m1 - m0 + 1;
-  const lo = Math.min(m0 - 12, m0 - len), hi = m1;
-  const flag = m => (m >= m0 && m <= m1 ? 1 : 0) | (m >= m0 - 12 && m <= m1 - 12 ? 2 : 0) | (m >= m0 - len && m <= m0 - 1 ? 4 : 0);
+  // The period may be several runs of months added up (for example Q1 and Q3); k is a month's place among the selected ones.
+  const win = windows(periodsOf(f, scope));
+  const { m0, m1, len, lo } = win, hi = m1;
+  const flag = win.bits;
+  const kOf = new Int32Array(m1 - lo + 1).fill(-1);
+  win.months.forEach((m, k) => { kOf[m - lo] = k; });
 
   // Mother brand and sub category of each brand (product) in this product group.
   const nProd = dicts.product.length;
@@ -110,7 +112,7 @@ function brandView(ds, lookup, f, scope, opts) {
     add(get(mbEnt, mb), fl, v, isC);
     if ((fl & 1) && mine[a]) mineMb.add(mb);
     if (fl & 1) {
-      const k = m - m0;
+      const k = kOf[m - lo];
       catMonthly[k] += v; add(catMed[md], 1, v, isC); catVt[isC ? 0 : 1] += v; add(get(catByCh, c), 1, v, isC);
       arr(entMonthly, ek, len)[k] += v;
       if (mine[a]) mineEnt.add(ek);
@@ -134,15 +136,15 @@ function brandView(ds, lookup, f, scope, opts) {
       const ck = childKind === 'mb' ? mb : p;
       add(get(children, ck), fl, v, isC);
       if (mine[a]) mineChild.add(ck);
-      if (fl & 1) { arr(childMonthly, ck, len)[m - m0] += v; childCh.set(ck * nCh + c, (childCh.get(ck * nCh + c) || 0) + v); }
+      if (fl & 1) { arr(childMonthly, ck, len)[kOf[m - lo]] += v; childCh.set(ck * nCh + c, (childCh.get(ck * nCh + c) || 0) + v); }
     }
     if ((fl & 1) && bucket < NB) { durB.counts[bucket]++; const sec = D.durSecondsOf(raw, !isC); if (sec > 0) { durB.sum += sec; durB.n++; } }
     if (fl & 1) {
-      const k = m - m0;
+      const k = kOf[m - lo];
       mCur[k] += v; mN[k]++;
       if (isC) { mC[k] += v; mCn[k]++; } else { mV[k] += v; mVn[k]++; }
     }
-    if (fl & 2) mYoy[m - (m0 - 12)] += v;
+    if (fl & 2) mYoy[kOf[m + 12 - lo]] += v;
   }
 
   const pct = (a, b) => (b > 0 ? (a / b) * 100 : null);
@@ -197,7 +199,7 @@ function brandView(ds, lookup, f, scope, opts) {
   campaigns.C = campaigns.C.slice(0, 50); campaigns.V = campaigns.V.slice(0, 50);
 
   const monthsList = Array.from({ length: len }, (_, k) => ({
-    ...label(m0 + k), spend: mCur[k], spots: mN[k], yoy: mYoy[k], sos: pct(mCur[k], catMonthly[k]), C: mC[k], V: mV[k], Cn: mCn[k], Vn: mVn[k], cat: catMonthly[k],
+    ...label(win.months[k]), spend: mCur[k], spots: mN[k], yoy: mYoy[k], sos: pct(mCur[k], catMonthly[k]), C: mC[k], V: mV[k], Cn: mCn[k], Vn: mVn[k], cat: catMonthly[k],
   }));
 
   // Name and the parts that make up the scope (for the trail and the chips).
@@ -220,7 +222,7 @@ function brandView(ds, lookup, f, scope, opts) {
   const topCh = channels[0] || null;
   return {
     filters: { pg: f.pg, sub: f.sub || '' }, tagCommercial: tag, level, entKind, childKind,
-    ranges: { cur: [monthKey(m0), monthKey(m1)], yoy: [monthKey(m0 - 12), monthKey(m1 - 12)], prev: [monthKey(m0 - len), monthKey(m0 - 1)] }, months: len,
+    ranges: win.ranges, months: len,
     name: main ? main.v : f.pg, kind: main ? kindNames[main.k] : 'Category', parts, us: numMine,
     head: {
       cur: num.s[0], yoy: num.s[1], prev: num.s[2], spots: num.n[0], spotsYoy: num.n[1], spotsPrev: num.n[2],
