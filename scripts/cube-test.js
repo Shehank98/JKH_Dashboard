@@ -6,7 +6,9 @@ const fs = require('fs');
 const path = require('path');
 const { readSpotFile } = require('../server/browser-readers');
 const compute = require('../server/compute');
-const { buildCube, unpackCube } = require('../server/cube');
+const { buildCube, unpackCube, packCategory, unpackCategory } = require('../server/cube');
+const { deriveCategory } = require('../server/brand-derive');
+const category = require('../server/category');
 
 const file = process.argv[2] || path.join(__dirname, '..', 'samples', 'sample_420000.csv');
 (async () => {
@@ -62,6 +64,15 @@ const file = process.argv[2] || path.join(__dirname, '..', 'samples', 'sample_42
   assert.ok(vaOnly.sos.total.spend > 0 && comOnly.sos.total.spend > 0, 'Tag is a value addition by default and a commercial when ticked');
   near(vaOnly.sos.total.spend, compute.dashboard(tagDs, { ...base, adType: 'Sponsorship', tagCommercial: false }).sos.total.spend, 'Tag as VA matches full data');
   near(comOnly.sos.total.spend, compute.dashboard(tagDs, { ...base, adType: 'Commercial', tagCommercial: true }).sos.total.spend, 'Tag as commercial matches full data');
+  // Category data in a share: same numbers, and a product-group lock leaves other groups' names out
+  const catDs = deriveCategory(ds, lookup, {});
+  const catAll = unpackCategory(JSON.parse(JSON.stringify(packCategory(catDs, ''))));
+  const catLocked = packCategory(catDs, pgName);
+  assert.deepStrictEqual(catLocked.dicts.pg, [pgName]);
+  assert.ok(!JSON.stringify(catLocked.dicts).includes('Personal Care') && !JSON.stringify(catLocked.dicts.brand).includes('Shampoo'), 'no other product group names');
+  const cf = { pg: pgName, from: '2026-01', to: '2026-06', mine: [catAll.dicts.adv[0]], comps: [], sub: '', top: 10, yearType: 'CY' };
+  const c1 = category.overview(catDs), c2 = category.overview(catAll);
+  assert.deepStrictEqual(c2.productGroups.map(g => g.name).sort(), c1.productGroups.map(g => g.name).sort());
   // locked to one product group
   const locked = buildCube(ds, lookup, { pg: pgName });
   assert.deepStrictEqual(locked.dicts.pg, [pgName]);

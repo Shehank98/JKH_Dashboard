@@ -28,11 +28,11 @@
   function open() {
     if (!O.spot || !O.spot.hasData()) { O.toast('Load a data file first'); return; }
     const st = O.spot.getState();
-    s = { level: 'standard', lockPg: true, withFilters: true, title: `${st.pg} · Mine vs competitors`, client: '', expires: '', map: null, cube: null, bytes: 0, records: 0, building: false, seq: 0, result: null, shares: null, err: '', busy: false };
+    s = { level: 'standard', lockPg: true, withFilters: true, title: `${st.pg} · Mine vs competitors`, client: '', expires: '', map: null, cube: null, withCat: true, catAvail: false, catBytes: 0, catRows: 0, bytes: 0, records: 0, building: false, seq: 0, result: null, shares: null, err: '', busy: false };
     root.classList.add('on');
     draw();
     loadShares();
-    preview();
+    O.engine.call('catStatus').then(r => { if (!s) return; s.catAvail = !!r.has; s.withCat = !!r.has; draw(); preview(); }).catch(() => preview());
   }
   function close() { root.classList.remove('on'); root.innerHTML = ''; s = null; }
 
@@ -52,8 +52,16 @@
         const r = await O.engine.call('buildCube', { map: s.map, pg: s.lockPg ? st.pg : '', level: s.level, tagCommercial: !!st.tagCommercial });
         if (!s || my !== s.seq) return;
         s.cube = r.cube; s.records = r.cube.meta.records; s.bytes = JSON.stringify(r.cube).length;
+        s.catBytes = 0; s.catRows = 0;
+        if (s.withCat && s.catAvail) {
+          const pack = await O.engine.call('buildCategoryCube', { pg: s.lockPg ? st.pg : '' });
+          if (!s || my !== s.seq) return;
+          const cs = O.catState ? O.catState() : null;
+          pack.state = cs && pack.dicts.pg.includes(cs.pg) ? cs : null;
+          r.cube.category = pack; s.catRows = pack.cols.mon.length; s.catBytes = JSON.stringify(pack).length;
+        }
         s.building = false;
-        if (s.bytes > MAX_BYTES) s.err = 'This is too large to share. Pick Standard or Compact, or share only one product group.';
+        if (s.bytes + s.catBytes > MAX_BYTES) s.err = 'This is too large to share. Pick Standard or Compact, or share only one product group.';
       } catch (e) { if (!s || my !== s.seq) return; s.building = false; s.err = e.message; }
       paintStatus();
     }, delay);
@@ -72,6 +80,7 @@
           <div class="sh-l">What the client can see</div>
           <div class="sh-levels">${LEVELS.map(([k, n, d]) => `<label class="sh-lv${s.level === k ? ' on' : ''}"><input type="radio" name="shLv" value="${k}" ${s.level === k ? 'checked' : ''}><b>${n}</b><span>${d}</span></label>`).join('')}</div>
           <label class="sh-ck"><input type="checkbox" id="shLock" ${s.lockPg ? 'checked' : ''}><span>Share only <b>${esc(st.pg)}</b> <small>(other product groups are not included in the link at all)</small></span></label>
+          <label class="sh-ck${s.catAvail ? '' : ' off'}"><input type="checkbox" id="shCat" ${s.withCat && s.catAvail ? 'checked' : ''} ${s.catAvail ? '' : 'disabled'}><span>Include the <b>Category dashboard</b> <small>${s.catAvail ? '(the client gets a “Switch to Category” button. It shows mother brands, brand names and sub categories for the product group)' : '(not available: load your main file first so the Category data is built)'}</small></span></label>
           <label class="sh-ck"><input type="checkbox" id="shState" ${s.withFilters ? 'checked' : ''}><span>Open with my current filters <small>(advertisers, dates, medium…; the client can change them)</small></span></label>
           <div class="sh-status" id="shStatus"></div>
           <p class="sh-note">Ad type: <b>Tag is counted as a ${st.tagCommercial ? 'commercial' : 'value addition'}</b>, as in your filters. The client sees the dashboard that way; change the tick box in Filters first if you want it the other way.</p>
@@ -97,7 +106,7 @@
       el.className = 'sh-status' + (s.err ? ' err' : '');
       el.innerHTML = s.building ? '<span class="sh-spin"></span> Summing up your data…'
         : s.err ? esc(s.err)
-        : s.cube ? `<b>${nf(s.records)}</b> summary records from ${nf(s.cube.meta.spots)} spots · about <b>${mb(s.bytes)}</b> (${mb(Math.round(s.bytes / 4))} to download)` : '';
+        : s.cube ? `<b>${nf(s.records)}</b> summary records from ${nf(s.cube.meta.spots)} spots${s.catRows ? ` + <b>${nf(s.catRows)}</b> category rows` : ''} · about <b>${mb(s.bytes + s.catBytes)}</b> (${mb(Math.round((s.bytes + s.catBytes) / 4))} to download)` : '';
     }
     if (go) go.disabled = s.building || !s.cube || !!s.err || s.busy;
   }
@@ -133,7 +142,7 @@
     s.busy = true; paintStatus(); $('shErr').textContent = ''; $('shGo').textContent = 'Saving…';
     try {
       const st = O.spot.getState();
-      const body = JSON.stringify({ title, clientName: s.client, expiresAt, lockedFilters: { pg: s.lockPg ? st.pg : '', level: s.level }, state: s.withFilters ? st : null, cube: s.cube });
+      const body = JSON.stringify({ title, clientName: s.client, expiresAt, lockedFilters: { pg: s.lockPg ? st.pg : '', level: s.level, category: !!s.catRows }, state: s.withFilters ? st : null, cube: s.cube });
       let res;
       try {
         // Compressed on the way up (the data cube is highly repetitive), plain if this browser cannot compress.
@@ -177,6 +186,7 @@
     const t = e.target;
     if (t.name === 'shLv') { s.level = t.value; root.querySelectorAll('.sh-lv').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); preview(); }
     else if (t.id === 'shLock') { s.lockPg = t.checked; preview(); }
+    else if (t.id === 'shCat') { s.withCat = t.checked; preview(); }
     else if (t.id === 'shState') s.withFilters = t.checked;
     else if (t.id === 'shExp') s.expires = t.value;
   });

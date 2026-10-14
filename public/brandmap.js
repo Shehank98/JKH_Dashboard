@@ -133,7 +133,7 @@
   // ---------- keep the Category data in step with the shared map ----------
   let syncing = false;
   async function sync() {
-    if (syncing || !O.ready) return;
+    if (syncing || !O.ready || document.body.classList.contains('share-mode')) return;
     syncing = true;
     try {
       const s = await O.engine.call('catStatus');

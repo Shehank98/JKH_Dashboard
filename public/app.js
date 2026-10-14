@@ -16,7 +16,7 @@
   // A client opens /share/<token>: a read-only dashboard over a data cube, with no upload, Brand Map or planning tools.
   const SHARE = (location.pathname.match(/^\/share\/([A-Za-z0-9_-]+)/) || [])[1] || null;
   let sharePayload = null;
-  if (SHARE) document.body.classList.add('share-mode');
+  if (SHARE) document.body.classList.add('share-mode', 'share-nocat');
   const isCube = () => !!(overview && overview.meta && overview.meta.cube);
 
   // ---------- state ----------
@@ -1543,7 +1543,9 @@
       sharePayload = j;
       document.title = `${j.title} · Ogilvy Orbit`;
       $('shareBanner').innerHTML = `<b>${esc(j.title)}</b>${j.clientName ? `<span>Prepared for ${esc(j.clientName)}</span>` : ''}<span>${j.expiresAt ? 'Link valid until ' + fmtDate(j.expiresAt.slice(0, 10)) : ''}</span>`;
-      await engine.call('initShared', { cube: j.cube });
+      const init = await engine.call('initShared', { cube: j.cube });
+      // Category included: the Switch to Category button stays, and the Category dashboard starts from the agency's view.
+      if (init.category) { window.ORBIT.shareCatState = j.cube.category.state || null; document.body.classList.remove('share-nocat'); window.ORBIT.ready = true; document.dispatchEvent(new Event('orbit:ready')); }
       sharePayload.cube = null;
       await loadOverview(false);
     } catch (e) { fail('Could not open this dashboard', e.message); }

@@ -53,6 +53,7 @@ async function idbDo(mode, fn) {
 
 let owner = 'local';
 let dataset = null;
+let sharedMode = false; // a client's data cube: nothing is read from or written to this browser's storage
 let pending = null; // a file that has been read but whose brands are not confirmed yet
 let catDataset = null; // the Category file, saved under the same person with a ':category' suffix
 const isoDay = d => new Date(d * 86400000).toISOString().slice(0, 10);
@@ -107,13 +108,18 @@ const handlers = {
     const cube = requireLib('cube').buildCube(need(), (g, b) => lookup.get(keyOf(g, b)) || null, { pg: pg || '', level, tagCommercial: !!tagCommercial });
     return { cube, ms: Date.now() - t };
   },
+  // The Category dashboard's rows for a share (needs Category data, built from the main file or loaded).
+  buildCategoryCube({ pg }) { return requireLib('cube').packCategory(needCat(), pg || ''); },
   // The client's side: a cube replaces the dataset in memory only (nothing is saved in this browser).
   initShared({ cube }) {
-    dataset = requireLib('cube').unpackCube(cube);
-    return { dataset: describe(dataset) };
+    const lib = requireLib('cube');
+    dataset = lib.unpackCube(cube);
+    sharedMode = true;
+    catDataset = cube.category ? lib.unpackCategory(cube.category) : null;
+    return { dataset: describe(dataset), category: describeCat(catDataset) };
   },
   // What the Category data currently is, so the page can tell when the Brand Map has moved on.
-  catStatus() { return { derived: !!(catDataset && catDataset.meta.derived), mapVersion: catDataset ? catDataset.meta.mapVersion : null, canDerive: !!(dataset && dataset.dicts.product) }; },
+  catStatus() { return { has: !!catDataset, derived: !sharedMode && !!(catDataset && catDataset.meta.derived), mapVersion: catDataset ? catDataset.meta.mapVersion : null, canDerive: !!(dataset && dataset.dicts.product) }; },
   async cancelIngest() { pending = null; return { ok: true }; },
   // The Brand Map changed (someone edited it): rebuild the Category data from the saved main file.
   async rederiveCategory({ map, version }) {
@@ -142,6 +148,7 @@ const handlers = {
   },
   // ---- Category dashboard (a second, independent file) ----
   async catInit() {
+    if (sharedMode) return { dataset: describeCat(catDataset), storageError: null };
     catDataset = null;
     let saved = null, storageError = null;
     try { saved = await idbDo('readonly', s => s.get(owner + ':category')); } catch (e) { storageError = e.message; }

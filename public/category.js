@@ -71,15 +71,19 @@
   const initials = name => name.split(/[^A-Za-z0-9]+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
 
   // ---------- persistence ----------
-  const KEY = 'cas-cat-filters', MODE = 'orbit-mode';
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ } };
+  // A client opening a shared link (body.share-mode) keeps filters for this tab only, starting from the agency's view.
+  const CLIENT = document.body.classList.contains('share-mode');
+  const KEY = CLIENT ? 'share-cat-filters-' + location.pathname.split('/').pop() : 'cas-cat-filters', MODE = 'orbit-mode';
+  const store = CLIENT ? sessionStorage : localStorage;
+  const save = () => { try { store.setItem(KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ } };
   // A shared link (#cat=...) carries the filters and the view, never the data. It opens view-only: the filters
   // cannot be changed, everything else can be clicked. (The person opening it loads the same file in Data file.)
   let shared = null, sharedApplied = false;
   try { if (location.hash.startsWith('#cat=')) shared = JSON.parse(decodeURIComponent(location.hash.slice(5))); } catch (e) { shared = null; }
   const readSaved = () => {
     if (shared && shared.state) return shared.state;
-    try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; }
+    try { const mine = JSON.parse(store.getItem(KEY) || 'null'); if (mine) return mine; } catch (e) { /* none yet */ }
+    return CLIENT ? (O.shareCatState || null) : null;
   };
 
   // ---------- data file tab ----------
@@ -1300,7 +1304,7 @@
       if (toCat) ensureStarted();
       setTimeout(() => { inn.classList.remove('enter-right', 'enter-left'); busy = false; }, 520);
     }, 260);
-    try { localStorage.setItem(MODE, toCat ? 'cat' : 'spot'); } catch (e) { /* storage unavailable */ }
+    if (!CLIENT) { try { localStorage.setItem(MODE, toCat ? 'cat' : 'spot'); } catch (e) { /* storage unavailable */ } }
   });
 
   // ---------- boot (after the data engine knows who is signed in) ----------
@@ -1313,10 +1317,11 @@
       if (s.dataset) await loadOverview(false); else { showEmpty(); }
       if (window.BRANDMAP) window.BRANDMAP.sync();
       let mode = shared ? 'cat' : null;
-      if (!shared) { try { mode = localStorage.getItem(MODE); } catch (e) { /* storage unavailable */ } }
+      if (!shared && !CLIENT) { try { mode = localStorage.getItem(MODE); } catch (e) { /* storage unavailable */ } }
       if (mode === 'cat') { document.body.classList.add('mode-cat'); applyModeText(); ensureStarted(); }
     } catch (e) { toast('Category data: ' + e.message); }
   }
+  O.catState = () => JSON.parse(JSON.stringify(state));
   // The main file was loaded (or the shared Brand Map changed): the Category data was rebuilt, so show it.
   document.addEventListener('orbit:catrefresh', async e => {
     renderFile(e.detail.dataset);

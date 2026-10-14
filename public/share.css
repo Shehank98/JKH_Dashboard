@@ -30,9 +30,12 @@
 body.share-mode .sharebanner{display:flex;align-items:baseline;gap:10px;min-width:0;overflow:hidden;white-space:nowrap}
 .sharebanner b{font-size:14px;letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis}
 .sharebanner span{font-size:11.5px;color:#6B7590}
-body.share-mode #modeBtn,body.share-mode .bmbtn,body.share-mode #shareBtn,body.share-mode #userBtn,body.share-mode #userMenu,
-body.share-mode .tab[data-pane="paneData"],body.share-mode #paneData,body.share-mode #catDrawerToggle,body.share-mode #catFilterBtn,
+body.share-nocat #modeBtn,body.share-nocat #viewCat,body.share-nocat #catDrawerToggle,body.share-nocat #catFilterBtn,
+body.share-mode #catShareBtn,body.share-mode .ctab[data-pane="cpData"],body.share-mode #cpData,body.share-mode #cDeleteBtn,
+body.share-mode .bmbtn,body.share-mode #shareBtn,body.share-mode #userBtn,body.share-mode #userMenu,
+body.share-mode .tab[data-pane="paneData"],body.share-mode #paneData,
 body.share-mode #exportMenu [data-x="send"],body.share-mode #exportMenu [data-x="json"],body.share-mode #exportMenu [data-x="plan"],
 body.share-mode #exportMenu hr,body.share-mode #fTagCommercial,body.share-mode label.tick:has(#fTagCommercial){display:none!important}
-body.share-mode #viewCat,body.share-mode #bmPage,body.share-mode #bmConfirm{display:none!important}
+body.share-mode #bmPage,body.share-mode #bmConfirm{display:none!important}
 body.share-fail .topbar .fbtn,body.share-fail .tright{display:none}
+.sh-ck.off{opacity:.55;cursor:default}

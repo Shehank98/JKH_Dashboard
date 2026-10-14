@@ -117,6 +117,11 @@ async function createShares(dataDir) {
       if (!cube || !cube.cols || !cube.dicts || !cube.meta || !Array.isArray(cube.cols.mon) || !cube.cols.mon.length) throw fail(400, 'The data for this dashboard is missing or empty');
       const n = cube.cols.mon.length;
       for (const k of Object.keys(cube.cols)) if (!Array.isArray(cube.cols[k]) || cube.cols[k].length !== n) throw fail(400, 'The data for this dashboard is not valid');
+      if (cube.category) {
+        const cc = cube.category, m = cc.cols && cc.cols.mon;
+        if (!cc.dicts || !cc.meta || !Array.isArray(m) || !m.length) throw fail(400, 'The category data for this dashboard is not valid');
+        for (const k of Object.keys(cc.cols)) if (!Array.isArray(cc.cols[k]) || cc.cols[k].length !== m.length) throw fail(400, 'The category data for this dashboard is not valid');
+      }
       let expiresAt = null;
       if (b.expiresAt) {
         const t = new Date(b.expiresAt);

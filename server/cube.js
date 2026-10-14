@@ -125,4 +125,42 @@ function unpackCube(cube) {
   };
 }
 
-module.exports = { buildCube, unpackCube, THEMES, LEVELS };
+// The Category dashboard's data for a share: its monthly rows (optionally one product group only), with the
+// dictionaries renumbered so names from other product groups are not included.
+function packCategory(ds, pg) {
+  const { dicts, cols } = ds;
+  const lockId = pg ? dicts.pg.indexOf(pg) : -1;
+  if (pg && lockId < 0) throw new Error('Unknown product group');
+  const n = cols.mon.length;
+  const keep = [];
+  for (let i = 0; i < n; i++) if (lockId < 0 || cols.pg[i] === lockId) keep.push(i);
+  if (!keep.length) throw new Error('There is no category data to share for this selection.');
+  const renum = key => {
+    const m = new Map(), names = [], ids = new Array(keep.length);
+    keep.forEach((i, k) => { const v = cols[key][i]; let j = m.get(v); if (j === undefined) { j = names.length; names.push(dicts[key][v]); m.set(v, j); } ids[k] = j; });
+    return { names, ids };
+  };
+  const r = { pg: renum('pg'), mb: renum('mb'), adv: renum('adv'), brand: renum('brand'), sub: renum('sub') };
+  const med = k => keep.map(i => Math.round(cols[k][i] * 1000) / 1000);
+  let minMon = Infinity, maxMon = -Infinity;
+  const mon = keep.map(i => { const v = cols.mon[i]; if (v < minMon) minMon = v; if (v > maxMon) maxMon = v; return v; });
+  return {
+    v: VERSION, meta: { minMon, maxMon, hasSub: !!ds.meta.hasSub && r.sub.names.some(x => x !== '(none)') },
+    dicts: { pg: r.pg.names, mb: r.mb.names, adv: r.adv.names, brand: r.brand.names, sub: r.sub.names },
+    cols: { mon, pg: r.pg.ids, mb: r.mb.ids, adv: r.adv.ids, brand: r.brand.ids, sub: r.sub.ids, tv: med('tv'), radio: med('radio'), press: med('press') },
+  };
+}
+function unpackCategory(c) {
+  if (!c || c.v !== VERSION) throw new Error('This shared dashboard was made by a different version. Ask for a new link.');
+  const k = c.cols;
+  return {
+    meta: { kind: 'category', shared: true, rows: k.mon.length, skipped: 0, minMon: c.meta.minMon, maxMon: c.meta.maxMon, hasSub: !!c.meta.hasSub, fileName: 'Shared dashboard', uploadedAt: new Date().toISOString() },
+    dicts: c.dicts,
+    cols: {
+      mon: Int32Array.from(k.mon), pg: Int32Array.from(k.pg), mb: Int32Array.from(k.mb), adv: Int32Array.from(k.adv), brand: Int32Array.from(k.brand), sub: Int32Array.from(k.sub),
+      tv: Float64Array.from(k.tv), radio: Float64Array.from(k.radio), press: Float64Array.from(k.press),
+    },
+  };
+}
+
+module.exports = { buildCube, unpackCube, packCategory, unpackCategory, THEMES, LEVELS };
