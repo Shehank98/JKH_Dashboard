@@ -133,6 +133,12 @@ const handlers = {
     const { keyOf } = requireLib('brand-derive');
     return requireLib('category-brand').brandView(need(), (pg, b) => heldLookup.get(keyOf(pg, b)) || null, filters || {}, scope || {}, { tagCommercial: !!tagCommercial });
   },
+  // Channel preference by brands (the extra chart of the Category dashboard).
+  catChannelPref({ filters, brands, medium }) {
+    if (!heldLookup) throw new Error('The Brand Map is not loaded yet.');
+    const { keyOf } = requireLib('brand-derive');
+    return requireLib('category-brand').channelPreference(need(), (pg, b) => heldLookup.get(keyOf(pg, b)) || null, filters || {}, { brands: brands || [], medium: medium || '' });
+  },
   // What the Category data currently is, so the page can tell when the Brand Map has moved on.
   catStatus() { return { has: !!catDataset, derived: !sharedMode && !!(catDataset && catDataset.meta.derived), mapVersion: catDataset ? catDataset.meta.mapVersion : null, mapHeld: heldVersion, canDerive: !!(dataset && dataset.dicts.product) }; },
   async cancelIngest() { pending = null; return { ok: true }; },

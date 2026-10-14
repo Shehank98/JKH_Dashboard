@@ -256,4 +256,62 @@ function brandView(ds, lookup, f, scope, opts) {
   };
 }
 
-module.exports = { brandView };
+// Channel preference by brands: for each mother brand shown (and the whole category), how its spend in the selected
+// period is spread across channels. Channels are the biggest ones of the category first; the small rest is one slice.
+// opts.brands: the mother brands to show (in that order); opts.medium: 'TV' | 'Radio' | 'Press' or '' for all.
+function channelPreference(ds, lookup, f, opts) {
+  opts = opts || {};
+  const { dicts, cols } = ds;
+  if (!dicts.product || !cols.product) throw new Error('This data file was loaded before brands were read. Please load it again.');
+  const pgId = dicts.pg.indexOf(f.pg);
+  if (pgId < 0) throw new Error('Unknown product group');
+  const win = windows(periodsOf(f, {}));
+  const nProd = dicts.product.length;
+  const mbNames = [], mbIdx = new Map(), subNames = [], subIdx = new Map();
+  const prodMb = new Int32Array(nProd), prodSub = new Int32Array(nProd);
+  const idOf = (names, map, v) => { const k = v.toLowerCase(); let i = map.get(k); if (i === undefined) { i = names.length; names.push(v); map.set(k, i); } return i; };
+  for (let p = 0; p < nProd; p++) {
+    const brand = dicts.product[p], found = lookup ? lookup(f.pg, brand) : null;
+    prodMb[p] = idOf(mbNames, mbIdx, clean(found && found.mother) || guessMother(brand, []));
+    prodSub[p] = idOf(subNames, subIdx, clean(found && found.sub) || '(none)');
+  }
+  const ctxSub = f.sub ? subIdx.get(String(f.sub).toLowerCase()) : -1;
+  if (f.sub && ctxSub === undefined) throw new Error('Unknown sub category');
+  const med = opts.medium ? MED.indexOf(opts.medium) : -1;
+  const wanted = (opts.brands || []).map(n => mbIdx.get(String(n).toLowerCase())).filter(x => x !== undefined);
+  const want = new Set(wanted);
+  const mine = new Uint8Array(dicts.adv.length);
+  for (const n of f.mine || []) { const i = dicts.adv.indexOf(n); if (i >= 0) mine[i] = 1; }
+  const nCh = dicts.channel.length, chMed = dicts.channelMedium;
+  const catCh = new Float64Array(nCh), byBrand = new Map(), mineMb = new Set();
+  const { pg, adv, ch, mon, cost, product } = cols;
+  for (let i = 0, n = pg.length; i < n; i++) {
+    if (pg[i] !== pgId) continue;
+    if (!(win.bits(mon[i]) & 1)) continue;
+    const p = product[i];
+    if (ctxSub >= 0 && prodSub[p] !== ctxSub) continue;
+    const c = ch[i];
+    if (med >= 0 && chMed[c] !== med) continue;
+    const v = cost[i] / 1000, mb = prodMb[p];
+    catCh[c] += v;
+    if (want.has(mb)) {
+      let a = byBrand.get(mb); if (!a) { a = new Float64Array(nCh); byBrand.set(mb, a); }
+      a[c] += v;
+      if (mine[adv[i]]) mineMb.add(mb);
+    }
+  }
+  const order = [...catCh.keys()].filter(c => catCh[c] > 0).sort((x, y) => catCh[y] - catCh[x]);
+  const TOP = 9, top = order.slice(0, TOP), rest = order.slice(TOP);
+  const series = top.map(c => ({ key: dicts.channel[c], name: dicts.channelName[c], medium: MED[chMed[c]] }));
+  if (rest.length) series.push({ key: '', name: `Other channels (${rest.length})`, medium: '', other: true });
+  const column = arr => {
+    const values = top.map(c => arr[c]);
+    if (rest.length) values.push(rest.reduce((a, c) => a + arr[c], 0));
+    const total = values.reduce((a, b) => a + b, 0);
+    return { total, values, shares: values.map(v => (total > 0 ? (v / total) * 100 : 0)) };
+  };
+  const brands = wanted.filter(mb => byBrand.has(mb)).map(mb => ({ name: mbNames[mb], us: mineMb.has(mb), ...column(byBrand.get(mb)) })).filter(b => b.total > 0);
+  return { series, brands, category: column(catCh), medium: opts.medium || '', months: win.len, ranges: win.ranges };
+}
+
+module.exports = { brandView, channelPreference };

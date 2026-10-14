@@ -6,7 +6,7 @@ const path = require('path');
 const { readSpotFile } = require('../server/browser-readers');
 const { deriveCategory, keyOf } = require('../server/brand-derive');
 const category = require('../server/category');
-const { brandView } = require('../server/category-brand');
+const { brandView, channelPreference } = require('../server/category-brand');
 
 const file = process.argv[2] || path.join(__dirname, '..', 'samples', 'sample_420000.csv');
 const near = (a, b, w) => assert.ok(Math.abs(a - b) <= Math.max(1e-6, Math.abs(b) * 1e-9) + 1e-6, `${w}: ${a} vs ${b}`);
@@ -90,6 +90,18 @@ const sum = (a, k) => a.reduce((s, x) => s + x[k], 0);
   near(sum(bvB.monthsList, 'spend'), bvB.head.cur, 'the six months add up');
   near(sum(bvB.channels, 'cur'), bvB.head.cur, 'channels add up over both quarters');
   assert.deepStrictEqual(brandView(ds, lookup, f, { mb: mbName, periods: [['2026-05', '2026-05']] }, {}).monthsList.map(m => m.key), ['2026-05'], 'a clicked period replaces the selection');
+  // channel preference by brands
+  const names = all.children.map(c => c.name);
+  const cpAll = channelPreference(ds, lookup, f, { brands: names, medium: '' });
+  near(cpAll.category.total, all.head.cur, 'category column is the category total');
+  assert.deepStrictEqual(cpAll.brands.map(b => b.name), names);
+  for (const b of cpAll.brands) { near(b.shares.reduce((a, x) => a + x, 0), 100, b.name + ' shares'); near(b.total, all.children.find(c => c.name === b.name).cur, b.name + ' spend'); }
+  near(cpAll.category.shares.reduce((a, x) => a + x, 0), 100, 'category shares');
+  assert.ok(cpAll.series.length >= 2 && cpAll.series[0].name);
+  const cpTv = channelPreference(ds, lookup, f, { brands: names, medium: 'TV' });
+  near(cpTv.category.total, all.head.mediums[0], 'TV only is the TV spend');
+  assert.ok(cpTv.series.every(s => s.other || s.medium === 'TV'));
+  near(channelPreference(ds, lookup, both, { brands: names, medium: '' }).category.total, dB.total.cur, 'several quarters added up');
   assert.ok(Array.isArray(mbv.sos.self) && mbv.sos.self.every(v => v == null || Number.isFinite(v)), 'sos series is a plain list of numbers');
   assert.strictEqual(JSON.stringify(mbv).includes('NaN'), false);
   assert.throws(() => brandView(ds, lookup, f, { mb: 'No such' }, {}), /Unknown mother brand/);

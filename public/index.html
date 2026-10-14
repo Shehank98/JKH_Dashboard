@@ -730,7 +730,10 @@ tr.me .sharebar{background:#FF8A3D}
         </section>
       </div>
       <div class="ccolR">
-        <section class="cpanel" id="catS3">
+        <section class="cpanel slidepanel" id="catS3">
+          <button type="button" class="slidetab" id="catRSlide" hidden aria-label="Show channel preference by brands" aria-pressed="false" title="Slide between investment by mother brand and channel preference by brands"><span class="st-arrow">›</span><span class="st-text">Channel preference</span></button>
+          <div class="slider" id="catRSlider">
+            <div class="sview" id="catR0">
           <div class="cph">
             <h2 class="cedit cpt" id="catTitle3" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2>
             <p id="catSub3" hidden></p>
@@ -739,6 +742,16 @@ tr.me .sharebar{background:#FF8A3D}
           <div class="flipbox" id="catBrBox">
             <div class="face f"><div class="csubs" id="catSubs"></div></div>
             <div class="face b"><div class="csubs mixc" id="catMixC"></div></div>
+          </div>
+            </div>
+            <div class="sview" id="catR1">
+              <div class="cph">
+                <span class="cpt label">Channel preference by brands</span>
+                <p id="catSub4" hidden></p>
+                <div class="tgl" id="catCpMed" title="Which channels to show"><button data-v="TV" class="on">TV</button><button data-v="Radio">Radio</button><button data-v="Press">Press</button><button data-v="">All media</button></div>
+              </div>
+              <div class="cchart" id="catChPref"></div>
+            </div>
           </div>
         </section>
       </div>

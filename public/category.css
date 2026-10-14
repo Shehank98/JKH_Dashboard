@@ -344,3 +344,14 @@ body.ro-cat #catFilterBtn,body.ro-cat .ctab[data-pane=cpFilters],body.ro-cat #cp
 .pchip:hover{background:#F6F8FC}
 .pchip.on{background:#1A1F36;border-color:#1A1F36;color:#fff}
 .psel{font-size:11px;font-weight:600;color:#4A5570;margin-top:6px;line-height:1.4}
+
+/* the right card slides like the left one: investment by mother brand <-> channel preference by brands */
+.ccolR .slidepanel{flex:1 1 0;overflow:hidden;padding:0;position:relative}
+.ccolR .sview{padding:8px 12px 6px 36px}
+#catChPref{display:flex;flex-direction:column;min-height:0}
+.cp-svg{flex:1;min-height:0;position:relative}
+.cp-leg{display:flex;flex-wrap:wrap;gap:4px 14px;justify-content:center;padding-top:4px;font-size:10.5px;font-weight:600;color:#4A5570}
+.cp-leg span{display:flex;align-items:center;gap:5px}.cp-leg i{width:10px;height:10px;display:inline-block;border-radius:2px}
+#catChPref svg [data-scope]{cursor:pointer}
+#catChPref svg rect[data-scope]:hover{opacity:.85}
+.cp-note{padding:30px;text-align:center;color:#6B7590;font-size:12.5px}

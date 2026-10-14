@@ -323,6 +323,7 @@
     const d = data, yt = state.yearType, R = d.ranges;
     const { cur, yoy, prev } = labelsOf(d);
     const f = d.filters;
+    checkCp().then(() => { if (slideR) renderCp(); });
     heading($('catTitle'), 's1', `Leading ${f.pg} Brands by Investment`);
     const topN = f.top === 0 ? null : Math.min(f.top, d.brandCount);
     const scope = (f.comps && f.comps.length) ? `${d.shown} mother brands (mine and selected competitors)` : topN == null ? `All ${d.brandCount} mother brands` : `Top ${topN} mother brands`;
@@ -404,6 +405,7 @@
     window.addEventListener('mouseup', () => { if (down) { down = false; g.classList.remove('drag'); } });
     g.addEventListener('click', e => { if (moved) { e.stopImmediatePropagation(); e.preventDefault(); moved = false; } }, true);
   })();
+  window.addEventListener('resize', () => { if (data && slideR && document.body.classList.contains('mode-cat')) { clearTimeout(cpTimer); cpTimer = setTimeout(renderCp, 150); } });
   window.addEventListener('resize', () => { if (data && document.body.classList.contains('mode-cat')) { updateStrip(); renderChart(data, null); renderCi(data); } });
 
   // ---------- Category behaviour, month by month ----------
@@ -886,6 +888,104 @@
   const openScope = e => { const el = e.target.closest('[data-scope]'); if (!el) return false; try { openDetail(JSON.parse(el.dataset.scope)); } catch (err) { return false; } return true; };
   $('catChart').addEventListener('click', openScope);
   $('catMixC').addEventListener('click', e => { if (!e.target.closest('.cedit')) openScope(e); });
+
+  // ---------- channel preference by brands: the right card slides to it ----------
+  // For each mother brand shown (and the whole category) how its spend in the selected period splits across channels.
+  // Needs the Category data built from the main file (channels come from the spot log), so the slide tab only shows then.
+  const cp = { medium: 'TV', data: null, key: '', seq: 0 };
+  let slideR = false, cpAvail = false;
+  const CHAN_COL = [[/derana/i, '8C8C8C'], [/hiru/i, '0B2A6F'], [/sirasa/i, 'E8141B'], [/swarna/i, 'FFC900'], [/itn/i, 'F28B93'], [/siyatha/i, '7B3FA0'], [/shakthi/i, '00A859'], [/vasantham/i, '8B4A2B'], [/varnam/i, '8FD14F'], [/supreme/i, '111111'], [/rupavahini|rupa/i, 'C2410C']];
+  const CHAN_FALL = ['1E88E5', '00ACC1', 'E91E63', 'F5A300', '455A64', '9C27B0', '5B6B2F', '2F5A9E', 'B84A93', '0A3EA6'];
+  const chanHex = (s, k) => (s.other ? 'C5CEE3' : ((CHAN_COL.find(([re]) => re.test(s.name)) || [])[1] || CHAN_FALL[k % CHAN_FALL.length]));
+  const inkOn = hex => { const n = parseInt(hex, 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? '1A1F36' : 'FFFFFF'; };
+
+  function setRSlide(m, instant) {
+    slideR = m;
+    const sl = $('catRSlider'), tab = $('catRSlide');
+    if (instant) sl.style.transition = 'none';
+    sl.classList.toggle('m', m);
+    if (instant) { void sl.offsetWidth; sl.style.transition = ''; }
+    tab.classList.toggle('on', m);
+    tab.setAttribute('aria-pressed', String(m));
+    tab.querySelector('.st-arrow').textContent = m ? '‹' : '›';
+    tab.querySelector('.st-text').textContent = m ? 'Mother brands' : 'Channel preference';
+    tab.setAttribute('aria-label', m ? 'Show investment by mother brand' : 'Show channel preference by brands');
+    if (m) renderCp();
+  }
+  $('catRSlide').addEventListener('click', () => setRSlide(!slideR));
+  $('catCpMed').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    cp.medium = b.dataset.v;
+    [...$('catCpMed').children].forEach(x => x.classList.toggle('on', x === b));
+    renderCp();
+  });
+  async function checkCp() {
+    try { cpAvail = !!(window.BRANDVIEW && await window.BRANDVIEW.canOpen()); } catch (e) { cpAvail = false; }
+    $('catRSlide').hidden = !cpAvail;
+    if (!cpAvail && slideR) setRSlide(false, true);
+    return cpAvail;
+  }
+  async function cpFetch() {
+    const d = data;
+    if (!d || !cpAvail) return null;
+    const brands = d.cards.map(c => c.name), key = JSON.stringify([d.filters, brands, cp.medium]);
+    if (cp.data && cp.key === key) return cp.data;
+    cp.data = await engine.call('catChannelPref', { filters: d.filters, brands, medium: cp.medium }); cp.key = key;
+    return cp.data;
+  }
+  // The drawing, as shapes shared by the screen (SVG) and the PowerPoint.
+  function cpPrims(CP, W, H) {
+    const P = [], cols = [...CP.brands, { name: 'Category', total: CP.category.total, shares: CP.category.shares, values: CP.category.values, cat: true }];
+    const n = cols.length, X0 = 74, HB = 28, T = HB + 14, XL = 44, Y0 = H - XL, gw = (W - X0 - 4) / n, bw = Math.min(gw * 0.72, 76);
+    const colHex = CP.series.map((s, k) => chanHex(s, k));
+    P.push({ t: 'r', x: 0, y: 0, w: X0 - 2, h: HB, fill: '000000' });
+    P.push({ t: 't', x: (X0 - 2) / 2, y: HB / 2 + 4, text: 'Spend (Mn)', size: 10, color: 'FFFFFF', anchor: 'middle', bold: true });
+    cols.forEach((c, i) => {
+      P.push({ t: 'r', x: X0 + i * gw, y: 0, w: gw - 2, h: HB, fill: '000000' });
+      P.push({ t: 't', x: X0 + i * gw + gw / 2, y: HB / 2 + 4, text: mnNum(c.total), size: 11, color: 'FFFFFF', anchor: 'middle', bold: true });
+    });
+    for (let g = 0; g <= 10; g++) {
+      const y = Y0 - ((Y0 - T) * g) / 10;
+      P.push({ t: 'l', x1: X0, y1: y, x2: W - 4, y2: y, color: 'E7EBF3', lw: 1 });
+      P.push({ t: 't', x: X0 - 8, y: y + 3.5, text: `${g * 10}%`, size: 10, color: '8A93AD', anchor: 'end' });
+    }
+    cols.forEach((c, i) => {
+      const cx = X0 + i * gw + gw / 2;
+      let acc = 0;
+      c.shares.forEach((v, k) => {
+        if (!(v > 0)) return;
+        const h = ((Y0 - T) * v) / 100, y = Y0 - ((Y0 - T) * (acc + v)) / 100;
+        acc += v;
+        const s = CP.series[k], scope = c.cat ? (s.other ? null : { ch: s.key }) : (s.other ? { mb: c.name } : { mb: c.name, ch: s.key });
+        P.push({ t: 'r', x: cx - bw / 2, y, w: bw, h, fill: colHex[k], line: 'FFFFFF', lw: 0.5, tip: `${c.name} · ${s.name}: ${nf(v, 1)}% · ${mnTxt(c.values[k])}`, ...(scope ? { scope } : {}) });
+        if (h >= 13) P.push({ t: 't', x: cx, y: y + h / 2 + 4, text: `${nf(v, 0)}%`, size: 11, color: inkOn(colHex[k]), anchor: 'middle', ...(scope ? { scope } : {}) });
+      });
+      const words = c.name.split(/\s+/), lines = [];
+      let line = '';
+      words.forEach(w => { if (line && (line + ' ' + w).length > Math.max(8, Math.floor(gw / 6.5))) { lines.push(line); line = w; } else line = line ? line + ' ' + w : w; });
+      if (line) lines.push(line);
+      lines.slice(0, 2).forEach((ln, j) => P.push({ t: 't', x: cx, y: Y0 + 15 + j * 13, text: (c.us ? '★ ' : '') + (j === 1 && lines.length > 2 ? ln + '…' : ln), size: 11, color: '4A5570', anchor: 'middle', bold: !!c.us, ...(c.cat ? {} : { scope: { mb: c.name } }) }));
+    });
+    return P;
+  }
+  let cpPaint = 0, cpTimer = 0;
+  async function renderCp() {
+    const host = $('catChPref');
+    if (!host || !data) return;
+    const my = ++cpPaint;
+    host.innerHTML = '<div class="cp-note">Working out channel preference…</div>';
+    let CP;
+    try { if (!cpAvail) await checkCp(); CP = await cpFetch(); } catch (e) { if (my === cpPaint) host.innerHTML = `<div class="cp-note">${esc(e.message)}</div>`; return; }
+    if (my !== cpPaint) return;
+    $('catSub4').textContent = `${labelsOf(data).cur}${cp.medium ? ' · ' + cp.medium + ' channels' : ' · all media'} · share of each brand's spend by channel`;
+    if (!CP || !CP.brands.length) { host.innerHTML = '<div class="cp-note">No spend on these channels in the selected period.</div>'; return; }
+    host.innerHTML = `<div class="cp-svg" id="cpBox"></div><div class="cp-leg">${CP.series.map((s, k) => `<span><i style="background:#${chanHex(s, k)}"></i>${esc(s.name)}</span>`).join('')}</div>`;
+    const box = $('cpBox'), W = Math.max(320, box.clientWidth), H = Math.max(170, box.clientHeight);
+    box.innerHTML = primsToSvg(cpPrims(CP, W, H), W, H, 'cp');
+  }
+  $('catChPref').addEventListener('click', e => openScope(e));
+
   const detailStack = [];
   let cmTab = 'ov', lastDetail = null;
   const closeModal = () => { $('catModal').classList.remove('on'); detailStack.length = 0; };
@@ -1009,7 +1109,7 @@
   // The whole screen, then each panel as its own JPG (both sides of the flip panels), in a ZIP.
   async function exportJpg() {
     toast('Preparing JPG images');
-    const root = $('viewCat'), savedCi = flips.ci, savedBr = flips.br, savedSlide = slideM;
+    const root = $('viewCat'), savedCi = flips.ci, savedBr = flips.br, savedSlide = slideM, savedR = slideR;
     const grid = $('catGrid'), s3 = $('catS3'), subs = $('catSubs');
     try {
       await Promise.all([loadScript('/vendor/html-to-image/html-to-image.js'), loadScript('/vendor/jszip/jszip.min.js')]);
@@ -1026,6 +1126,8 @@
       setSlide(true, true); await settle();
       await shot('00_Full_screen_monthly_by_brand', $('catOne'));
       setSlide(false, true); await settle();
+      setRSlide(false, true);
+      if (await checkCp()) { setRSlide(true, true); await renderCp(); await settle(); await settle(); await shot('00_Full_screen_channel_preference', $('catOne')); setRSlide(false, true); await settle(); }
       // Every card (the strip wraps into rows for this picture).
       grid.style.cssText += ';flex-wrap:wrap;overflow:visible;height:auto'; await settle();
       await shot('01_Cards', $('catS1'));
@@ -1047,7 +1149,7 @@
       toast('JPG images downloaded');
     } catch (e) { toast('Export failed: ' + e.message); } finally {
       root.classList.remove('exporting');
-      setFlip('ci', savedCi, true); setFlip('br', savedBr, true); setSlide(savedSlide, true);
+      setFlip('ci', savedCi, true); setFlip('br', savedBr, true); setSlide(savedSlide, true); setRSlide(savedR && cpAvail, true);
       if (data) { updateStrip(); renderChart(data, null); renderCi(data); }
     }
   }
@@ -1119,6 +1221,28 @@
           if (runs.length) slide.addText(runs, { x: 0.55, y: 5.98, w: 12.2, h: 1.4, fontFace: 'Calibri', valign: 'top', margin: 0 });
         }
         slide.addNotes(CD.periods.map(p => `${p.tipLabel}${p.complete ? '' : ' (incomplete)'}: total ${nf(p.total / 1000, 0)} (TV ${nf(p.tv / 1000, 0)}, Radio ${nf(p.radio / 1000, 0)}, Press ${nf(p.press / 1000, 0)})` + CD.names.map((nm, k) => `; ${nm} ${nf(p.subs[k] / 1000, 0)}`).join('')).join('\n'));
+      }
+
+      // ----- slide: channel preference by brands (when the Category data comes from the main file) -----
+      if (await checkCp()) {
+        const CPd = await cpFetch();
+        if (CPd && CPd.brands.length) {
+          const slide = pptx.addSlide(), f1 = 0.01, tsz = 1.25;
+          chrome(slide, `${f.pg}: channel preference by brands`, `${L.cur}${cp.medium ? ' · ' + cp.medium + ' channels' : ' · all media'} · share of each brand's spend by channel · Spend in Rs. Mn`);
+          const CW = 1230, CH = 440, P = cpPrims(CPd, CW, CH);
+          P.forEach(e => {
+            if (e.t === 'r') slide.addShape(SHAPE.rect, { x: 0.55 + e.x * f1, y: 1.6 + e.y * f1, w: Math.max(0.005, e.w * f1), h: Math.max(0.005, e.h * f1), fill: { color: e.fill }, line: e.line ? { color: e.line, width: e.lw || 1 } : { color: e.fill, width: 0 } });
+            else if (e.t === 'l') slide.addShape(SHAPE.line, { x: 0.55 + Math.min(e.x1, e.x2) * f1, y: 1.6 + Math.min(e.y1, e.y2) * f1, w: Math.abs(e.x2 - e.x1) * f1, h: Math.abs(e.y2 - e.y1) * f1, line: { color: e.color, width: e.lw || 1 } });
+            else if (e.t === 't') {
+              const w = (e.text.length * e.size * 0.6 + 8) * f1, h = e.size * 1.5 * f1, anchor = e.anchor || 'start';
+              const x = anchor === 'middle' ? e.x * f1 - w / 2 : anchor === 'end' ? e.x * f1 - w : e.x * f1;
+              slide.addText(e.text, { x: 0.55 + x, y: 1.6 + (e.y - e.size * 0.95) * f1, w, h, align: anchor === 'middle' ? 'center' : anchor === 'end' ? 'right' : 'left', valign: 'middle', fontFace: 'Calibri', fontSize: e.size * f1 * 72 * tsz, bold: !!e.bold, color: e.color, margin: 0, wrap: false });
+            }
+          });
+          let lx = 1.6;
+          CPd.series.forEach((sr, k) => { slide.addShape(SHAPE.rect, { x: lx, y: 6.2, w: 0.12, h: 0.12, fill: { color: chanHex(sr, k) }, line: { color: chanHex(sr, k), width: 0 } }); slide.addText(sr.name, { x: lx + 0.17, y: 6.15, w: 1.5, h: 0.22, fontFace: 'Calibri', fontSize: 10, color: INK, margin: 0 }); lx += 0.3 + Math.max(0.7, sr.name.length * 0.085); });
+          slide.addNotes(CPd.brands.map(b => `${b.name}: ${mnTxt(b.total)}` + CPd.series.map((sr, k) => `; ${sr.name} ${nf(b.shares[k], 0)}%`).join('')).join('\n'));
+        }
       }
 
       // ----- slide(s): cards, ten to a slide -----
