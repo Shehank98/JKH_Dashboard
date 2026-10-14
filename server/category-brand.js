@@ -4,7 +4,7 @@
 // thousand rupees, like the rest of the Category dashboard.
 //
 // scope can combine: mb, mbs (a set), brand, adv, sub, ch (channel), theme (campaign), medium, vt ('C' commercials,
-// 'V' value additions), from + to (a month range other than the dashboard's). Medium, channel, ad type and the
+// 'V' value additions), dur (an ad length such as '30s', TV and Radio), from + to (a month range other than the dashboard's). Medium, channel, ad type and the
 // dashboard's sub category are the "context": they narrow the whole category too, so share of spend stays like for like.
 // Mother brand, brand, advertiser, campaign and a scope sub category narrow only the brand being looked at.
 // Value additions follow the Spot Log rules (derive.js), including its "count Tag as a commercial" tick box.
@@ -58,6 +58,8 @@ function brandView(ds, lookup, f, scope, opts) {
   const sMed = scope.medium ? MED.indexOf(scope.medium) : -1;
   if (scope.medium && sMed < 0) throw new Error('Unknown medium');
   const sVt = scope.vt === 'C' ? 1 : scope.vt === 'V' ? 2 : 0;
+  const sDur = scope.dur ? D.DUR_BUCKETS.indexOf(scope.dur) : -1;
+  if (scope.dur && sDur < 0) throw new Error('Unknown ad length');
   const tag = !!opts.tagCommercial;
   const excluded = excludedThemes(ds, tag);
   const mine = new Uint8Array(dicts.adv.length);
@@ -72,6 +74,8 @@ function brandView(ds, lookup, f, scope, opts) {
 
   const num = mk(), cat = mk();
   const ent = new Map(), entMonthly = new Map(), mineEnt = new Set();
+  const NB = D.DUR_BUCKETS.length, durRaw = cols.durRaw || null;
+  const durB = { counts: new Array(NB).fill(0), sum: 0, n: 0 }, durC = { counts: new Array(NB).fill(0), sum: 0, n: 0 };
   const catMonthly = new Float64Array(len), catMed = [mk(), mk(), mk()], catVt = [0, 0], catByCh = new Map();
   const children = new Map(), childMonthly = new Map(), childCh = new Map(), mineChild = new Set();
   const medAcc = [mk(), mk(), mk()], byCh = new Map(), byAdv = new Map(), byTheme = new Map();
@@ -93,6 +97,8 @@ function brandView(ds, lookup, f, scope, opts) {
     if (sMed >= 0 && md !== sMed) continue;
     if (sCh >= 0 && c !== sCh) continue;
     const th = theme[i], isC = excluded[th] !== 1;
+    const raw = durRaw ? durRaw[i] : NaN, bucket = durRaw && md < 2 ? D.durBucketOf(raw, !isC) : 255;
+    if (sDur >= 0 && bucket !== sDur) continue;
     if (sVt === 1 && !isC) continue;
     if (sVt === 2 && isC) continue;
     const v = cost[i] / 1000, a = adv[i], mb = prodMb[p];
@@ -105,6 +111,7 @@ function brandView(ds, lookup, f, scope, opts) {
       catMonthly[k] += v; add(catMed[md], 1, v, isC); catVt[isC ? 0 : 1] += v; add(get(catByCh, c), 1, v, isC);
       arr(entMonthly, ek, len)[k] += v;
       if (mine[a]) mineEnt.add(ek);
+      if (bucket < NB) { durC.counts[bucket]++; const sec = D.durSecondsOf(raw, !isC); if (sec > 0) { durC.sum += sec; durC.n++; } }
     }
     // The brand being looked at.
     if (sMb >= 0 && mb !== sMb) continue;
@@ -125,6 +132,7 @@ function brandView(ds, lookup, f, scope, opts) {
       if (mine[a]) mineChild.add(ck);
       if (fl & 1) { arr(childMonthly, ck, len)[m - m0] += v; childCh.set(ck * nCh + c, (childCh.get(ck * nCh + c) || 0) + v); }
     }
+    if ((fl & 1) && bucket < NB) { durB.counts[bucket]++; const sec = D.durSecondsOf(raw, !isC); if (sec > 0) { durB.sum += sec; durB.n++; } }
     if (fl & 1) {
       const k = m - m0;
       mCur[k] += v; mN[k]++;
@@ -165,6 +173,7 @@ function brandView(ds, lookup, f, scope, opts) {
   const channels = [...byCh].filter(([, a]) => a.s[0] > 0 || a.s[1] > 0).map(([c, a]) => ({
     key: dicts.channel[c], name: chName(c), medium: MED[chMed[c]], cur: a.s[0], yoy: a.s[1], prev: a.s[2], share: pct(a.s[0], num.s[0]), ...split(a),
     sosHere: pct(a.s[0], (catByCh.get(c) || mk()).s[0]), spots: a.n[0],
+    catShare: pct((catByCh.get(c) || mk()).s[0], cat.s[0]),
   })).sort((x, y) => y.cur - x.cur);
   const advertisers = [...byAdv].filter(([, a]) => a.s[0] > 0 || a.s[1] > 0).map(([a2, a]) => ({
     name: dicts.adv[a2], us: !!mine[a2], cur: a.s[0], yoy: a.s[1], share: pct(a.s[0], num.s[0]), ...split(a), spots: a.n[0],
@@ -194,7 +203,8 @@ function brandView(ds, lookup, f, scope, opts) {
   if (sTheme >= 0) parts.push({ k: 'theme', v: dicts.theme[sTheme] });
   if (sMed >= 0) parts.push({ k: 'medium', v: MED[sMed] });
   if (sVt) parts.push({ k: 'vt', v: sVt === 1 ? 'Commercials' : 'Value additions' });
-  const main = parts.find(p => !['medium', 'vt'].includes(p.k) && p.k === (sTheme >= 0 ? 'theme' : sCh >= 0 ? 'ch' : sBrand >= 0 ? 'brand' : sAdv >= 0 ? 'adv' : sMb >= 0 ? 'mb' : scSub >= 0 ? 'sub' : 'mbs'));
+  if (sDur >= 0) parts.push({ k: 'dur', v: scope.dur + ' ads' });
+  const main = parts.find(p => !['medium', 'vt', 'dur'].includes(p.k) && p.k === (sTheme >= 0 ? 'theme' : sCh >= 0 ? 'ch' : sBrand >= 0 ? 'brand' : sAdv >= 0 ? 'adv' : sMb >= 0 ? 'mb' : scSub >= 0 ? 'sub' : 'mbs'));
   const kindNames = { theme: 'Campaign', ch: 'Channel', brand: 'Brand', adv: 'Advertiser', mb: 'Mother brand', sub: 'Sub category', mbs: 'Group' };
 
   const topCh = channels[0] || null;
@@ -220,6 +230,14 @@ function brandView(ds, lookup, f, scope, opts) {
       self: sosOf(mCur, catMonthly), competitors, ranking,
       byMedium: medAcc.map((a, k) => ({ medium: MED[k], share: pct(a.s[0], catMed[k].s[0]) })).filter(x => x.share != null),
       byAdType: { C: pct(split(num).C, catVt[0]), V: pct(split(num).V, catVt[1]) },
+    },
+    mediums: medAcc.map((a, k) => ({
+      medium: MED[k], cur: a.s[0], yoy: a.s[1], prev: a.s[2], share: pct(a.s[0], num.s[0]), ...split(a), spots: a.n[0],
+      sos: pct(a.s[0], catMed[k].s[0]), catShare: pct(catMed[k].s[0], cat.s[0]), catCur: catMed[k].s[0],
+    })),
+    duration: {
+      buckets: D.DUR_BUCKETS, hasLengths: !!durRaw,
+      brand: { counts: durB.counts, acd: durB.n ? durB.sum / durB.n : null }, cat: { counts: durC.counts, acd: durC.n ? durC.sum / durC.n : null },
     },
     channels, advertisers, campaigns, monthsList,
   };

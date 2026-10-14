@@ -59,6 +59,15 @@ const sum = (a, k) => a.reduce((s, x) => s + x[k], 0);
   assert.strictEqual(one.months, 1); near(one.head.cur, mbv.monthsList.find(m => m.key === '2026-05').spend, 'one month');
   const sub = brandView(ds, lookup, { ...f, sub: 'Plain' }, {}, {});
   assert.ok(sub.head.cat.cur < all.head.cat.cur && sub.head.cat.cur > 0, 'sub category filter narrows the category');
+  // medium split, duration mix and channel mix
+  near(sum(mbv.mediums, 'cur'), mbv.head.cur, 'mediums add up'); near(sum(mbv.mediums, 'share'), 100, 'medium shares');
+  near(mbv.channels.reduce((a, c) => a + (c.catShare || 0), 0), 100, 'category channel mix adds to 100');
+  assert.ok(mbv.duration.hasLengths && sum(mbv.duration.brand.counts.map(c => ({ c })), 'c') > 0, 'duration counts');
+  assert.ok(mbv.duration.brand.acd > 0 && mbv.duration.cat.acd > 0, 'acd');
+  const dur = mbv.duration.buckets.find((b, i) => mbv.duration.brand.counts[i] > 0), di = mbv.duration.buckets.indexOf(dur);
+  const dv = brandView(ds, lookup, f, { mb: mbName, dur }, {});
+  assert.ok(dv.head.cur > 0 && dv.head.cur < mbv.head.cur, 'one ad length narrows');
+  assert.strictEqual(dv.duration.brand.counts[di], mbv.duration.brand.counts[di], 'same spots in that length');
   assert.ok(Array.isArray(mbv.sos.self) && mbv.sos.self.every(v => v == null || Number.isFinite(v)), 'sos series is a plain list of numbers');
   assert.strictEqual(JSON.stringify(mbv).includes('NaN'), false);
   assert.throws(() => brandView(ds, lookup, f, { mb: 'No such' }, {}), /Unknown mother brand/);
