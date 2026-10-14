@@ -1277,7 +1277,7 @@
     if (!b) return;
     menu.classList.remove('on');
     if (!data) return toast('Nothing to export yet');
-    ({ jpg: exportImage, pdf: exportPdf, ppt: exportPpt, plan: exportPlanning, send: sendToPlanning, json: exportCompetitorJson, csv: exportCsv })[b.dataset.x]();
+    ({ jpg: exportImage, pdf: exportPdf, ppt: exportPpt, plan: exportPlanning, send: sendToPlanning, json: exportCompetitorJson, csv: exportCsv, report: () => (window.REPORT ? window.REPORT.open() : toast('The report tool did not load')) })[b.dataset.x]();
   });
   const fileBase = () => `Ogilvy_Orbit_Chub_${data.filters.pg.replace(/[^\w]+/g, '-')}_${data.filters.from}_to_${data.filters.to}`;
   const loadScript = src => new Promise((ok, fail) => {
@@ -1517,7 +1517,9 @@
   }
   // Share opens the client-dashboard dialog (share.js); the old filters-only link stays inside it.
   $('shareBtn').addEventListener('click', () => { if (window.SHAREDASH) window.SHAREDASH.open(); else copyFilterLink(); });
-  window.ORBIT.spot = { getState: () => JSON.parse(JSON.stringify(state)), hasData: () => !!overview && !isCube(), dataMeta: () => (overview ? overview.meta : null), copyFilterLink, fileName: () => (overview && overview.meta ? overview.meta.fileName : '') };
+  // For the full report (report.js): pictures of the dashboard and its cards, and the click-through pop-up.
+  const reportHooks = () => ({ dashboard: captureDashboard, card: captureCard, openDetail: scope => openDetail(scope, true), setDetailTab: t => { detailTab = t; renderDetailBody(); }, closeDetail });
+  window.ORBIT.spot = { getState: () => JSON.parse(JSON.stringify(state)), hasData: () => !!overview && !isCube(), dataMeta: () => (overview ? overview.meta : null), copyFilterLink, get cap() { return reportHooks(); }, fileName: () => (overview && overview.meta ? overview.meta.fileName : '') };
 
   // ---------- signed-in user ----------
   const userMenu = $('userMenu');

@@ -1096,7 +1096,7 @@
     if (!b) return;
     menu.classList.remove('on');
     if (!data) return toast('Nothing to export yet');
-    ({ jpg: exportJpg, ppt: exportPpt })[b.dataset.x]();
+    ({ jpg: exportJpg, ppt: exportPpt, report: () => (window.REPORT ? window.REPORT.open() : toast('The report tool did not load')) })[b.dataset.x]();
   });
   const loadScript = src => new Promise((ok, fail) => {
     if (document.querySelector(`script[src="${src}"]`)) return ok();
@@ -1464,7 +1464,7 @@
   O.catState = () => JSON.parse(JSON.stringify(state));
   // For the brand view (brandview.js): the dashboard's filters and period names.
   O.catHelp = {
-    filters: () => data.filters, yearType: () => state.yearType, pg: () => (data ? data.filters.pg : state.pg),
+    filters: () => data.filters, cards: () => (data ? data.cards.map(c => ({ name: c.name, mine: !!c.mine })) : []), hasData: () => !!data, yearType: () => state.yearType, pg: () => (data ? data.filters.pg : state.pg),
     periodLabel: (a, b, yt) => periodLabel(a, b, yt), monLabel: key => monLabel(key), short: r => periodLabel(r[0], r[1], state.yearType), rangesLabel: list => rangesLabel(list, state.yearType),
   };
   // The main file was loaded (or the shared Brand Map changed): the Category data was rebuilt, so show it.

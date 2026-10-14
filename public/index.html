@@ -376,6 +376,7 @@ tr.me .sharebar{background:#FF8A3D}
 <link rel="stylesheet" href="/brandmap.css?v=1">
 <link rel="stylesheet" href="/share.css?v=1">
 <link rel="stylesheet" href="/brandview.css?v=1">
+<link rel="stylesheet" href="/report.css?v=1">
 </head>
 <body>
 
@@ -600,6 +601,8 @@ tr.me .sharebar{background:#FF8A3D}
     <div class="menu cat-only" id="catExportMenu">
       <button data-x="jpg"><b>JPG images (ZIP)</b><span>Each section (cards, month by month, sub categories) as its own JPG</span></button>
       <button data-x="ppt"><b>PowerPoint (PPT, editable)</b><span>Native tables, text and shapes: one slide per section</span></button>
+      <hr>
+      <button data-x="report"><b>Full report (PowerPoint)</b><span>Everything: both dashboards with all flips, then advertiser analysis, then brand by brand</span></button>
     </div>
     <button class="fbtn light spot-only" id="exportBtn">Export ▾</button>
     <button class="fbtn light spot-only" id="shareBtn">Share</button>
@@ -607,6 +610,7 @@ tr.me .sharebar{background:#FF8A3D}
       <button data-x="jpg"><b>JPG images (ZIP)</b><span>Full dashboard plus each chart as its own JPG</span></button>
       <button data-x="pdf"><b>PDF</b><span>The whole dashboard on one landscape page</span></button>
       <button data-x="ppt"><b>PowerPoint (PPT)</b><span>Title slide, full dashboard, then one slide per chart</span></button>
+      <button data-x="report"><b>Full report (PowerPoint)</b><span>Everything: both dashboards with all flips, then advertiser analysis, then brand by brand</span></button>
       <hr>
       <button data-x="send"><b>Send to planning tool</b><span>Opens the media planning tool with competitor channels, programmes, breaks, lengths and timing</span></button>
       <button data-x="json"><b>Competitor data for planning tool (JSON)</b><span>The same data as a file, to import by hand</span></button>
@@ -794,6 +798,7 @@ tr.me .sharebar{background:#FF8A3D}
 </div>
 
 <div class="bvpage" id="bvPage"></div>
+<div class="bmmodal" id="rpModal"></div>
 <div class="bmmodal" id="shareModal"></div>
 <div class="bmmodal" id="bmConfirm"></div>
 <div class="bmmodal" id="bmPage"></div>
@@ -804,5 +809,6 @@ tr.me .sharebar{background:#FF8A3D}
 <script src="/share.js?v=1"></script>
 <script src="/brandview.js?v=1"></script>
 <script src="/category.js?v=3"></script>
+<script src="/report.js?v=1"></script>
 </body>
 </html>

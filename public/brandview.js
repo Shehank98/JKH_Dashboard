@@ -55,7 +55,7 @@
     ui = { ...ui, ctab: 'C', tab: 'advertisers', page: 0 };
     root.classList.add('on'); document.body.classList.add('bv-open');
     root.innerHTML = '<div class="bv-wrap"><div class="bv-loading">Loading…</div></div>';
-    load();
+    return load();
   }
   function close() { root.classList.remove('on'); document.body.classList.remove('bv-open'); root.innerHTML = ''; stack = []; d = null; }
   async function load() {
@@ -153,14 +153,14 @@
 
     root.innerHTML = `<div class="bv-wrap" id="bvBody">
       <div class="bv-bar">
-        <button class="bv-btn" data-act="back">${stack.length > 1 ? '← Back' : '← Back to dashboard'}</button>
+        <button class="bv-btn bv-noshot" data-act="back">${stack.length > 1 ? '← Back' : '← Back to dashboard'}</button>
         <div class="bv-trail"><button class="bv-crumb" data-act="trail" data-i="0">Category</button><span>›</span>${H.pg() ? `<span>${esc(H.pg())}</span><span>›</span>` : ''}${trail.join('<span>›</span>')}</div>
         <div class="bv-ctl">
           <span class="bv-pill">${esc(curLabel)}${rg.curList && rg.curList.length > 1 ? ` · ${d.months} months` : d.months > 1 ? ` · ${esc(H.monLabel(rg.cur[0]))} to ${esc(H.monLabel(rg.cur[1]))}` : ` · ${esc(H.monLabel(rg.cur[0]))}`}</span>
           <span class="bv-seg"><button class="${ui.cmp === 'yoy' ? 'on' : ''}" data-act="cmp" data-v="yoy">vs last year</button><button class="${ui.cmp === 'prev' ? 'on' : ''}" data-act="cmp" data-v="prev">vs previous</button></span>
           <span class="bv-seg"><button class="${scope.medium ? '' : 'on'}"${setA({ medium: null })}>All media</button>${MED.map(m => `<button class="${scope.medium === m ? 'on' : ''}"${setA({ medium: m })}>${m}</button>`).join('')}</span>
-          <button class="bv-btn" data-act="jpg" title="Download this view as a picture">Export JPG</button>
-          <button class="bv-x" data-act="close" aria-label="Close" title="Close">✕</button>
+          <button class="bv-btn bv-noshot" data-act="jpg" title="Download this view as a picture">Export JPG</button>
+          <button class="bv-x bv-noshot" data-act="close" aria-label="Close" title="Close">✕</button>
         </div>
       </div>
       <div class="bv-tabs bv-main-tabs" role="tablist">${tabs.map(([k, n, c], i) => `${i === 5 ? '<span class="bv-tsep"></span>' : ''}<button role="tab" aria-selected="${ui.tab === k}" class="${ui.tab === k ? 'on' : ''}" data-act="tab" data-v="${k}">${n}${c != null ? ` <em>${c}</em>` : ''}</button>`).join('')}</div>
@@ -306,7 +306,7 @@
     try {
       if (!window.htmlToImage) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = '/vendor/html-to-image/html-to-image.js'; s.onload = res; s.onerror = () => rej(new Error('Could not load the picture tool')); document.head.appendChild(s); });
       O.toast('Preparing picture…');
-      const url = await window.htmlToImage.toJpeg(node, { quality: 0.92, backgroundColor: '#F4F6FA', pixelRatio: 1.5, filter: n => !(n.classList && n.classList.contains('bv-bar')) });
+      const url = await window.htmlToImage.toJpeg(node, { quality: 0.92, backgroundColor: '#F4F6FA', pixelRatio: 1.5, filter: n => !(n.classList && n.classList.contains('bv-noshot')) });
       const a = document.createElement('a');
       a.href = url; a.download = `Brand_view_${(d.name || 'view').replace(/[^A-Za-z0-9]+/g, '_')}.jpg`; a.click();
     } catch (e) { O.toast('Export failed: ' + e.message); }
@@ -351,5 +351,7 @@
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && root.classList.contains('on') && !$('catModal').classList.contains('on')) close(); });
 
-  window.BRANDVIEW = { canOpen, open, close };
+  // For the full report: open one brand, switch tab, and get the card to photograph.
+  const showTab = k => { ui.tab = k; ui.page = 0; draw(); };
+  window.BRANDVIEW = { canOpen, open, close, showTab, box: () => $('bvBody'), current: () => d };
 })();
