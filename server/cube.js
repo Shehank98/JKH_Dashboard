@@ -27,7 +27,7 @@ function buildCube(ds, lookup, opts) {
   const hasProduct = !!(dicts.product && cols.product);
   const lockId = opts.pg ? dicts.pg.indexOf(opts.pg) : -1;
   if (opts.pg && lockId < 0) throw new Error('Unknown product group');
-  const excluded = dicts.theme.map(t => (D.isExcludedTheme(t, { tagCommercial: false }) ? 1 : 0));
+  const excluded = dicts.theme.map(t => (D.isExcludedTheme(t, { tagCommercial: !!opts.tagCommercial }) ? 1 : 0));
   // Mother brand + sub category entries, numbered as they are met.
   const prodList = [], prodMap = new Map();
   const prodOf = (mother, sub) => {
@@ -82,7 +82,7 @@ function buildCube(ds, lookup, opts) {
   for (let i = 0; i < c.mon.length; i++) { if (c.mon[i] < minMon) minMon = c.mon[i]; if (c.mon[i] > maxMon) maxMon = c.mon[i]; spots += c.n[i]; }
   return {
     v: VERSION,
-    meta: { minMon, maxMon, spots, records: rows.length, hasMap: hasProduct, lockedPg: opts.pg || '', level },
+    meta: { minMon, maxMon, spots, records: rows.length, hasMap: hasProduct, lockedPg: opts.pg || '', level, tagCommercial: !!opts.tagCommercial },
     dicts: {
       pg: pgR.ids.map(i => dicts.pg[i]), adv: advR.ids.map(i => dicts.adv[i]), channel: chR.ids.map(i => dicts.channel[i]),
       channelMedium: chR.ids.map(i => dicts.channelMedium[i]), channelName: chR.ids.map(i => dicts.channelName[i]),
@@ -105,7 +105,7 @@ function unpackCube(cube) {
   const lastMon = cube.meta.maxMon;
   return {
     meta: {
-      cube: true, rows: n, spots: cube.meta.spots, skipped: 0, hasProduct: false, hasMap: cube.meta.hasMap, lockedPg: cube.meta.lockedPg, level: cube.meta.level || 'full',
+      cube: true, rows: n, spots: cube.meta.spots, skipped: 0, hasProduct: false, hasMap: cube.meta.hasMap, lockedPg: cube.meta.lockedPg, level: cube.meta.level || 'full', tagCommercial: !!cube.meta.tagCommercial,
       minDay: Math.round(Date.UTC(Math.floor(cube.meta.minMon / 12), cube.meta.minMon % 12, 1) / 86400000),
       maxDay: Math.round(Date.UTC(Math.floor(lastMon / 12), (lastMon % 12) + 1, 1) / 86400000) - 1,
       fileName: 'Shared dashboard', uploadedAt: new Date().toISOString(), parseMs: 0,

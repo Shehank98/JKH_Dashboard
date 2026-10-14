@@ -99,12 +99,12 @@ const handlers = {
   },
   // ---- shared client dashboards ----
   // The data cube for the loaded file: monthly records only (see cube.js), with mother brand and sub category from the Brand Map.
-  buildCube({ map, pg, level }) {
+  buildCube({ map, pg, level, tagCommercial }) {
     const { keyOf } = requireLib('brand-derive');
     const lookup = new Map();
     for (const r of map || []) lookup.set(keyOf(r[0], r[1]), { mother: r[2], sub: r[3] });
     const t = Date.now();
-    const cube = requireLib('cube').buildCube(need(), (g, b) => lookup.get(keyOf(g, b)) || null, { pg: pg || '', level });
+    const cube = requireLib('cube').buildCube(need(), (g, b) => lookup.get(keyOf(g, b)) || null, { pg: pg || '', level, tagCommercial: !!tagCommercial });
     return { cube, ms: Date.now() - t };
   },
   // The client's side: a cube replaces the dataset in memory only (nothing is saved in this browser).

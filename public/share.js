@@ -49,7 +49,7 @@
           s.map = meta && meta.hasProduct ? (await api('/api/brandmap/all')).rows : [];
         }
         const st = O.spot.getState();
-        const r = await O.engine.call('buildCube', { map: s.map, pg: s.lockPg ? st.pg : '', level: s.level });
+        const r = await O.engine.call('buildCube', { map: s.map, pg: s.lockPg ? st.pg : '', level: s.level, tagCommercial: !!st.tagCommercial });
         if (!s || my !== s.seq) return;
         s.cube = r.cube; s.records = r.cube.meta.records; s.bytes = JSON.stringify(r.cube).length;
         s.building = false;
@@ -74,6 +74,7 @@
           <label class="sh-ck"><input type="checkbox" id="shLock" ${s.lockPg ? 'checked' : ''}><span>Share only <b>${esc(st.pg)}</b> <small>(other product groups are not included in the link at all)</small></span></label>
           <label class="sh-ck"><input type="checkbox" id="shState" ${s.withFilters ? 'checked' : ''}><span>Open with my current filters <small>(advertisers, dates, medium…; the client can change them)</small></span></label>
           <div class="sh-status" id="shStatus"></div>
+          <p class="sh-note">Ad type: <b>Tag is counted as a ${st.tagCommercial ? 'commercial' : 'value addition'}</b>, as in your filters. The client sees the dashboard that way; change the tick box in Filters first if you want it the other way.</p>
           <p class="sh-note">The client sees monthly totals by channel, advertiser, mother brand and sub category, and can filter them, but never the raw spot log: no programmes, campaigns, brand names, times or individual spots. Anyone with the link can open it, so share it only with the client.</p>
         </div>
         <div class="sh-result" ${s.result ? '' : 'hidden'}>${s.result ? `

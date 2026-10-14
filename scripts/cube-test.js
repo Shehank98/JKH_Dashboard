@@ -54,6 +54,14 @@ const file = process.argv[2] || path.join(__dirname, '..', 'samples', 'sample_42
     near(x.sos.total.spend, all.sos.total.spend, 'level total'); assert.strictEqual(x.sos.total.spots, all.sos.total.spots);
     x.trend.categoryTotal.forEach((v, k) => near(v, all.trend.categoryTotal[k], 'level month'));
   }
+  // "Tag counts as a commercial" is decided when the cube is built
+  const tagDs = { ...ds, dicts: { ...ds.dicts, theme: ['Tag', 'Other'] }, cols: { ...ds.cols, theme: ds.cols.theme.map(() => 0) } };
+  const asVa = unpackCube(JSON.parse(JSON.stringify(buildCube(tagDs, lookup, { level: 'standard' }))));
+  const asCom = unpackCube(JSON.parse(JSON.stringify(buildCube(tagDs, lookup, { level: 'standard', tagCommercial: true }))));
+  const vaOnly = compute.dashboard(asVa, { ...base, adType: 'Sponsorship' }), comOnly = compute.dashboard(asCom, { ...base, adType: 'Commercial' });
+  assert.ok(vaOnly.sos.total.spend > 0 && comOnly.sos.total.spend > 0, 'Tag is a value addition by default and a commercial when ticked');
+  near(vaOnly.sos.total.spend, compute.dashboard(tagDs, { ...base, adType: 'Sponsorship', tagCommercial: false }).sos.total.spend, 'Tag as VA matches full data');
+  near(comOnly.sos.total.spend, compute.dashboard(tagDs, { ...base, adType: 'Commercial', tagCommercial: true }).sos.total.spend, 'Tag as commercial matches full data');
   // locked to one product group
   const locked = buildCube(ds, lookup, { pg: pgName });
   assert.deepStrictEqual(locked.dicts.pg, [pgName]);
