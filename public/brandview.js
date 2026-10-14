@@ -262,6 +262,7 @@
   // 5. The brands (or mother brands) inside, with Commercials and Value additions and the ratio.
   function childrenPane() {
     const kids = d.childKind === 'mb' ? 'mother brand' : 'brand';
+    const curLabel = O.catHelp.rangesLabel(d.ranges.curList || [d.ranges.cur]);
     const sp = d.head.split, [cS, vS] = cvOf(sp), tS = cS + vS, pc = tS ? (cS / tS) * 100 : 0;
     const fmt = v => (ui.metric === 'spots' ? `${nf(v)} spots` : mnTxt(v));
     const { slice, pager } = paged(d.children);
