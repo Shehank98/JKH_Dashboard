@@ -27,8 +27,8 @@ function clean(s) {
 function router(express) {
   const r = express.Router();
   r.get('/status', async (req, res) => {
-    try { const list = await models(); res.json({ ok: true, models: list, model: DEFAULT_MODEL && list.includes(DEFAULT_MODEL) ? DEFAULT_MODEL : list[0] || '' }); }
-    catch (e) { res.json({ ok: false, models: [], error: 'Ollama is not reachable at ' + BASE }); }
+    try { const list = await models(); res.json({ ok: list.length > 0, error: list.length ? '' : 'The AI service is running but has no models yet (they may still be downloading, check again in a few minutes).', models: list, model: DEFAULT_MODEL && list.includes(DEFAULT_MODEL) ? DEFAULT_MODEL : list[0] || '' }); }
+    catch (e) { res.json({ ok: false, models: [], error: 'The dashboard server cannot reach the AI service at ' + BASE + (process.env.OLLAMA_URL ? '' : ' (OLLAMA_URL is not set)') }); }
   });
   r.post('/notes', async (req, res) => {
     const { model, title, text, context } = req.body || {};
