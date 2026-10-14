@@ -929,7 +929,7 @@
   async function cpFetch() {
     const d = data;
     if (!d || !cpAvail) return null;
-    const brands = d.cards.map(c => c.name), key = JSON.stringify([d.filters, brands, cp.medium]);
+    const brands = d.cards.slice(0, 5).map(c => c.name), key = JSON.stringify([d.filters, brands, cp.medium]); // the five biggest mother brands
     if (cp.data && cp.key === key) return cp.data;
     cp.data = await engine.call('catChannelPref', { filters: d.filters, brands, medium: cp.medium }); cp.key = key;
     return cp.data;
@@ -978,7 +978,7 @@
     let CP;
     try { if (!cpAvail) await checkCp(); CP = await cpFetch(); } catch (e) { if (my === cpPaint) host.innerHTML = `<div class="cp-note">${esc(e.message)}</div>`; return; }
     if (my !== cpPaint) return;
-    $('catSub4').textContent = `${labelsOf(data).cur}${cp.medium ? ' · ' + cp.medium + ' channels' : ' · all media'} · share of each brand's spend by channel`;
+    $('catSub4').textContent = `${labelsOf(data).cur}${cp.medium ? ' · ' + cp.medium + ' channels' : ' · all media'} · top 5 mother brands · share of each brand's spend by channel`;
     if (!CP || !CP.brands.length) { host.innerHTML = '<div class="cp-note">No spend on these channels in the selected period.</div>'; return; }
     host.innerHTML = `<div class="cp-svg" id="cpBox"></div><div class="cp-leg">${CP.series.map((s, k) => `<span><i style="background:#${chanHex(s, k)}"></i>${esc(s.name)}</span>`).join('')}</div>`;
     const box = $('cpBox'), W = Math.max(320, box.clientWidth), H = Math.max(170, box.clientHeight);
@@ -1228,7 +1228,7 @@
         const CPd = await cpFetch();
         if (CPd && CPd.brands.length) {
           const slide = pptx.addSlide(), f1 = 0.01, tsz = 1.25;
-          chrome(slide, `${f.pg}: channel preference by brands`, `${L.cur}${cp.medium ? ' · ' + cp.medium + ' channels' : ' · all media'} · share of each brand's spend by channel · Spend in Rs. Mn`);
+          chrome(slide, `${f.pg}: channel preference by brands`, `${L.cur}${cp.medium ? ' · ' + cp.medium + ' channels' : ' · all media'} · top 5 mother brands · share of each brand's spend by channel · Spend in Rs. Mn`);
           const CW = 1230, CH = 440, P = cpPrims(CPd, CW, CH);
           P.forEach(e => {
             if (e.t === 'r') slide.addShape(SHAPE.rect, { x: 0.55 + e.x * f1, y: 1.6 + e.y * f1, w: Math.max(0.005, e.w * f1), h: Math.max(0.005, e.h * f1), fill: { color: e.fill }, line: e.line ? { color: e.line, width: e.lw || 1 } : { color: e.fill, width: 0 } });
