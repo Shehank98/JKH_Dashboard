@@ -60,7 +60,7 @@
   function estimate(o) { return (o.ai ? 0 : 0) + 3 + (o.spot ? 29 : 0) + (o.cat ? 17 : 0) + (o.adv ? 1 + 4 * o.advN : 0) + (o.br ? 6 * o.brN : 0); }
   function info() {
     const o = optsNow(), n = estimate(o);
-    const secs = Math.round(n * 1.1 + (o.ai ? n * (o.aiAll ? 1 : 0.45) * 25 : 0));
+    const secs = Math.round(n * 1.1 + (o.ai ? n * (o.aiAll ? 1 : 0.45) * 9 : 0));
     $('rpInfo').innerHTML = `About <b>${n}</b> slides · takes about <b>${secs >= 120 ? Math.round(secs / 60) + ' minutes' : Math.max(10, secs) + ' seconds'}</b>${o.ai ? ' (AI insights make it slower)' : ''}`;
   }
   root.addEventListener('change', info);
