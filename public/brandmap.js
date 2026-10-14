@@ -145,6 +145,17 @@
       if (r.category) { document.dispatchEvent(new CustomEvent('orbit:catrefresh', { detail: { dataset: r.category.dataset, fresh: false } })); O.toast('Brand Map changed: the Category dashboard was updated'); }
     } catch (e) { /* offline or signed out: keep what is shown */ } finally { syncing = false; }
   }
+  // Makes sure the browser engine holds the current Brand Map (the brand view needs it) and the Category data is built from it.
+  // Resolves true when the full brand view can be used.
+  async function ensureMap() {
+    if (document.body.classList.contains('share-mode')) return false;
+    await sync();
+    const s = await O.engine.call('catStatus');
+    if (!s.canDerive || !s.derived) return false;
+    const v = await api('/api/brandmap/version');
+    if (s.mapHeld !== v.version) { const all = await api('/api/brandmap/all'); await O.engine.call('setMap', { map: all.rows, version: all.version }); }
+    return true;
+  }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) sync(); });
 
   // ---------- the Brand Map page ----------
@@ -255,5 +266,5 @@
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && page.classList.contains('on') && !(st)) close(); });
   document.querySelectorAll('[data-open-brandmap]').forEach(b => b.addEventListener('click', open));
 
-  window.BRANDMAP = { confirm, sync, open };
+  window.BRANDMAP = { confirm, sync, open, ensureMap };
 })();

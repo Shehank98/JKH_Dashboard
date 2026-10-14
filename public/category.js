@@ -880,6 +880,8 @@
   // Drill-down. scope can combine: mb, mbs (a set), sub, adv, brand, medium, from + to (a period), or all: true.
   // Every table row, medium chip and month in the popup goes one level deeper (Back returns).
   async function openDetail(scope, push = true) {
+    // The full brand view (channels, Commercials vs Value additions, SOS...) when the Category data is built from the main file.
+    if (push && window.BRANDVIEW && data && await window.BRANDVIEW.canOpen()) { window.BRANDVIEW.open(scope); return; }
     if (push) { detailStack.push(scope); if (detailStack.length === 1) cmTab = 'ov'; }
     $('catModalBox').innerHTML = '<div class="cm-h"><h3>Loading…</h3></div>';
     $('catModal').classList.add('on');
@@ -1322,6 +1324,11 @@
     } catch (e) { toast('Category data: ' + e.message); }
   }
   O.catState = () => JSON.parse(JSON.stringify(state));
+  // For the brand view (brandview.js): the dashboard's filters and period names.
+  O.catHelp = {
+    filters: () => data.filters, yearType: () => state.yearType, pg: () => (data ? data.filters.pg : state.pg),
+    periodLabel: (a, b, yt) => periodLabel(a, b, yt), monLabel: key => monLabel(key), short: r => periodLabel(r[0], r[1], state.yearType),
+  };
   // The main file was loaded (or the shared Brand Map changed): the Category data was rebuilt, so show it.
   document.addEventListener('orbit:catrefresh', async e => {
     renderFile(e.detail.dataset);

@@ -18,7 +18,8 @@
     "sample:category": "node scripts/generate-category-sample.js",
     "test:brandmap": "node scripts/brandmap-test.js",
     "test:cube": "node scripts/cube-test.js",
-    "test:shares": "node scripts/shares-test.js"
+    "test:shares": "node scripts/shares-test.js",
+    "test:brandview": "node scripts/category-brand-test.js"
   },
   "engines": {
     "node": "22.x"

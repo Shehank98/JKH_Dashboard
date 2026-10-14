@@ -505,4 +505,4 @@ function detail(ds, f, scope = {}) {
   };
 }
 
-module.exports = { overview, groupOptions, dashboard, detail };
+module.exports = { overview, groupOptions, dashboard, detail, excludedThemes };

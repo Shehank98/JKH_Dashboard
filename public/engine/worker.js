@@ -7,7 +7,7 @@
 importScripts('/vendor/jszip/jszip.min.js');
 
 // ---- a tiny CommonJS loader for the shared modules ----
-const LIB = ['derive', 'brand-derive', 'cube', 'builder', 'compute', 'planning', 'competitor', 'category-builder', 'category', 'browser-readers'];
+const LIB = ['derive', 'brand-derive', 'cube', 'builder', 'compute', 'planning', 'competitor', 'category-builder', 'category', 'category-brand', 'browser-readers'];
 const SRC = {}, CACHE = {};
 function requireLib(name) {
   if (name === 'jszip') return self.JSZip;
@@ -53,6 +53,7 @@ async function idbDo(mode, fn) {
 
 let owner = 'local';
 let dataset = null;
+let heldLookup = null, heldVersion = null; // the Brand Map the Category data was built with, for the brand view
 let sharedMode = false; // a client's data cube: nothing is read from or written to this browser's storage
 let pending = null; // a file that has been read but whose brands are not confirmed yet
 let catDataset = null; // the Category file, saved under the same person with a ':category' suffix
@@ -118,8 +119,22 @@ const handlers = {
     catDataset = cube.category ? lib.unpackCategory(cube.category) : null;
     return { dataset: describe(dataset), category: describeCat(catDataset) };
   },
+  // The Brand Map for the brand view (when the page was opened without loading a file, the map is fetched and handed over).
+  setMap({ map, version }) {
+    const { keyOf } = requireLib('brand-derive');
+    const lookup = new Map();
+    for (const r of map || []) lookup.set(keyOf(r[0], r[1]), { mother: r[2], sub: r[3] });
+    heldLookup = lookup; heldVersion = version;
+    return { ok: true };
+  },
+  // Full brand view for a click in the Category dashboard (channels, ad types and campaigns come from the main file).
+  catBrand({ filters, scope, tagCommercial }) {
+    if (!heldLookup) throw new Error('The Brand Map is not loaded yet.');
+    const { keyOf } = requireLib('brand-derive');
+    return requireLib('category-brand').brandView(need(), (pg, b) => heldLookup.get(keyOf(pg, b)) || null, filters || {}, scope || {}, { tagCommercial: !!tagCommercial });
+  },
   // What the Category data currently is, so the page can tell when the Brand Map has moved on.
-  catStatus() { return { has: !!catDataset, derived: !sharedMode && !!(catDataset && catDataset.meta.derived), mapVersion: catDataset ? catDataset.meta.mapVersion : null, canDerive: !!(dataset && dataset.dicts.product) }; },
+  catStatus() { return { has: !!catDataset, derived: !sharedMode && !!(catDataset && catDataset.meta.derived), mapVersion: catDataset ? catDataset.meta.mapVersion : null, mapHeld: heldVersion, canDerive: !!(dataset && dataset.dicts.product) }; },
   async cancelIngest() { pending = null; return { ok: true }; },
   // The Brand Map changed (someone edited it): rebuild the Category data from the saved main file.
   async rederiveCategory({ map, version }) {
@@ -200,6 +215,7 @@ async function buildCategory(map, version) {
   const { deriveCategory, keyOf } = requireLib('brand-derive');
   const lookup = new Map();
   for (const r of map || []) lookup.set(keyOf(r[0], r[1]), { mother: r[2], sub: r[3] });
+  heldLookup = lookup; heldVersion = version;
   const m = dataset.meta;
   const cat = deriveCategory(dataset, (pg, brand) => lookup.get(keyOf(pg, brand)) || null,
     { fileName: m.fileName, size: m.size, uploadedAt: m.uploadedAt, mapVersion: version });
