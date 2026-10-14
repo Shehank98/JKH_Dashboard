@@ -9,11 +9,13 @@
   const root = $('bvPage');
   const MED = ['TV', 'Radio', 'Press'], MED_COL = ['#2F5DBF', '#FF8A3D', '#1FA97A'], MED_BG = ['#E3EBFB', '#FFE9D8', '#DDF3EA'], MED_FG = ['#2F5DBF', '#B4540C', '#14805A'];
   const CC = '#7B3FA0', VC = '#E0A100';
-  const SECTIONS = [['children', 'Brands'], ['adtype', 'Commercials vs Value additions'], ['sos', 'Share of spend'], ['channels', 'Channels'], ['advertisers', 'Advertisers'], ['campaigns', 'Campaigns'], ['months', 'Months']];
+  const SECTIONS = [['children', 'Brands'], ['channels', 'Channels'], ['campaigns', 'Campaigns']];
+  // One card with tabs, so these are switched, not scrolled to.
+  const TABS = [['adtype', 'Commercials vs Value additions'], ['sos', 'Share of spend'], ['advertisers', 'Advertisers'], ['months', 'Months']];
 
   let stack = [];        // [{ scope, label }]: the trail
   let d = null;          // the brand view data for the top of the stack
-  let ui = { metric: 'spend', cmp: 'yoy', ctab: 'C', allCh: false, sec: 'children' };
+  let ui = { metric: 'spend', cmp: 'yoy', ctab: 'C', allCh: false, sec: 'children', tab: 'adtype' };
   let seq = 0;
 
   // ---------- number formats (spend arrives in thousand rupees) ----------
@@ -122,7 +124,7 @@
             <button class="bv-btn" data-act="jpg" title="Download this view as a picture">Export JPG</button>
           </div>
         </div>
-        <div class="bv-nav">${sections.map(([k, n], i) => `<button class="bv-chip${ui.sec === k ? ' on' : ''}" data-act="sec" data-v="${k}">${i + 1} ${n}${k === 'children' ? ` <em>${d.children.length}</em>` : k === 'channels' ? ` <em>${d.channels.length}</em>` : k === 'advertisers' ? ` <em>${d.advertisers.length}</em>` : ''}</button>`).join('')}</div>
+        <div class="bv-nav">${sections.map(([k, n], i) => `<button class="bv-chip${ui.sec === k ? ' on' : ''}" data-act="sec" data-v="${k}">${n}${k === 'children' ? ` <em>${d.children.length}</em>` : k === 'channels' ? ` <em>${d.channels.length}</em>` : ''}</button>`).join('')}</div>
       </div>
 
       <div class="bv-title"><span class="bv-av">${esc(initial)}</span><div>
@@ -141,12 +143,10 @@
       </div>
 
       ${d.childKind ? childrenSection(baseWord) : ''}
-      ${adTypeSection(split, tS, cS, vS)}
-      ${sosSection(baseWord, sosBase)}
+      <section class="bv-card bv-sec bv-tabcard" id="bv-tabs"><div class="bv-tabs">${TABS.map(([k, n]) => `<button class="${ui.tab === k ? 'on' : ''}" data-act="tab" data-v="${k}">${n}${k === 'advertisers' ? ` <em>${d.advertisers.length}</em>` : ''}</button>`).join('')}</div>
+        ${ui.tab === 'sos' ? sosSection(baseWord, sosBase) : ui.tab === 'advertisers' ? advertisersSection() : ui.tab === 'months' ? monthsSection() : adTypeSection(split, tS, cS, vS)}</section>
       ${channelsSection(baseWord, scope)}
-      ${advertisersSection()}
       ${campaignsSection()}
-      ${monthsSection()}
       <div class="bv-foot">Spend in Rs Mn. Value additions follow the Spot Log list (-BB, Com Break, DJ, Time Check…); Tag is counted as a <b>${d.tagCommercial ? 'commercial' : 'value addition'}</b>, as ticked in the Spot Log filters. Share of spend compares like with like: a medium, channel or ad type you pick narrows the category too.</div>
     </div></div></div>`;
   }
@@ -156,7 +156,7 @@
   function childrenSection(baseWord) {
     const rows = d.children;
     const title = d.childKind === 'mb' ? `Mother brands in ${esc(d.name)}` : `Brands in ${esc(d.name)}`;
-    return `<section class="bv-card bv-sec" id="bv-children"><div class="bv-sh"><h3>1 · ${title}</h3><span class="bv-hint">Click a ${d.childKind === 'mb' ? 'mother brand' : 'brand'} to open its own full view</span></div>
+    return `<section class="bv-card bv-sec" id="bv-children"><div class="bv-sh"><h3>${title}</h3><span class="bv-hint">Click a ${d.childKind === 'mb' ? 'mother brand' : 'brand'} to open its own full view</span></div>
       <div class="bv-t bv-t-ch"><div class="bv-th"><span>${d.childKind === 'mb' ? 'MOTHER BRAND' : 'BRAND'}</span><span class="r">${esc(O.catHelp.short(d.ranges.cur))}</span><span class="r">${ui.cmp === 'prev' ? 'PREVIOUS' : 'LAST YEAR'}</span><span class="r">GROWTH</span><span class="r">SHARE</span><span>COMMERCIALS : VALUE ADDITIONS</span><span>MONTH BY MONTH</span><span>TOP CHANNEL</span><span></span></div>
       ${rows.map(r => `<div class="bv-tr"${go(d.childKind === 'mb' ? { mb: r.name, brand: null, adv: null } : { brand: r.name })}>
         <span class="bv-nm"><b>${esc(r.name)}</b>${usTag(r.us)}${r.sub ? `<br><small>${esc(r.sub)}</small>` : ''}</span>
@@ -184,7 +184,7 @@
     const yc = ui.metric === 'spots' ? [split.Cny, split.Vny] : [split.Cy, split.Vy], ty = yc[0] + yc[1];
     const pc = tS ? (cS / tS) * 100 : 0;
     const children = d.children;
-    return `<section class="bv-card bv-sec" id="bv-adtype"><div class="bv-sh"><h3>2 · Commercials vs Value additions</h3>${metricToggle()}</div>
+    return `<div class="bv-pane" id="bv-adtype"><div class="bv-sh"><h3>Commercials vs Value additions</h3>${metricToggle()}</div>
       <div class="bv-bigbar"><button class="bv-bp" style="width:${Math.max(pc, 12)}%;background:${CC};color:#fff"${go({ vt: 'C' })}>Commercials · ${ui.metric === 'spots' ? nf(cS) + ' spots' : mnTxt(cS)} · ${nf(pc, 0)}%</button><button class="bv-bp" style="width:${Math.max(100 - pc, 12)}%;background:${VC};color:#1A1F36"${go({ vt: 'V' })}>VA · ${ui.metric === 'spots' ? nf(vS) + ' spots' : mnTxt(vS)} · ${nf(100 - pc, 0)}%</button></div>
       <div class="bv-cmp"><span>Last year: <b>${ty ? `${nf((yc[0] / ty) * 100, 0)} : ${nf((yc[1] / ty) * 100, 0)}` : '–'}</b></span><span>${growth(cS, yc[0])} Commercials</span><span>${growth(vS, yc[1])} Value additions</span><span class="mut" style="margin-left:auto">Click either part to see its campaigns</span></div>
       <div class="bv-two"><div><div class="bv-mini">MONTH BY MONTH · ${ui.metric === 'spots' ? 'SPOTS' : 'RS MN'}</div>
@@ -193,7 +193,7 @@
           <div class="bv-mr bv-mh"><span>${d.childKind === 'mb' ? 'MOTHER BRAND' : 'BRAND'}</span><span class="r">${ui.metric === 'spots' ? 'COMM. SPOTS' : 'COMM.'}</span><span class="r">${ui.metric === 'spots' ? 'VA SPOTS' : 'VA'}</span><span>RATIO</span><span></span></div>
           ${children.slice(0, 8).map(r => `<div class="bv-mr"${go(d.childKind === 'mb' ? { mb: r.name, brand: null, adv: null } : { brand: r.name })}><b>${esc(r.name)}</b><span class="r">${ui.metric === 'spots' ? nf(r.Cn) : mnNum(r.C)}</span><span class="r">${ui.metric === 'spots' ? nf(r.Vn) : mnNum(r.V)}</span>${ratioBar(r)}<span class="bv-go">›</span></div>`).join('')}` : ''}
           <div class="bv-mini" style="margin-top:12px">BY MEDIUM</div>
-          ${a.byMedium.map(r => { const k = MED.indexOf(r.medium); return `<div class="bv-mr bv-mr2"${go({ medium: r.medium })}><b>${r.medium}</b>${ratioBar(r)}<b class="r">${ratioTxt(r)}</b></div>`; }).join('') || '<div class="bv-empty">–</div>'}</div></div></section>`;
+          ${a.byMedium.map(r => { const k = MED.indexOf(r.medium); return `<div class="bv-mr bv-mr2"${go({ medium: r.medium })}><b>${r.medium}</b>${ratioBar(r)}<b class="r">${ratioTxt(r)}</b></div>`; }).join('') || '<div class="bv-empty">–</div>'}</div></div></div>`;
   }
 
   function sosSection(baseWord, sosBase) {
@@ -201,20 +201,21 @@
     const months = d.monthsList;
     const lines = [{ name: d.name, vals: s.self, col: '#E4702A', w: 3, self: true }, ...s.competitors.map((c, k) => ({ name: c.name, vals: c.values, col: ['#2F5DBF', '#7B8DB5', '#B4BCD0'][k], w: 2, us: c.us }))];
     const all = lines.flatMap(l => l.vals).filter(v => v != null);
-    const mx = Math.max(10, Math.ceil((Math.max(0, ...all) + 2) / 10) * 10);
-    const W = 440, H = 180, L = 34, R = 90, T = 12, B = 24, n = months.length;
+    const mx = Math.max(20, Math.ceil((Math.max(0, ...all) + 2) / 20) * 20);
+    const W = 440, H = 180, L = 34, R = 24, T = 12, B = 24, n = months.length;
     const X = k => (n === 1 ? L + (W - L - R) / 2 : L + (k / (n - 1)) * (W - L - R)), Y = v => H - B - (v / mx) * (H - B - T);
-    const grid = [0, 0.25, 0.5, 0.75, 1].map(f => `<line x1="${L}" y1="${Y(mx * f)}" x2="${W - R + 20}" y2="${Y(mx * f)}" stroke="#EEF1F7"/><text x="0" y="${Y(mx * f) + 4}" font-size="10.5" fill="#8A93AD" font-weight="600">${nf(mx * f, 0)}%</text>`).join('');
+    const grid = [0, 0.25, 0.5, 0.75, 1].map(f => `<line x1="${L}" y1="${Y(mx * f)}" x2="${W - R}" y2="${Y(mx * f)}" stroke="#EEF1F7"/><text x="0" y="${Y(mx * f) + 4}" font-size="10.5" fill="#8A93AD" font-weight="600">${nf(mx * f, 0)}%</text>`).join('');
     const paths = n < 2 ? '' : lines.map(l => `<polyline points="${l.vals.map((v, k) => (v == null ? null : `${X(k)},${Y(v)}`)).filter(Boolean).join(' ')}" fill="none" stroke="${l.col}" stroke-width="${l.w}" stroke-linecap="round" stroke-linejoin="round"/>`).join('')
-      + lines.map(l => { const lastK = l.vals.length - 1, v = l.vals[lastK]; return v == null ? '' : `<text x="${X(lastK) + 8}" y="${Y(v) + 4}" font-size="10.5" font-weight="800" fill="${l.self ? '#C2570C' : '#4A5570'}">${esc(l.name.length > 12 ? l.name.slice(0, 11) + '…' : l.name)} ${nf(v, 1)}%</text>`; }).join('');
+;
     const xl = months.map((m, k) => `<text x="${X(k)}" y="${H - 6}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#4A5570">${esc(m.label)}</text>`).filter((_, k) => n <= 8 || k % Math.ceil(n / 8) === 0).join('');
     const tiles = [['SOS · COMMERCIALS', s.byAdType.C], ['SOS · VALUE ADD.', s.byAdType.V], ...s.byMedium.slice(0, 1).map(m => [`SOS · ${m.medium.toUpperCase()}`, m.share])].filter(t => t[1] != null);
-    return `<section class="bv-card bv-sec" id="bv-sos"><div class="bv-sh"><h3>3 · Share of spend (SOS)</h3><span class="bv-hint">in ${esc(O.catHelp.pg())}</span></div>
+    return `<div class="bv-pane" id="bv-sos"><div class="bv-sh"><h3>Share of spend (SOS)</h3><span class="bv-hint">in ${esc(O.catHelp.pg())}</span></div>
       <div class="bv-sosn"><span class="bv-kv big">${pctS(h.sos.cur, 1)}</span>${sosBase != null && h.sos.cur != null ? `<b class="${h.sos.cur >= sosBase ? 'up' : 'down'}">${h.sos.cur >= sosBase ? '▲' : '▼'} ${nf(Math.abs(h.sos.cur - sosBase), 1)} pp vs ${baseWord}</b>` : ''}${h.rank ? `<span class="mut">Rank #${h.rank}</span>` : ''}</div>
-      ${n >= 2 ? `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Share of spend by month">${grid}${paths}${xl}</svg>` : '<div class="bv-hint" style="margin:8px 0">Pick a longer period to see the share of spend month by month.</div>'}
+      ${n >= 2 ? `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Share of spend by month">${grid}${paths}${xl}</svg>
+        <div class="bv-lines">${lines.map(l => { const v = l.vals[l.vals.length - 1]; return `<span><i style="background:${l.col}"></i>${esc(l.name)} <b>${v == null ? '–' : nf(v, 1) + '%'}</b></span>`; }).join('')}</div>` : '<div class="bv-hint" style="margin:8px 0">Pick a longer period to see the share of spend month by month.</div>'}
       <div class="bv-tiles">${tiles.map(t => `<div class="bv-tile"><div class="bv-kl">${t[0]}</div><b>${pctS(t[1], 1)}</b></div>`).join('')}</div>
       ${s.ranking.length ? `<div class="bv-mini" style="margin-top:10px">WHO IS NEXT · click one for its own view</div>
-      ${s.ranking.map((r, i) => `<div class="bv-mr bv-rk${r.self ? ' me' : ''}"${r.self ? '' : go(d.entKind === 'brand' ? { brand: r.key, mb: null } : d.entKind === 'adv' ? { adv: r.key, mb: null, brand: null } : { mb: r.key, brand: null, adv: null })}><span class="mut">${r.rank || i + 1}</span><b>${esc(r.key)} ${usTag(r.us)}</b><span class="r">${mnNum(r.cur)}</span><b class="r">${pctS(r.share, 1)}</b><span class="bv-go">${r.self ? '' : '›'}</span></div>`).join('')}` : ''}</section>`;
+      ${s.ranking.map((r, i) => `<div class="bv-mr bv-rk${r.self ? ' me' : ''}"${r.self ? '' : go(d.entKind === 'brand' ? { brand: r.key, mb: null } : d.entKind === 'adv' ? { adv: r.key, mb: null, brand: null } : { mb: r.key, brand: null, adv: null })}><span class="mut">${r.rank || i + 1}</span><b>${esc(r.key)} ${usTag(r.us)}</b><span class="r">${mnNum(r.cur)}</span><b class="r">${pctS(r.share, 1)}</b><span class="bv-go">${r.self ? '' : '›'}</span></div>`).join('')}` : ''}</div>`;
   }
 
   function channelsSection(baseWord, scope) {
@@ -224,7 +225,7 @@
       <span class="bv-bw"><span class="bv-bt"><i style="width:${rows[0].cur ? (r.cur / rows[0].cur) * 100 : 0}%;background:${MED_COL[k]}"></i></span><b>${pctS(r.share)}</b></span>
       <span class="bv-rt">${ratioBar(r)}<b>${ratioTxt(r)}</b></span><b class="r bv-sosl"${go({ ch: r.key, mb: null, brand: null, adv: null, theme: null })} title="Who leads on this channel">${pctS(r.sosHere)}</b><b class="r">${growth(r.cur, baseOf(r))}</b><span class="bv-go">›</span></div>`; };
     const restSum = rest.reduce((a, r) => a + r.cur, 0);
-    return `<section class="bv-card bv-sec" id="bv-channels"><div class="bv-sh"><h3>4 · Channels</h3><span class="bv-hint">Click a channel to see ${esc(d.name)} on that channel only. Click its SOS to see who leads there.</span></div>
+    return `<section class="bv-card bv-sec" id="bv-channels"><div class="bv-sh"><h3>Channels</h3><span class="bv-hint">Click a channel to see ${esc(d.name)} on that channel only. Click its SOS to see who leads there.</span></div>
       <div class="bv-th bv-th-c"><span>#</span><span>CHANNEL</span><span class="r">RS MN</span><span>SHARE OF ${esc(d.name.toUpperCase().slice(0, 18))}</span><span>COMMERCIALS : VA</span><span class="r">SOS HERE</span><span class="r">${ui.cmp === 'prev' ? 'VS PREV' : 'VS LY'}</span><span></span></div>
       ${top.map(rowHtml).join('') || '<div class="bv-empty">No channels in this selection</div>'}
       ${!ui.allCh && rest.length ? `<button class="bv-more" data-act="allch">Other channels (${rest.length}) · ${mnTxt(restSum)} · ${pctS(tot ? (restSum / tot) * 100 : 0)} — show all</button>` : ui.allCh && rest.length ? '<button class="bv-more" data-act="allch">Show fewer</button>' : ''}
@@ -233,15 +234,15 @@
 
   function advertisersSection() {
     const rows = d.advertisers;
-    return `<section class="bv-card bv-sec" id="bv-advertisers"><div class="bv-sh"><h3>5 · Advertisers</h3></div>
+    return `<div class="bv-pane" id="bv-advertisers"><div class="bv-sh"><h3>Advertisers</h3></div>
       <div class="bv-th bv-th-a"><span>ADVERTISER</span><span class="r">RS MN</span><span class="r">SHARE</span><span class="r">C : VA</span><span></span></div>
       ${rows.map(r => `<div class="bv-tr bv-tr-a"${go({ adv: r.name })}><b>${esc(r.name)}${usTag(r.us)}</b><b class="r">${mnNum(r.cur)}</b><span class="r">${pctS(r.share)}</span><b class="r">${ratioTxt(r)}</b><span class="bv-go">›</span></div>`).join('') || '<div class="bv-empty">–</div>'}
-      <div class="bv-hint" style="margin-top:6px">If a brand is run by more than one advertiser, each gets its own row.</div></section>`;
+      <div class="bv-hint" style="margin-top:6px">If a brand is run by more than one advertiser, each gets its own row.</div></div>`;
   }
 
   function campaignsSection() {
     const rows = d.campaigns[ui.ctab], n = d.adType.counts;
-    return `<section class="bv-card bv-sec" id="bv-campaigns"><div class="bv-sh"><h3>6 · Campaigns</h3>
+    return `<section class="bv-card bv-sec" id="bv-campaigns"><div class="bv-sh"><h3>Campaigns</h3>
       <span class="bv-seg"><button class="${ui.ctab === 'C' ? 'on c' : ''}" data-act="ctab" data-v="C">Commercials ${n.C}</button><button class="${ui.ctab === 'V' ? 'on v' : ''}" data-act="ctab" data-v="V">Value additions ${n.V}</button></span></div>
       <div class="bv-th bv-th-k"><span>${ui.ctab === 'C' ? 'COMMERCIAL' : 'VALUE ADDITION'} (ADVT_THEME)</span><span class="r">RS MN</span><span class="r">SHARE</span><span class="r">SPOTS</span><span></span></div>
       ${rows.map(r => `<div class="bv-tr bv-tr-k"${go({ theme: r.name, adv: r.advertiser })}><span><b>${esc(r.name)}</b>${usTag(r.us)}<br><small>${esc(r.advertiser)}</small></span><b class="r">${mnNum(r.cur)}</b><span class="r">${pctS(r.share)}</span><span class="r">${nf(r.spots)}</span><span class="bv-go">›</span></div>`).join('') || `<div class="bv-empty">No ${ui.ctab === 'C' ? 'commercials' : 'value additions'} in this selection</div>`}
@@ -250,8 +251,8 @@
 
   function monthsSection() {
     const ms = d.monthsList;
-    return `<section class="bv-card bv-sec" id="bv-months"><div class="bv-sh"><h3>7 · Months</h3>${ms.length === 1 ? '<span class="bv-hint">Already narrowed to one month</span>' : ''}</div>
-      <div class="bv-mtiles">${ms.map(m => { const [c, v] = ui.metric === 'spots' ? [m.Cn, m.Vn] : [m.C, m.V], t = c + v; return `<button class="bv-mt2"${go({ from: m.key, to: m.key })}><span class="mut">${esc(m.label)} ${m.year}</span><b>${mnNum(m.spend)}</b> ${growth(m.spend, m.yoy)}<small>SOS ${pctS(m.sos, 1)} · ${t ? `${nf((c / t) * 100, 0)} : ${nf((v / t) * 100, 0)}` : '–'}</small></button>`; }).join('')}</div></section>`;
+    return `<div class="bv-pane" id="bv-months"><div class="bv-sh"><h3>Months</h3>${ms.length === 1 ? '<span class="bv-hint">Already narrowed to one month</span>' : ''}</div>
+      <div class="bv-mtiles">${ms.map(m => { const [c, v] = ui.metric === 'spots' ? [m.Cn, m.Vn] : [m.C, m.V], t = c + v; return `<button class="bv-mt2"${go({ from: m.key, to: m.key })}><span class="mut">${esc(m.label)} ${m.year}</span><b>${mnNum(m.spend)}</b> ${growth(m.spend, m.yoy)}<small>SOS ${pctS(m.sos, 1)} · ${t ? `${nf((c / t) * 100, 0)} : ${nf((v / t) * 100, 0)}` : '–'}</small></button>`; }).join('')}</div></div>`;
   }
 
   // ---------- clicks ----------
@@ -279,6 +280,7 @@
       else if (a === 'ctab') { ui.ctab = v; draw(); }
       else if (a === 'allch') { ui.allCh = !ui.allCh; draw(); }
       else if (a === 'jpg') exportJpg();
+      else if (a === 'tab') { ui.tab = v; draw(); }
       else if (a === 'sec') { ui.sec = v; draw(); const el = $('bv-' + v); const sc = $('bvScroll'); if (el && sc) sc.scrollTop = el.offsetTop - 120; }
       return;
     }
