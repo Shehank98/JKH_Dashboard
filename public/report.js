@@ -29,6 +29,8 @@
     const st = O.spot.getState();
     const advs = [...st.mine, ...st.comps];
     const cards = hasCat ? O.catHelp.cards() : [];
+    let ai = { ok: false, models: [] };
+    try { ai = await (await fetch('/api/ai/status')).json(); ai.ok = ai.ok && ai.models.length > 0; } catch (e) { ai = { ok: false, models: [], error: e.message }; }
     root.innerHTML = `<div class="sh-box rp-box" role="dialog" aria-label="Full report">
       <div class="sh-h"><h3>Full report (PowerPoint)</h3><button class="bmp-x" id="rpX" aria-label="Close">✕</button></div>
       <div class="sh-body">
@@ -39,6 +41,7 @@
           <label class="sh-ck"><input type="checkbox" id="rpAdv" ${advs.length ? 'checked' : 'disabled'}><span><b>2 · Advertiser analysis</b> <small>${advs.length ? `the category's advertisers, then Commercials, Value additions, Channels and Months for each of` : '(pick advertisers in Filters first)'} <select class="rp-sel" id="rpAdvN" ${advs.length ? '' : 'disabled'}>${advs.map((_, i) => `<option value="${i + 1}"${i + 1 === advs.length ? ' selected' : ''}>${i + 1 === advs.length ? `all ${advs.length} selected` : `the first ${i + 1}`}</option>`).join('') || '<option>0</option>'}</select></small></span></label>
           <label class="sh-ck${brandOk ? '' : ' off'}"><input type="checkbox" id="rpBr" ${brandOk ? 'checked' : 'disabled'}><span><b>3 · Brand analysis</b> <small>${brandOk ? 'for each of the top' : '(needs the Category data built from your main file)'} <select class="rp-sel" id="rpBrN" ${brandOk ? '' : 'disabled'}>${[3, 5, 8, 10].filter(n => n <= Math.max(3, cards.length)).map(n => `<option value="${n}"${n === Math.min(5, cards.length || 5) ? ' selected' : ''}>${n}</option>`).join('')}</select> mother brands: Advertisers, Medium split, Channel mix, Duration mix, Brands, Campaigns</small></span></label>
         </div>
+        <label class="sh-ck${ai.ok ? '' : ' off'}"><input type="checkbox" id="rpAi" ${ai.ok ? 'checked' : 'disabled'}><span><b>Short notes on each slide (Ollama)</b> <small>${ai.ok ? `a local model writes 2–3 lines about what the slide shows, from the numbers on screen. Model <select class="rp-sel" id="rpAiModel">${ai.models.map(m => `<option${m === ai.model ? ' selected' : ''}>${esc(m)}</option>`).join('')}</select>` : `(Ollama was not found: ${esc(ai.error || 'start it and reopen this window')}. Everything else works without it.)`}</small></span></label>
         <div class="sh-status" id="rpInfo"></div>
         <div class="rp-prog" id="rpProg" hidden><div class="rp-bar"><i id="rpBar"></i></div><div class="rp-step" id="rpStep"></div></div>
         <p class="sh-note">While it runs the dashboard will flip and change on its own; keep this tab open and it puts everything back at the end. Bigger reports take longer (about a second per slide).</p>
@@ -51,11 +54,13 @@
     spot: $('rpSpot').checked, cat: $('rpCat').checked && !$('rpCat').disabled,
     adv: $('rpAdv').checked && !$('rpAdv').disabled, advN: Number($('rpAdvN').value) || 0,
     br: $('rpBr').checked && !$('rpBr').disabled, brN: Number($('rpBrN').value) || 0,
+    ai: $('rpAi').checked && !$('rpAi').disabled ? $('rpAiModel').value : '',
   });
-  function estimate(o) { return 3 + (o.spot ? 29 : 0) + (o.cat ? 17 : 0) + (o.adv ? 1 + 4 * o.advN : 0) + (o.br ? 6 * o.brN : 0); }
+  function estimate(o) { return (o.ai ? 0 : 0) + 3 + (o.spot ? 29 : 0) + (o.cat ? 17 : 0) + (o.adv ? 1 + 4 * o.advN : 0) + (o.br ? 6 * o.brN : 0); }
   function info() {
     const o = optsNow(), n = estimate(o);
-    $('rpInfo').innerHTML = `About <b>${n}</b> slides · takes about <b>${Math.max(10, Math.round(n * 1.1))} seconds</b>`;
+    const secs = Math.round(n * 1.1 + (o.ai ? n * 6 : 0));
+    $('rpInfo').innerHTML = `About <b>${n}</b> slides · takes about <b>${secs >= 120 ? Math.round(secs / 60) + ' minutes' : Math.max(10, secs) + ' seconds'}</b>${o.ai ? ' (notes make it slower)' : ''}`;
   }
   root.addEventListener('change', info);
   root.addEventListener('click', async e => {
@@ -83,10 +88,11 @@
   const visible = sel => { const el = document.querySelector(sel); return !!(el && !el.hidden && el.offsetParent !== null); };
   const imgOf = url => new Promise(r => { const i = new Image(); i.onload = () => r({ url, w: i.naturalWidth, h: i.naturalHeight }); i.onerror = () => r(null); i.src = url; });
   async function shotEl(el, bg = '#F4F6FA') {
-    const url = await window.htmlToImage.toJpeg(el, { quality: 0.9, pixelRatio: 1.5, backgroundColor: bg, width: el.offsetWidth, height: el.offsetHeight, style: { transform: 'none', margin: '0', animation: 'none', boxShadow: 'none' }, filter: n => !(n.classList && n.classList.contains('bv-noshot')) });
-    return imgOf(url);
+    const url = await window.htmlToImage.toJpeg(el, { quality: 0.9, pixelRatio: 1.5, backgroundColor: bg, width: el.offsetWidth, height: el.offsetHeight, style: { transform: 'none', margin: '0', animation: 'none', boxShadow: 'none' }, filter: n => n.id !== 'rpModal' && !(n.classList && n.classList.contains('bv-noshot')) });
+    const im = await imgOf(url); if (im) im.text = textOf(el); return im;
   }
-  const spotCard = async id => imgOf(await O.spot.cap.card($(id), false));
+  const textOf = el => (el.innerText || '').replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n').trim().slice(0, 4000);
+  const spotCard = async id => { const im = await imgOf(await O.spot.cap.card($(id), false)); if (im) im.text = textOf($(id)); return im; };
   const catShot = el => shotEl(el);
 
   // The toggle groups that the run changes, so they can be put back.
@@ -109,11 +115,12 @@
   }
 
   // ---------- the deck ----------
-  function deckBuilder(title, footerText) {
+  function deckBuilder(title, footerText, aiOn) {
     const deck = new window.PptxGenJS();
     deck.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 in
     deck.title = title; deck.company = 'Ogilvy'; deck.author = 'Ogilvy Orbit Chub';
     let n = 0;
+    const pending = [];
     const base = (headline, sub) => {
       const s = deck.addSlide(); n++;
       s.background = { color: 'FFFFFF' };
@@ -127,10 +134,11 @@
       deck,
       picture(headline, sub, im, note) {
         if (!im) return;
-        const s = base(headline, sub), aw = 12.43, ah = 5.8, sc = Math.min(aw / im.w, ah / im.h), w = im.w * sc, h = im.h * sc;
+        const s = base(headline, sub), aw = 12.43, ah = aiOn ? 5.0 : 5.8, sc = Math.min(aw / im.w, ah / im.h), w = im.w * sc, h = im.h * sc;
         s.addImage({ data: im.url, x: 0.45 + (aw - w) / 2, y: 1.18 + (ah - h) / 2, w, h });
-        if (note) s.addNotes(note);
+        if (aiOn && im.text) pending.push({ s, headline, text: im.text });
       },
+      pending,
       divider(num, headline, lines) {
         const s = deck.addSlide(); n++;
         s.background = { color: INK };
@@ -151,7 +159,7 @@
     ctl = { cancel: false };
     $('rpGo').disabled = true; $('rpErr').textContent = '';
     $('rpProg').hidden = false; $('rpCancel').textContent = 'Stop';
-    const total = estimate(o);
+    let total = estimate(o);
     let done = 0;
     const step = label => { done++; $('rpBar').style.width = Math.min(100, Math.round((done / total) * 100)) + '%'; $('rpStep').textContent = label; if (ctl.cancel) throw new Error('Stopped'); };
     const before = snapshot();
@@ -164,7 +172,7 @@
       const spotPeriod = $('periodText').textContent.replace(/\s+/g, ' ').trim();
       const pgName = st.pg;
       const footer = `${pgName} · ${spotPeriod}`;
-      const B = deckBuilder(`${pgName}: full report`, footer);
+      const B = deckBuilder(`${pgName}: full report`, footer, !!o.ai);
       const chips = [...document.querySelectorAll('#chips .chip')].filter(c => c.id !== 'busyChip').map(c => c.textContent.trim()).filter(Boolean);
 
       // cover and contents
@@ -189,7 +197,7 @@
         const head = id => ($(id).textContent || '').trim();
         const tag = '1a · Spot Log dashboard';
         let im;
-        step('Spot Log: the whole dashboard'); im = await O.spot.cap.dashboard(); B.picture(`${tag}: the whole dashboard`, spotPeriod, await imgOf(im.url).then(r => r && { ...r, w: im.w, h: im.h }));
+        step('Spot Log: the whole dashboard'); im = await O.spot.cap.dashboard(); B.picture(`${tag}: the whole dashboard`, spotPeriod, await imgOf(im.url).then(r => r && { ...r, w: im.w, h: im.h, text: textOf($('viewSpot')) }));
         document.body.classList.add('exporting');
         try {
           step('Spot Log: medium split'); B.picture(head('h-donut'), `${tag} · category against mine, by medium`, await spotCard('cardMedium'));
@@ -313,6 +321,22 @@
         } finally { window.BRANDVIEW.close(); }
       }
 
+      if (o.ai && B.pending.length) {
+        total += B.pending.length; let failed = 0;
+        for (let i = 0; i < B.pending.length; i++) {
+          const { s, headline, text } = B.pending[i];
+          step(`Writing notes: slide ${i + 1} of ${B.pending.length}`);
+          try {
+            const r = await fetch('/api/ai/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: o.ai, title: headline, text }) });
+            const j = await r.json();
+            if (!r.ok || !j.notes) throw new Error(j.error || 'no notes');
+            s.addShape('rect', { x: 0.45, y: 6.2, w: 0.06, h: 0.8, fill: { color: 'FF8A3D' }, line: { color: 'FF8A3D', width: 0 } });
+            s.addText(j.notes, { x: 0.62, y: 6.2, w: 12.2, h: 0.8, fontFace: 'Calibri', fontSize: 11.5, color: INK, valign: 'middle', margin: 0, fit: 'shrink', paraSpaceAfter: 2 });
+            s.addNotes(j.notes);
+            failed = 0;
+          } catch (e) { if (e.message === 'Stopped') throw e; if (++failed >= 3) { O.toast('Ollama stopped answering, so the rest has no notes'); break; } }
+        }
+      }
       step('Writing the PowerPoint file');
       const file = `${pgName.replace(/[^A-Za-z0-9]+/g, '_')}_Full_report_${new Date().toISOString().slice(0, 10)}.pptx`;
       await B.deck.writeFile({ fileName: file });
