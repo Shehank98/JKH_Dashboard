@@ -198,22 +198,10 @@
 
   function sosSection(baseWord, sosBase) {
     const s = d.sos, h = d.head;
-    const months = d.monthsList;
-    const lines = [{ name: d.name, vals: s.self, col: '#E4702A', w: 3, self: true }, ...s.competitors.map((c, k) => ({ name: c.name, vals: c.values, col: ['#2F5DBF', '#7B8DB5', '#B4BCD0'][k], w: 2, us: c.us }))];
-    const all = lines.flatMap(l => l.vals).filter(v => v != null);
-    const mx = Math.max(20, Math.ceil((Math.max(0, ...all) + 2) / 20) * 20);
-    const W = 440, H = 180, L = 34, R = 24, T = 12, B = 24, n = months.length;
-    const X = k => (n === 1 ? L + (W - L - R) / 2 : L + (k / (n - 1)) * (W - L - R)), Y = v => H - B - (v / mx) * (H - B - T);
-    const grid = [0, 0.25, 0.5, 0.75, 1].map(f => `<line x1="${L}" y1="${Y(mx * f)}" x2="${W - R}" y2="${Y(mx * f)}" stroke="#EEF1F7"/><text x="0" y="${Y(mx * f) + 4}" font-size="10.5" fill="#8A93AD" font-weight="600">${nf(mx * f, 0)}%</text>`).join('');
-    const paths = n < 2 ? '' : lines.map(l => `<polyline points="${l.vals.map((v, k) => (v == null ? null : `${X(k)},${Y(v)}`)).filter(Boolean).join(' ')}" fill="none" stroke="${l.col}" stroke-width="${l.w}" stroke-linecap="round" stroke-linejoin="round"/>`).join('')
-;
-    const xl = months.map((m, k) => `<text x="${X(k)}" y="${H - 6}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#4A5570">${esc(m.label)}</text>`).filter((_, k) => n <= 8 || k % Math.ceil(n / 8) === 0).join('');
     const tiles = [['SOS · COMMERCIALS', s.byAdType.C], ['SOS · VALUE ADD.', s.byAdType.V], ...s.byMedium.slice(0, 1).map(m => [`SOS · ${m.medium.toUpperCase()}`, m.share])].filter(t => t[1] != null);
     return `<div class="bv-pane" id="bv-sos"><div class="bv-sh"><h3>Share of spend (SOS)</h3><span class="bv-hint">in ${esc(O.catHelp.pg())}</span></div>
       <div class="bv-sosn"><span class="bv-kv big">${pctS(h.sos.cur, 1)}</span>${sosBase != null && h.sos.cur != null ? `<b class="${h.sos.cur >= sosBase ? 'up' : 'down'}">${h.sos.cur >= sosBase ? '▲' : '▼'} ${nf(Math.abs(h.sos.cur - sosBase), 1)} pp vs ${baseWord}</b>` : ''}${h.rank ? `<span class="mut">Rank #${h.rank}</span>` : ''}</div>
-      ${n >= 2 ? `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Share of spend by month">${grid}${paths}${xl}</svg>
-        <div class="bv-lines">${lines.map(l => { const v = l.vals[l.vals.length - 1]; return `<span><i style="background:${l.col}"></i>${esc(l.name)} <b>${v == null ? '–' : nf(v, 1) + '%'}</b></span>`; }).join('')}</div>` : '<div class="bv-hint" style="margin:8px 0">Pick a longer period to see the share of spend month by month.</div>'}
-      <div class="bv-tiles">${tiles.map(t => `<div class="bv-tile"><div class="bv-kl">${t[0]}</div><b>${pctS(t[1], 1)}</b></div>`).join('')}</div>
+      <div class="bv-tiles" style="margin-top:12px">${tiles.map(t => `<div class="bv-tile"><div class="bv-kl">${t[0]}</div><b>${pctS(t[1], 1)}</b></div>`).join('')}</div>
       ${s.ranking.length ? `<div class="bv-mini" style="margin-top:10px">WHO IS NEXT · click one for its own view</div>
       ${s.ranking.map((r, i) => `<div class="bv-mr bv-rk${r.self ? ' me' : ''}"${r.self ? '' : go(d.entKind === 'brand' ? { brand: r.key, mb: null } : d.entKind === 'adv' ? { adv: r.key, mb: null, brand: null } : { mb: r.key, brand: null, adv: null })}><span class="mut">${r.rank || i + 1}</span><b>${esc(r.key)} ${usTag(r.us)}</b><span class="r">${mnNum(r.cur)}</span><b class="r">${pctS(r.share, 1)}</b><span class="bv-go">${r.self ? '' : '›'}</span></div>`).join('')}` : ''}</div>`;
   }
