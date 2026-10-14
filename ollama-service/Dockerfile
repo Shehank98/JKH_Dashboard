@@ -11,5 +11,5 @@ ENV PRELOAD_MODELS="llama3.2:3b qwen2.5:3b" \
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 EXPOSE 11434
-VOLUME /root/.ollama
+# No VOLUME line: Railway does not allow it. Add a Railway Volume mounted at /root/.ollama instead.
 ENTRYPOINT ["/entrypoint.sh"]
