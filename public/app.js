@@ -1095,6 +1095,7 @@
   // ---------- detail pop-up ----------
   const modal = $('modal');
   let detailStack = [], detailData = null, detailTab = 'adv';
+  let campSort = { k: 'spend', dir: -1 }; // sort of the Commercials / Value additions table in the pop-up
   function closeDetail() { modal.classList.remove('on'); detailStack = []; }
   $('mClose').addEventListener('click', closeDetail);
   modal.addEventListener('click', e => { if (e.target === modal) closeDetail(); });
@@ -1105,6 +1106,14 @@
     if (!b) return;
     detailTab = b.dataset.t;
     renderDetailBody();
+  });
+  // Column headers of the campaign table sort it; a second click flips the direction.
+  $('mBody').addEventListener('click', e => {
+    const th = e.target.closest('th[data-sort]');
+    if (!th) return;
+    const k = th.dataset.sort;
+    campSort = { k, dir: campSort.k === k ? -campSort.dir : (k === 'name' || k === 'advertiser' || k === 'brand' ? 1 : -1) };
+    renderDetailBody(true);
   });
   // Rows inside the pop-up drill one level deeper.
   $('mBody').addEventListener('click', e => {
@@ -1146,6 +1155,7 @@
     if (fresh) detailStack = [];
     detailStack.push(scope);
     detailTab = scope.tab || 'adv';
+    campSort = { k: 'spend', dir: -1 };
     $('mTitle').textContent = scope.title || 'Details';
     $('mSub').textContent = scopeText(scope);
     $('mBack').style.display = detailStack.length > 1 ? '' : 'none';
@@ -1210,7 +1220,7 @@
     toast('Dashboard updated');
   });
 
-  function renderDetailBody() {
+  function renderDetailBody(keepScroll) {
     const x = detailData;
     if (!x) return;
     const split = state.adType === 'All';
@@ -1237,10 +1247,13 @@
       if (!rows.length) html = '<div class="mload">No spend in this selection</div>';
     } else if (detailTab === 'camp' || detailTab === 'va') {
       const wantVa = detailTab === 'va' || state.adType === 'Sponsorship';
-      const list = state.adType === 'All' ? x.campaigns.filter(c => !!c.va === wantVa) : x.campaigns;
-      const max = list.length ? list[0].spend : 0;
+      const base = state.adType === 'All' ? x.campaigns.filter(c => !!c.va === wantVa) : x.campaigns;
+      const val = { name: c => c.name, advertiser: c => c.advertiser, brand: c => c.brand || '', spend: c => c.spend, share: c => c.spend, spots: c => c.spots }[campSort.k];
+      const list = [...base].sort((a, b) => { const va = val(a), vb = val(b); return (typeof va === 'string' ? va.localeCompare(vb, undefined, { sensitivity: 'base' }) : va - vb) * campSort.dir || b.spend - a.spend; });
+      const max = list.reduce((m, c) => Math.max(m, c.spend), 0);
       const tot = (x.campaignTotals || {})[wantVa ? 'V' : 'C'] || { spend: list.reduce((a, c) => a + c.spend, 0), spots: list.reduce((a, c) => a + c.spots, 0), count: list.length };
-      html = `<table><tbody><tr><th>#</th><th>${wantVa ? 'Value addition' : 'Commercial'} (Advt_Theme)</th><th>Advertiser</th><th>Brand</th><th class="num">Spend</th><th class="num">Share</th><th class="num">Spots</th></tr>
+      const sh = (k, label, cls) => `<th class="srt${cls ? ' ' + cls : ''}${campSort.k === k ? ' on' : ''}" data-sort="${k}" title="Sort by ${label}">${label}<span class="sa">${campSort.k === k ? (campSort.dir > 0 ? '▲' : '▼') : '↕'}</span></th>`;
+      html = `<table><tbody><tr><th>#</th>${sh('name', `${wantVa ? 'Value addition' : 'Commercial'} (Advt_Theme)`)}${sh('advertiser', 'Advertiser')}${sh('brand', 'Brand')}${sh('spend', 'Spend', 'num')}${sh('share', 'Share', 'num')}${sh('spots', 'Spots', 'num')}</tr>
         <tr class="totrow"><td></td><td class="nm">Total · ${nf(tot.count)} ${wantVa ? 'value additions' : 'commercials'}${tot.count > list.length ? ` <small>(top ${list.length} listed)</small>` : ''}</td><td></td><td></td>
           <td class="num">${money(tot.spend, false)}</td><td class="num">${x.total ? pctS((tot.spend / x.total) * 100) : ''}</td><td class="num">${nf(tot.spots)}</td></tr>` +
         list.map((c, i) => `<tr class="${c.role === 'mine' ? 'me' : ''}"${sub({ advertiser: c.advertiser, theme: c.name, title: `“${c.name}”`, tab: 'ch' })} style="cursor:pointer" title="Click to see where this campaign ran">
@@ -1264,8 +1277,9 @@
           <td class="num">${nf(c.spots)}</td><td class="num mineval">${money(c.mine, false)}</td><td class="num mineval">${pctS(c.spend ? (c.mine / c.spend) * 100 : 0)}</td></tr>`).join('') + '</tbody></table>';
       if (!x.channels.length) html = '<div class="mload">No spend in this selection</div>';
     }
+    const keep = keepScroll === true ? $('mBody').scrollTop : 0;
     $('mBody').innerHTML = html;
-    $('mBody').scrollTop = 0;
+    $('mBody').scrollTop = keep;
   }
 
   // ---------- export and share ----------
