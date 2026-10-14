@@ -35,7 +35,7 @@ body.share-mode #catShareBtn,body.share-mode .ctab[data-pane="cpData"],body.shar
 body.share-mode .bmbtn,body.share-mode #shareBtn,body.share-mode #userBtn,body.share-mode #userMenu,
 body.share-mode .tab[data-pane="paneData"],body.share-mode #paneData,
 body.share-mode #exportMenu [data-x="send"],body.share-mode #exportMenu [data-x="json"],body.share-mode #exportMenu [data-x="plan"],
-body.share-mode #exportMenu hr,body.share-mode #fTagCommercial,body.share-mode label.tick:has(#fTagCommercial){display:none!important}
+body.share-mode #exportMenu hr,body.share-nocampaign label.tick:has(#fTagCommercial){display:none!important}
 body.share-mode #bmPage,body.share-mode #bmConfirm{display:none!important}
 body.share-fail .topbar .fbtn,body.share-fail .tright{display:none}
 .sh-ck.off{opacity:.55;cursor:default}

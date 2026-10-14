@@ -12,7 +12,8 @@ const THEMES = ['Commercials', 'Value additions -BB']; // the second name is rec
 const VERSION = 1;
 
 // Detail levels: how finely a cube is cut. Every extra dimension multiplies the number of records.
-//   full      month, channel, product group, advertiser, mother brand, sub category, daypart, ad length, ad type
+//   full      month, channel, product group, advertiser, mother brand, sub category, daypart, ad length and the campaign
+//             (Advt_Theme), so campaigns, Value additions and the Duration Mix work exactly as in the full file
 //   standard  the same without ad length (the Duration Mix card is left out)
 //   compact   without ad length and daypart (the Duration Mix card and the daypart filter are left out)
 const LEVELS = ['full', 'standard', 'compact'];
@@ -21,7 +22,7 @@ const LEVELS = ['full', 'standard', 'compact'];
 function buildCube(ds, lookup, opts) {
   opts = opts || {};
   const level = LEVELS.includes(opts.level) ? opts.level : 'full';
-  const keepDur = level === 'full', keepDp = level !== 'compact';
+  const keepDur = level === 'full', keepDp = level !== 'compact', keepTheme = level === 'full';
   const { dicts, cols } = ds;
   const n = cols.mon.length;
   const hasProduct = !!(dicts.product && cols.product);
@@ -53,16 +54,24 @@ function buildCube(ds, lookup, opts) {
   for (let i = 0; i < n; i++) {
     if (lockId >= 0 && cols.pg[i] !== lockId) continue;
     const th = excluded[cols.theme[i]] ? 1 : 0;
-    const raw = keepDur && durRaw ? durRaw[i] : NaN;
-    const sec = keepDur && durRaw ? D.durSecondsOf(raw, th === 1) : NaN;
-    const du = keepDur && durRaw ? D.durBucketOf(raw, th === 1) : 255;
+    let raw = keepDur && durRaw ? durRaw[i] : NaN, sec, du, hr = 0;
+    if (keepTheme) {
+      // Real campaign names are kept, so whether an ad is a value addition is decided when the client looks (the Tag
+      // tick box works). Length is therefore grouped as recorded; value additions are put in the 5s bucket by the engine.
+      hr = raw > 0 ? 1 : 0;
+      sec = hr ? raw : 0; du = hr ? D.durBucketOf(raw, false) : 255;
+    } else {
+      sec = keepDur && durRaw ? D.durSecondsOf(raw, th === 1) : NaN;
+      du = keepDur && durRaw ? D.durBucketOf(raw, th === 1) : 255;
+    }
     const dpv = keepDp ? cols.dp[i] : 4;
     const pr = prodFor(cols.pg[i], hasProduct ? cols.product[i] : 0);
-    const key = cols.mon[i] + ',' + cols.pg[i] + ',' + cols.adv[i] + ',' + pr + ',' + cols.ch[i] + ',' + dpv + ',' + du + ',' + th;
+    const thv = keepTheme ? cols.theme[i] : th;
+    const key = cols.mon[i] + ',' + cols.pg[i] + ',' + cols.adv[i] + ',' + pr + ',' + cols.ch[i] + ',' + dpv + ',' + du + ',' + thv + ',' + hr;
     let a = agg.get(key);
-    if (!a) { a = [cols.mon[i], cols.pg[i], cols.adv[i], pr, cols.ch[i], dpv, du, th, 0, 0, 0, 0]; agg.set(key, a); }
+    if (!a) { a = [cols.mon[i], cols.pg[i], cols.adv[i], pr, cols.ch[i], dpv, du, thv, 0, 0, 0, 0]; agg.set(key, a); }
     a[8] += cols.cost[i]; a[9]++;
-    if (sec > 0) { a[10] += sec; a[11]++; }
+    if (keepTheme) { a[10] += sec; a[11]++; } else if (sec > 0) { a[10] += sec; a[11]++; }
   }
   const rows = [...agg.values()];
   if (!rows.length) throw new Error('There is no data to share for this selection.');
@@ -72,21 +81,22 @@ function buildCube(ds, lookup, opts) {
     for (const r of rows) if (!m.has(r[idx])) { m.set(r[idx], out.length); out.push(r[idx]); }
     return { m, ids: out };
   };
-  const pgR = remap(dicts.pg, 1), advR = remap(dicts.adv, 2), chR = remap(dicts.channel, 4);
+  const pgR = remap(dicts.pg, 1), advR = remap(dicts.adv, 2), chR = remap(dicts.channel, 4), thR = keepTheme ? remap(dicts.theme, 7) : null;
   const c = { mon: [], pg: [], adv: [], pr: [], ch: [], dp: [], du: [], th: [], cost: [], n: [], ns: [], sec: [] };
   for (const r of rows) {
     c.mon.push(r[0]); c.pg.push(pgR.m.get(r[1])); c.adv.push(advR.m.get(r[2])); c.pr.push(r[3]); c.ch.push(chR.m.get(r[4]));
-    c.dp.push(r[5]); c.du.push(r[6]); c.th.push(r[7]); c.cost.push(Math.round(r[8])); c.n.push(r[9]); c.ns.push(r[11]); c.sec.push(Math.round(r[10]));
+    c.dp.push(r[5]); c.du.push(r[6]); c.th.push(keepTheme ? thR.m.get(r[7]) : r[7]); c.cost.push(Math.round(r[8])); c.n.push(r[9]); c.ns.push(r[11]); c.sec.push(Math.round(r[10]));
   }
   let minMon = Infinity, maxMon = -Infinity, spots = 0;
   for (let i = 0; i < c.mon.length; i++) { if (c.mon[i] < minMon) minMon = c.mon[i]; if (c.mon[i] > maxMon) maxMon = c.mon[i]; spots += c.n[i]; }
   return {
     v: VERSION,
-    meta: { minMon, maxMon, spots, records: rows.length, hasMap: hasProduct, lockedPg: opts.pg || '', level, tagCommercial: !!opts.tagCommercial },
+    meta: { minMon, maxMon, spots, records: rows.length, hasMap: hasProduct, lockedPg: opts.pg || '', level, tagCommercial: !!opts.tagCommercial, campaigns: keepTheme },
     dicts: {
       pg: pgR.ids.map(i => dicts.pg[i]), adv: advR.ids.map(i => dicts.adv[i]), channel: chR.ids.map(i => dicts.channel[i]),
       channelMedium: chR.ids.map(i => dicts.channelMedium[i]), channelName: chR.ids.map(i => dicts.channelName[i]),
       mother: prodList.map(p => p[0]), sub: prodList.map(p => p[1]),
+      theme: keepTheme ? thR.ids.map(i => dicts.theme[i]) : undefined,
     },
     cols: c,
   };
@@ -105,14 +115,14 @@ function unpackCube(cube) {
   const lastMon = cube.meta.maxMon;
   return {
     meta: {
-      cube: true, rows: n, spots: cube.meta.spots, skipped: 0, hasProduct: false, hasMap: cube.meta.hasMap, lockedPg: cube.meta.lockedPg, level: cube.meta.level || 'full', tagCommercial: !!cube.meta.tagCommercial,
+      cube: true, rows: n, spots: cube.meta.spots, skipped: 0, hasProduct: false, hasMap: cube.meta.hasMap, lockedPg: cube.meta.lockedPg, level: cube.meta.level || 'full', tagCommercial: !!cube.meta.tagCommercial, campaigns: !!cube.meta.campaigns,
       minDay: Math.round(Date.UTC(Math.floor(cube.meta.minMon / 12), cube.meta.minMon % 12, 1) / 86400000),
       maxDay: Math.round(Date.UTC(Math.floor(lastMon / 12), (lastMon % 12) + 1, 1) / 86400000) - 1,
       fileName: 'Shared dashboard', uploadedAt: new Date().toISOString(), parseMs: 0,
     },
     dicts: {
       pg: d.pg, adv: d.adv, channel: d.channel, channelMedium: d.channelMedium, channelName: d.channelName,
-      theme: THEMES.slice(), program: ['(blank)'], adPos: ['(blank)'],
+      theme: d.theme ? d.theme.slice() : THEMES.slice(), program: ['(blank)'], adPos: ['(blank)'],
       product: d.mother.map((m, i) => (d.sub[i] ? m + ' · ' + d.sub[i] : m)), productMother: d.mother, productSub: d.sub,
     },
     cols: {

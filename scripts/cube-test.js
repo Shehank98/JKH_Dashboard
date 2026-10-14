@@ -21,7 +21,7 @@ const file = process.argv[2] || path.join(__dirname, '..', 'samples', 'sample_42
   const cube = buildCube(ds, lookup, {});
   const json = JSON.stringify(cube);
   console.log(`cube: ${cube.meta.records} records from ${ds.meta.rows} rows, ${(json.length / 1024).toFixed(0)} KB json, ${(require('zlib').gzipSync(json).length / 1024).toFixed(0)} KB gzip, ${Date.now() - t0} ms`);
-  assert.ok(!json.includes('Morning Energy'), 'no campaign names');
+  assert.ok(json.includes('Morning Energy'), 'the full level keeps campaign names');
   assert.ok(!json.includes('Full Cream Milk'), 'no brand names');
   const cds = unpackCube(JSON.parse(json));
   const base = { pg: pgName, from: '2026-01-01', to: '2026-06-30', mine: [ds.dicts.adv[0]], comps: ds.dicts.adv.slice(1, 4), tagCommercial: false, yearType: 'CY' };
@@ -36,6 +36,21 @@ const file = process.argv[2] || path.join(__dirname, '..', 'samples', 'sample_42
     assert.deepStrictEqual(b.duration.rows.map(r => r.counts), a.duration.rows.map(r => r.counts), 'duration counts ' + JSON.stringify(extra));
     a.duration.rows.forEach((r, k) => { if (r.acd != null) near(b.duration.rows[k].acd, r.acd, 'acd'); });
     assert.strictEqual(JSON.stringify(b.sos.rows.map(r => Math.round(r.sos * 1000))), JSON.stringify(a.sos.rows.map(r => Math.round(r.sos * 1000))), 'sos');
+    // campaigns as the agency sees them: lead campaign per month
+    assert.deepStrictEqual(b.drill.map(m => m.campaign && [m.campaign.name, m.campaign.advertiser, Math.round(m.campaign.spend), m.campaign.spots]),
+      a.drill.map(m => m.campaign && [m.campaign.name, m.campaign.advertiser, Math.round(m.campaign.spend), m.campaign.spots]), 'lead campaigns ' + JSON.stringify(extra));
+  }
+  // Tag counts as a commercial: the client's tick box works on the full level
+  for (const tag of [false, true]) {
+    const f = { ...base, tagCommercial: tag };
+    const a = compute.detail(ds, f, {}), b = compute.detail(cds, f, {});
+    assert.deepStrictEqual(b.campaigns.map(c => [c.name, c.va, Math.round(c.spend), c.spots]), a.campaigns.map(c => [c.name, c.va, Math.round(c.spend), c.spots]), 'campaign list, tag ' + tag);
+    for (const adType of ['Commercial', 'Sponsorship']) {
+      const x = compute.dashboard(ds, { ...f, adType }), y = compute.dashboard(cds, { ...f, adType });
+      near(y.sos.total.spend, x.sos.total.spend, 'adType ' + adType + ' tag ' + tag);
+      assert.deepStrictEqual(y.duration.rows.map(r => r.counts), x.duration.rows.map(r => r.counts), 'duration ' + adType + tag);
+      x.duration.rows.forEach((r, k) => { if (r.acd != null) near(y.duration.rows[k].acd, r.acd, 'acd ' + adType + tag); });
+    }
   }
   // detail view and the mother brand filter
   const dA = compute.detail(ds, base, { advertiser: base.comps[0] }), dB = compute.detail(cds, base, { advertiser: base.comps[0] });
@@ -46,6 +61,7 @@ const file = process.argv[2] || path.join(__dirname, '..', 'samples', 'sample_42
   // a month-ending date range snaps to whole months
   const mid = compute.dashboard(cds, { ...base, from: '2026-01-15', to: '2026-06-10' });
   near(mid.sos.total.spend, all.sos.total.spend, 'snaps to whole months');
+  assert.ok(!JSON.stringify(buildCube(ds, lookup, { level: 'standard' })).includes('Morning Energy'), 'lighter levels hold no campaign names');
   // lighter cubes are smaller and keep the same totals
   const std = buildCube(ds, lookup, { level: 'standard' }), cmp = buildCube(ds, lookup, { level: 'compact' });
   assert.ok(cmp.meta.records < std.meta.records && std.meta.records < cube.meta.records);

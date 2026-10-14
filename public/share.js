@@ -9,9 +9,9 @@
   const MAX_BYTES = 38 * 1024 * 1024;
 
   const LEVELS = [
-    ['standard', 'Standard', 'Month, channel, advertiser, mother brand, sub category, daypart and ad type. The Duration Mix card is left out.'],
+    ['standard', 'Standard', 'Month, channel, advertiser, mother brand, sub category, daypart and ad type. No campaigns or Duration Mix.'],
     ['compact', 'Compact', 'The same without dayparts. Smallest, fastest to open.'],
-    ['full', 'Full', 'Adds ad lengths, so the Duration Mix card works. Largest.'],
+    ['full', 'Full', 'Everything you see: campaigns with Commercials and Value additions tabs, Duration Mix and the Tag tick box. Largest.'],
   ];
   let s = null;
 
@@ -68,6 +68,7 @@
   }
 
   function draw() {
+    if ($('shTitle')) { s.title = $('shTitle').value; s.client = $('shClient').value; s.expires = $('shExp').value; }
     const minDate = isoDay(new Date(Date.now() + 86400000));
     const st = O.spot.getState();
     root.innerHTML = `<div class="sh-box" role="dialog" aria-label="Share dashboard with client">
@@ -83,8 +84,8 @@
           <label class="sh-ck${s.catAvail ? '' : ' off'}"><input type="checkbox" id="shCat" ${s.withCat && s.catAvail ? 'checked' : ''} ${s.catAvail ? '' : 'disabled'}><span>Include the <b>Category dashboard</b> <small>${s.catAvail ? '(the client gets a “Switch to Category” button. It shows mother brands, brand names and sub categories for the product group)' : '(not available: load your main file first so the Category data is built)'}</small></span></label>
           <label class="sh-ck"><input type="checkbox" id="shState" ${s.withFilters ? 'checked' : ''}><span>Open with my current filters <small>(advertisers, dates, medium…; the client can change them)</small></span></label>
           <div class="sh-status" id="shStatus"></div>
-          <p class="sh-note">Ad type: <b>Tag is counted as a ${st.tagCommercial ? 'commercial' : 'value addition'}</b>, as in your filters. The client sees the dashboard that way; change the tick box in Filters first if you want it the other way.</p>
-          <p class="sh-note">The client sees monthly totals by channel, advertiser, mother brand and sub category, and can filter them, but never the raw spot log: no programmes, campaigns, brand names, times or individual spots. Anyone with the link can open it, so share it only with the client.</p>
+          <p class="sh-note">${s.level === 'full' ? 'The client opens with <b>Tag counted as a ' + (st.tagCommercial ? 'commercial' : 'value addition') + '</b>, as in your filters, and can change it.' : 'Ad type: <b>Tag is counted as a ' + (st.tagCommercial ? 'commercial' : 'value addition') + '</b>, as in your filters. The client cannot change it at this level; use Full for that.'}</p>
+          <p class="sh-note">The client sees monthly totals by channel, advertiser, mother brand and sub category, and can filter them, but never the raw spot log: no programmes, brand names, times or individual spots${s.level === 'full' ? ' (campaign names are included at this level)' : ', and no campaign names'}. Anyone with the link can open it, so share it only with the client.</p>
         </div>
         <div class="sh-result" ${s.result ? '' : 'hidden'}>${s.result ? `
           <div class="sh-ok">Your link is ready</div>
@@ -184,7 +185,7 @@
   root.addEventListener('change', e => {
     if (!s) return;
     const t = e.target;
-    if (t.name === 'shLv') { s.level = t.value; root.querySelectorAll('.sh-lv').forEach(l => l.classList.toggle('on', l.querySelector('input').checked)); preview(); }
+    if (t.name === 'shLv') { s.level = t.value; draw(); preview(); }
     else if (t.id === 'shLock') { s.lockPg = t.checked; preview(); }
     else if (t.id === 'shCat') { s.withCat = t.checked; preview(); }
     else if (t.id === 'shState') s.withFilters = t.checked;

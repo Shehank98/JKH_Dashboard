@@ -18,6 +18,8 @@
   let sharePayload = null;
   if (SHARE) document.body.classList.add('share-mode', 'share-nocat');
   const isCube = () => !!(overview && overview.meta && overview.meta.cube);
+  // A shared cube made at the Full level keeps campaign names, so campaigns, Value additions and the Tag tick box all work.
+  const noCampaigns = () => isCube() && !overview.meta.campaigns;
 
   // ---------- state ----------
   let overview = null;      // product groups, date bounds
@@ -261,7 +263,8 @@
     } else {
       Object.assign(state, defaultDates(), { pg: groups[0], mine: [], comps: [], medium: 'All', channel: '', daypart: '', adType: 'All', tagCommercial: false, mb: '', sub: '' });
     }
-    if (SHARE) state.tagCommercial = false;
+    // Without campaign names the cube cannot re-sort Tag, so it keeps the choice the agency made.
+    if (SHARE && noCampaigns()) state.tagCommercial = !!overview.meta.tagCommercial;
     applyCubeUi();
     await loadOptions(!(saved && saved.pg === state.pg && saved.mine && saved.mine.length));
     writeForm();
@@ -297,7 +300,7 @@
     const cube = isCube(), lvl = cube ? overview.meta.level : 'full';
     $('cardDur').style.display = cube && lvl !== 'full' ? 'none' : '';
     $('fDaypartWrap').style.display = cube && lvl === 'compact' ? 'none' : '';
-    document.querySelectorAll('#mTabs [data-t="camp"], #mTabs [data-t="va"]').forEach(b => { b.dataset.cube = cube ? '1' : ''; });
+    document.body.classList.toggle('share-nocampaign', noCampaigns());
     $('secBrand').style.display = 'none';
   }
   // Mother brand and sub category pick lists (data cubes with a Brand Map).
@@ -875,7 +878,7 @@
       let body = 'No spend recorded this month.';
       if (L) {
         body = `Leader <b style="color:${L.mine ? C.deep : '#1A1F36'}">${esc(L.name)}</b> <strong>${money(L.spend)}</strong> · ${nf(m.category ? (L.spend / m.category) * 100 : 0, 1)}% SOS`;
-        if (m.campaign && !isCube()) {
+        if (m.campaign && !noCampaigns()) {
           const me = d.filters.mine.includes(m.campaign.advertiser);
           body += `<span class="camp${me ? ' me' : ''}"${detA({ title: `“${m.campaign.name}” · ${m.label} ${m.year}`, month: m.key, advertiser: m.campaign.advertiser, theme: m.campaign.name, tab: 'ch' })}${tipA('Click to see where this campaign ran in ' + m.label)}><span class="cn">“${esc(m.campaign.name)}”</span><br>
             <span class="by">by <b>${esc(m.campaign.advertiser)}</b>${me ? ' (mine)' : ''} · ${mn(m.campaign.spend)} · ${nf(m.campaign.spots)} spots</span></span>`;
@@ -1212,8 +1215,8 @@
     tb.hidden = false;
     tb.textContent = split ? 'Commercials' : state.adType === 'Sponsorship' ? 'Value additions' : 'Commercials';
     $('mTabs').querySelector('[data-t="va"]').hidden = !split;
-    if (isCube() && (detailTab === 'camp' || detailTab === 'va')) detailTab = 'ch';
-    if (isCube()) { $('mTabs').querySelector('[data-t="camp"]').hidden = true; $('mTabs').querySelector('[data-t="va"]').hidden = true; }
+    if (noCampaigns() && (detailTab === 'camp' || detailTab === 'va')) detailTab = 'ch';
+    if (noCampaigns()) { $('mTabs').querySelector('[data-t="camp"]').hidden = true; $('mTabs').querySelector('[data-t="va"]').hidden = true; }
     [...$('mTabs').children].forEach(b => b.classList.toggle('on', b.dataset.t === detailTab));
     const sub = o => ` data-sub="${esc(JSON.stringify(o))}"`;
     const bar = (v, max) => `<span class="sharebar" style="width:${max ? Math.max(2, (v / max) * 60) : 0}px"></span>`;
@@ -1492,7 +1495,7 @@
     d.months.forEach((m, i) => {
       const dr = d.drill[i];
       lines.push([m.key, Math.round(d.trend.mine[i])].concat(d.trend.competitors.map(c => Math.round(c.values[i])),
-        [Math.round(d.trend.categoryAvg[i]), Math.round(dr.category), dr.leader ? dr.leader.name : '', dr.campaign && !isCube() ? dr.campaign.name : '', dr.campaign && !isCube() ? dr.campaign.advertiser : '']));
+        [Math.round(d.trend.categoryAvg[i]), Math.round(dr.category), dr.leader ? dr.leader.name : '', dr.campaign && !noCampaigns() ? dr.campaign.name : '', dr.campaign && !noCampaigns() ? dr.campaign.advertiser : '']));
     });
     const csv = lines.map(r => r.map(v => (typeof v === 'number' ? v : q(v))).join(',')).join('\r\n');
     const a = document.createElement('a');
