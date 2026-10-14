@@ -41,7 +41,7 @@
           <label class="sh-ck"><input type="checkbox" id="rpAdv" ${advs.length ? 'checked' : 'disabled'}><span><b>2 · Advertiser analysis</b> <small>${advs.length ? `the category's advertisers, then Commercials, Value additions, Channels and Months for each of` : '(pick advertisers in Filters first)'} <select class="rp-sel" id="rpAdvN" ${advs.length ? '' : 'disabled'}>${advs.map((_, i) => `<option value="${i + 1}"${i + 1 === advs.length ? ' selected' : ''}>${i + 1 === advs.length ? `all ${advs.length} selected` : `the first ${i + 1}`}</option>`).join('') || '<option>0</option>'}</select></small></span></label>
           <label class="sh-ck${brandOk ? '' : ' off'}"><input type="checkbox" id="rpBr" ${brandOk ? 'checked' : 'disabled'}><span><b>3 · Brand analysis</b> <small>${brandOk ? 'for each of the top' : '(needs the Category data built from your main file)'} <select class="rp-sel" id="rpBrN" ${brandOk ? '' : 'disabled'}>${[3, 5, 8, 10].filter(n => n <= Math.max(3, cards.length)).map(n => `<option value="${n}"${n === Math.min(5, cards.length || 5) ? ' selected' : ''}>${n}</option>`).join('')}</select> mother brands: Advertisers, Medium split, Channel mix, Duration mix, Brands, Campaigns</small></span></label>
         </div>
-        <label class="sh-ck${ai.ok ? '' : ' off'}"><input type="checkbox" id="rpAi" ${ai.ok ? 'checked' : 'disabled'}><span><b>Short notes on each slide (Ollama)</b> <small>${ai.ok ? `a local model writes 2–3 lines about what the slide shows, from the numbers on screen. Model <select class="rp-sel" id="rpAiModel">${ai.models.map(m => `<option${m === ai.model ? ' selected' : ''}>${esc(m)}</option>`).join('')}</select>` : `(Ollama was not found: ${esc(ai.error || 'start it and reopen this window')}. Everything else works without it.)`}</small></span></label>
+        <label class="sh-ck${ai.ok ? '' : ' off'}"><input type="checkbox" id="rpAi" ${ai.ok ? 'checked' : 'disabled'}><span><b>Short note using AI on each slide</b> <small>${ai.ok ? 'writes 2–3 lines about what the slide shows, from the numbers on screen' : '(not available right now, everything else still works)'}</small></span></label><input type="hidden" id="rpAiModel" value="${esc(ai.model || '')}">
         <div class="sh-status" id="rpInfo"></div>
         <div class="rp-prog" id="rpProg" hidden><div class="rp-bar"><i id="rpBar"></i></div><div class="rp-step" id="rpStep"></div></div>
         <p class="sh-note">While it runs the dashboard will flip and change on its own; keep this tab open and it puts everything back at the end. Bigger reports take longer (about a second per slide).</p>
@@ -334,7 +334,7 @@
             s.addText(j.notes, { x: 0.62, y: 6.2, w: 12.2, h: 0.8, fontFace: 'Calibri', fontSize: 11.5, color: INK, valign: 'middle', margin: 0, fit: 'shrink', paraSpaceAfter: 2 });
             s.addNotes(j.notes);
             failed = 0;
-          } catch (e) { if (e.message === 'Stopped') throw e; if (++failed >= 3) { O.toast('Ollama stopped answering, so the rest has no notes'); break; } }
+          } catch (e) { if (e.message === 'Stopped') throw e; if (++failed >= 3) { O.toast('The AI notes stopped, so the rest of the slides have no note'); break; } }
         }
       }
       step('Writing the PowerPoint file');
