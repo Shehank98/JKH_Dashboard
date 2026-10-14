@@ -134,7 +134,7 @@
       deck,
       picture(headline, sub, im, note) {
         if (!im) return;
-        const s = base(headline, sub), aw = 12.43, ah = aiOn ? 5.0 : 5.8, sc = Math.min(aw / im.w, ah / im.h), w = im.w * sc, h = im.h * sc;
+        const s = base(headline, sub), aw = 12.43, ah = aiOn ? 4.9 : 5.8, sc = Math.min(aw / im.w, ah / im.h), w = im.w * sc, h = im.h * sc;
         s.addImage({ data: im.url, x: 0.45 + (aw - w) / 2, y: 1.18 + (ah - h) / 2, w, h });
         if (aiOn && im.text) pending.push({ s, headline, text: im.text });
       },
@@ -322,16 +322,17 @@
       }
 
       if (o.ai && B.pending.length) {
+        const aiContext = `Our advertiser (the client, "mine"): ${st.mine.join(', ') || 'not set'}. Competitors: ${st.comps.join(', ') || 'none selected'}. Category: ${pgName}. Period: ${spotPeriod}. Currency LKR. Write from our advertiser's side.`;
         total += B.pending.length; let failed = 0;
         for (let i = 0; i < B.pending.length; i++) {
           const { s, headline, text } = B.pending[i];
           step(`Writing notes: slide ${i + 1} of ${B.pending.length}`);
           try {
-            const r = await fetch('/api/ai/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: o.ai, title: headline, text }) });
+            const r = await fetch('/api/ai/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: o.ai, title: headline, text, context: aiContext }) });
             const j = await r.json();
             if (!r.ok || !j.notes) throw new Error(j.error || 'no notes');
-            s.addShape('rect', { x: 0.45, y: 6.2, w: 0.06, h: 0.8, fill: { color: 'FF8A3D' }, line: { color: 'FF8A3D', width: 0 } });
-            s.addText(j.notes, { x: 0.62, y: 6.2, w: 12.2, h: 0.8, fontFace: 'Calibri', fontSize: 11.5, color: INK, valign: 'middle', margin: 0, fit: 'shrink', paraSpaceAfter: 2 });
+            s.addShape('rect', { x: 0.45, y: 6.12, w: 0.06, h: 0.95, fill: { color: 'FF8A3D' }, line: { color: 'FF8A3D', width: 0 } });
+            s.addText(j.notes, { x: 0.62, y: 6.12, w: 12.2, h: 0.95, fontFace: 'Calibri', fontSize: 11.5, color: INK, valign: 'middle', margin: 0, fit: 'shrink', paraSpaceAfter: 2 });
             s.addNotes(j.notes);
             failed = 0;
           } catch (e) { if (e.message === 'Stopped') throw e; if (++failed >= 3) { O.toast('The AI notes stopped, so the rest of the slides have no note'); break; } }

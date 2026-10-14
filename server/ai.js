@@ -12,9 +12,12 @@ async function models() {
   return (j.models || []).map(m => m.name);
 }
 
-const SYSTEM = 'You write short speaker notes for a media-spend report slide. You are given the text that is visible on the slide. ' +
-  'Write 2 or 3 bullet points (each starting with "• ", each under 25 words) saying what the slide shows: the biggest numbers, who leads, the main gap or change worth noticing. ' +
-  'Use only numbers and names that appear in the text. Never guess or invent. Plain English, no heading, no intro.';
+const SYSTEM = 'You are a senior media planner writing the key insights on a media-spend report slide for the ADVERTISER (the client, marked "mine" or "us" on the slide). ' +
+  'Always read the numbers from the advertiser\'s side: how our share of voice (SOV) and share of spend (SOS) compare with competitors, where we lead or trail, what to protect, close or fix. ' +
+  'Write exactly 3 bullets. Each starts with "• ", is under 28 words, and holds a number from the slide. ' +
+  'Use proper media and planning language where the slide supports it: share of voice and spend, spot weight and spot count, average spot cost, rate card, medium split TV / Radio / Press, channel mix and concentration, prime time (PT) and non prime time (NPT), spot length mix and average commercial duration (ACD), commercials against value additions (VA), flighting, burst and always-on weighting, seasonality and peak month, year-on-year growth, category growth versus ours. ' +
+  'Bullet 1: where we stand (share and rank against competitors). Bullet 2: the biggest driver, gap or change in the data. Bullet 3: what it means for us and a clear media action (for example rebalance weight, defend or attack a channel, adjust the spot length mix, shift flighting). ' +
+  'Use ONLY names and numbers that appear in the text. Never invent figures, reach, frequency, CPM, ratings or results that are not shown. If something is not on the slide, leave it out. No heading, no intro, no closing line.';
 
 function clean(s) {
   const lines = String(s || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => (/^[•\-*]\s*/.test(l) ? '• ' + l.replace(/^[•\-*]\s*/, '') : '• ' + l));
@@ -28,13 +31,13 @@ function router(express) {
     catch (e) { res.json({ ok: false, models: [], error: 'Ollama is not reachable at ' + BASE }); }
   });
   r.post('/notes', async (req, res) => {
-    const { model, title, text } = req.body || {};
+    const { model, title, text, context } = req.body || {};
     if (!model || !text) return res.status(400).json({ error: 'model and text are needed' });
     try {
       const resp = await fetch(BASE + '/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: timeout(90000),
-        body: JSON.stringify({ model: String(model), stream: false, options: { temperature: 0.2, num_predict: 200 },
-          messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `Slide: ${String(title || '').slice(0, 200)}\n\nVisible text:\n${String(text).slice(0, 4000)}` }] }),
+        body: JSON.stringify({ model: String(model), stream: false, options: { temperature: 0.2, num_predict: 280 },
+          messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `${context ? 'Report context: ' + String(context).slice(0, 600) + '\n' : ''}Slide: ${String(title || '').slice(0, 200)}\n\nVisible text:\n${String(text).slice(0, 4000)}` }] }),
       });
       if (!resp.ok) return res.status(502).json({ error: 'Ollama answered ' + resp.status });
       const j = await resp.json();
