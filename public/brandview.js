@@ -178,12 +178,11 @@
       <div class="bv-mcards">${rows.map((m, k) => `<button class="bv-mcard${m.cur > 0 ? '' : ' off'}"${m.cur > 0 ? go({ medium: m.medium }) : ' disabled'}>
         <div class="bv-mh2"><i style="background:${MED_COL[k]}"></i><b>${m.medium}</b><span class="bv-go">›</span></div>
         <div class="bv-mv">${m.cur > 0 ? mnTxt(m.cur) : '–'}</div>
-        <div class="bv-ms">${m.cur > 0 ? `${pctS(m.share)} of the brand · ${growth(m.cur, baseOf(m))} ${ui.cmp === 'prev' ? 'vs prev' : 'vs LY'}` : 'No spend'}</div>
-        ${m.cur > 0 ? `<div class="bv-mrow"><span>Category mix</span><b>${pctS(m.catShare)}</b></div>
+        <div class="bv-ms">${m.cur > 0 ? `${growth(m.cur, baseOf(m))} ${ui.cmp === 'prev' ? 'vs previous' : 'vs last year'}` : 'No spend'}</div>
+        ${m.cur > 0 ? `<div class="bv-mrow"><span>Medium split</span><b>${pctS(m.share)}</b></div>
         <div class="bv-mrow"><span>SOS in ${m.medium}</span><b>${pctS(m.sos, 1)}</b></div>
         <div class="bv-mrow"><span>Spots</span><b>${nf(m.spots)}</b></div>
-        <div class="bv-mrow"><span>Commercials : VA</span><b>${ratioTxt(m)}</b></div>${ratioBar(m)}` : ''}</button>`).join('')}</div>
-      <div class="bv-hint" style="margin-top:10px">Category mix is how the whole category splits across media; compare it with the brand's own split above.</div>`;
+        <div class="bv-mrow"><span>Commercials : VA</span><b>${ratioTxt(m)}</b></div>${ratioBar(m)}` : ''}</button>`).join('')}</div>`;
   }
 
   // 3. Channel mix, with how it compares with the category's own mix.
