@@ -74,6 +74,7 @@ function brandView(ds, lookup, f, scope, opts) {
 
   const num = mk(), cat = mk();
   const ent = new Map(), entMonthly = new Map(), mineEnt = new Set();
+  const mbEnt = new Map(), mineMb = new Set(), themeBrand = new Map(); // every mother brand in the context (quick-jump buttons); brands behind each campaign
   const NB = D.DUR_BUCKETS.length, durRaw = cols.durRaw || null;
   const durB = { counts: new Array(NB).fill(0), sum: 0, n: 0 }, durC = { counts: new Array(NB).fill(0), sum: 0, n: 0 };
   const catMonthly = new Float64Array(len), catMed = [mk(), mk(), mk()], catVt = [0, 0], catByCh = new Map();
@@ -106,6 +107,8 @@ function brandView(ds, lookup, f, scope, opts) {
     add(cat, fl, v, isC);
     const ek = level === 'brand' ? p : level === 'adv' ? a : mb;
     add(get(ent, ek), fl, v, isC);
+    add(get(mbEnt, mb), fl, v, isC);
+    if ((fl & 1) && mine[a]) mineMb.add(mb);
     if (fl & 1) {
       const k = m - m0;
       catMonthly[k] += v; add(catMed[md], 1, v, isC); catVt[isC ? 0 : 1] += v; add(get(catByCh, c), 1, v, isC);
@@ -126,6 +129,7 @@ function brandView(ds, lookup, f, scope, opts) {
     add(get(byCh, c), fl, v, isC);
     add(get(byAdv, a), fl, v, isC);
     add(get(byTheme, a * nTheme + th), fl, v, isC);
+    if (fl & 1) { const tk = a * nTheme + th; let tb = themeBrand.get(tk); if (!tb) { tb = new Map(); themeBrand.set(tk, tb); } tb.set(p, (tb.get(p) || 0) + v); }
     if (childKind) {
       const ck = childKind === 'mb' ? mb : p;
       add(get(children, ck), fl, v, isC);
@@ -182,7 +186,11 @@ function brandView(ds, lookup, f, scope, opts) {
   for (const [key, a] of byTheme) {
     if (!(a.s[0] > 0)) continue;
     const t = key % nTheme, ad = (key - t) / nTheme;
-    (excluded[t] === 1 ? campaigns.V : campaigns.C).push({ name: dicts.theme[t], advertiser: dicts.adv[ad], us: !!mine[ad], cur: a.s[0], yoy: a.s[1], share: pct(a.s[0], num.s[0]), spots: a.n[0] });
+    const tb = [...(themeBrand.get(key) || [])].sort((x, y) => y[1] - x[1]);
+    (excluded[t] === 1 ? campaigns.V : campaigns.C).push({
+      name: dicts.theme[t], advertiser: dicts.adv[ad], us: !!mine[ad], cur: a.s[0], yoy: a.s[1], share: pct(a.s[0], num.s[0]), spots: a.n[0],
+      brand: tb.length ? dicts.product[tb[0][0]] : '', brands: tb.length,
+    });
   }
   campaigns.C.sort((x, y) => y.cur - x.cur); campaigns.V.sort((x, y) => y.cur - x.cur);
   const totC = { C: campaigns.C.length, V: campaigns.V.length };
@@ -204,14 +212,16 @@ function brandView(ds, lookup, f, scope, opts) {
   if (sMed >= 0) parts.push({ k: 'medium', v: MED[sMed] });
   if (sVt) parts.push({ k: 'vt', v: sVt === 1 ? 'Commercials' : 'Value additions' });
   if (sDur >= 0) parts.push({ k: 'dur', v: scope.dur + ' ads' });
-  const main = parts.find(p => !['medium', 'vt', 'dur'].includes(p.k) && p.k === (sTheme >= 0 ? 'theme' : sCh >= 0 ? 'ch' : sBrand >= 0 ? 'brand' : sAdv >= 0 ? 'adv' : sMb >= 0 ? 'mb' : scSub >= 0 ? 'sub' : 'mbs'));
+  // The name on top is the thing you drilled into (brand, mother brand, advertiser, sub category), never a channel, campaign, medium or length: those are shown as filters.
+  const mainKey = sBrand >= 0 ? 'brand' : sMb >= 0 ? 'mb' : sAdv >= 0 ? 'adv' : scSub >= 0 ? 'sub' : mbsSet ? 'mbs' : null;
+  const main = mainKey ? parts.find(p => p.k === mainKey) : null;
   const kindNames = { theme: 'Campaign', ch: 'Channel', brand: 'Brand', adv: 'Advertiser', mb: 'Mother brand', sub: 'Sub category', mbs: 'Group' };
 
   const topCh = channels[0] || null;
   return {
     filters: { pg: f.pg, sub: f.sub || '' }, tagCommercial: tag, level, entKind, childKind,
     ranges: { cur: [monthKey(m0), monthKey(m1)], yoy: [monthKey(m0 - 12), monthKey(m1 - 12)], prev: [monthKey(m0 - len), monthKey(m0 - 1)] }, months: len,
-    name: main ? main.v : (scope.title || f.pg), kind: main ? kindNames[main.k] : 'Category', parts, us: numMine,
+    name: main ? main.v : f.pg, kind: main ? kindNames[main.k] : 'Category', parts, us: numMine,
     head: {
       cur: num.s[0], yoy: num.s[1], prev: num.s[2], spots: num.n[0], spotsYoy: num.n[1], spotsPrev: num.n[2],
       cat: { cur: cat.s[0], yoy: cat.s[1], prev: cat.s[2] },
@@ -221,6 +231,7 @@ function brandView(ds, lookup, f, scope, opts) {
       mediums: medAcc.map(a => a.s[0]), split: split(num),
     },
     children: childRows, siblings,
+    mothers: [...mbEnt].filter(([, a]) => a.s[0] > 0 || a.s[1] > 0).sort((x, y) => y[1].s[0] - x[1].s[0]).map(([k, a]) => ({ name: mbNames[k], cur: a.s[0], share: pct(a.s[0], cat.s[0]), us: mineMb.has(k), self: k === sMb })),
     adType: {
       cur: split(num), monthly: monthsList.map(m => ({ key: m.key, label: m.label, year: m.year, C: m.C, V: m.V, Cn: m.Cn, Vn: m.Vn })),
       byMedium: medAcc.map((a, k) => ({ medium: MED[k], ...split(a) })).filter(x => x.C + x.V > 0 || x.Cy + x.Vy > 0),

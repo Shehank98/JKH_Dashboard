@@ -59,6 +59,12 @@ const sum = (a, k) => a.reduce((s, x) => s + x[k], 0);
   assert.strictEqual(one.months, 1); near(one.head.cur, mbv.monthsList.find(m => m.key === '2026-05').spend, 'one month');
   const sub = brandView(ds, lookup, { ...f, sub: 'Plain' }, {}, {});
   assert.ok(sub.head.cat.cur < all.head.cat.cur && sub.head.cat.cur > 0, 'sub category filter narrows the category');
+  // the name on top stays the brand you drilled into
+  const onCh = brandView(ds, lookup, f, { mb: mbName, ch: mbv.channels[0].key, medium: 'TV', theme: mbv.campaigns.C[0].name }, {});
+  assert.strictEqual(onCh.name, mbName); assert.strictEqual(onCh.kind, 'Mother brand');
+  assert.strictEqual(brandView(ds, lookup, f, { ch: mbv.channels[0].key }, {}).name, f.pg);
+  assert.ok(mbv.mothers.length >= 2 && mbv.mothers.some(m => m.self && m.name === mbName), 'every mother brand is offered as a quick jump');
+  assert.ok(mbv.campaigns.C.every(c => c.brand && c.brands >= 1), 'each campaign names its brand');
   // medium split, duration mix and channel mix
   near(sum(mbv.mediums, 'cur'), mbv.head.cur, 'mediums add up'); near(sum(mbv.mediums, 'share'), 100, 'medium shares');
   near(mbv.channels.reduce((a, c) => a + (c.catShare || 0), 0), 100, 'category channel mix adds to 100');

@@ -138,14 +138,15 @@
     const h = d.head, scope = stack[stack.length - 1].scope, top = stack[stack.length - 1];
     const bBase = ui.cmp === 'prev' ? h.prev : h.yoy;
     const sosBase = ui.cmp === 'prev' ? h.sos.prev : h.sos.yoy;
-    const chips = d.parts.filter(p => !['mb', 'brand', 'adv', 'ch', 'theme', 'sub', 'mbs'].includes(p.k) || p.v !== d.name);
+    const NAMEK = { mb: 'Mother brand', brand: 'Brand', adv: 'Advertiser', ch: 'Channel', theme: 'Campaign', sub: 'Sub category' };
+    // The big name is the brand you drilled into; everything else you narrowed to is listed here.
+    const chips = d.parts.filter(p => !(p.v === d.name && ['mb', 'brand', 'adv', 'sub', 'mbs'].includes(p.k))).map(p => ({ v: NAMEK[p.k] ? `${NAMEK[p.k]}: ${p.v}` : p.v }));
     const initial = (d.name.replace(/[^A-Za-z0-9]/g, '')[0] || '?').toUpperCase();
     const trail = stack.map((s, i) => (i === stack.length - 1 ? `<b>${esc(s.label || d.name)}</b>` : `<button class="bv-crumb" data-act="trail" data-i="${i}">${esc(s.label || (i ? '…' : H.pg()))}</button>`));
     const tabs = tabList();
     if (!tabs.some(t => t[0] === ui.tab)) ui.tab = tabs[0][0];
     const split = h.split;
     const pane = { advertisers: advertisersPane, medium: mediumPane, channels: channelsPane, duration: durationPane, children: childrenPane, campaigns: campaignsPane, months: monthsPane }[ui.tab];
-    const rivals = d.sos.ranking.filter(r => !r.self).slice(0, 4);
     const tabName = (tabs.find(t => t[0] === ui.tab) || [])[1];
 
     root.innerHTML = `<div class="bv-wrap" id="bvBody">
@@ -164,7 +165,7 @@
       <div class="bv-head">
         <div class="bv-title"><span class="bv-av">${esc(initial)}</span><div>
           <div class="bv-h1"><span>${esc(d.name)}</span>${usTag(d.us)}</div>
-          <div class="bv-sub">${esc(d.kind)} · ${esc(H.pg())}${chips.length ? ' · ' + chips.map(c => esc(c.v)).join(' · ') : ''}</div></div></div>
+          <div class="bv-sub">${esc(d.kind)}${d.kind === 'Category' ? '' : ' · ' + esc(H.pg())}${chips.length ? ' · ' : ''}${chips.map(c => `<span class="bv-fc">${esc(c.v)}</span>`).join('')}</div></div></div>
         <div class="bv-kpis">
           <div class="bv-card bv-kpi"><div class="bv-kl">INVESTMENT · ${esc(curLabel)}</div><div class="bv-kv">${mnTxt(h.cur)}</div><div class="bv-ks">${growth(h.cur, bBase)} vs ${bBase > 0 ? mnTxt(bBase) : '–'} ${baseWord}</div></div>
           <div class="bv-card bv-kpi"><div class="bv-kl">SHARE OF SPEND</div><div class="bv-kv">${pctS(h.sos.cur, 1)}</div><div class="bv-ks">${h.rank ? `Rank <b>#${h.rank}</b> of ${h.rankOf}` : sosBase != null && h.sos.cur != null ? `<span class="${h.sos.cur >= sosBase ? 'up' : 'down'}">${h.sos.cur >= sosBase ? '▲' : '▼'} ${nf(Math.abs(h.sos.cur - sosBase), 1)} pp</span> vs ${baseWord}` : '&nbsp;'}</div></div>
@@ -172,7 +173,7 @@
           <div class="bv-card bv-kpi"><div class="bv-kl">CHANNELS · ADVERTISERS</div><div class="bv-kv">${h.channels} · ${d.advertisers.length}</div><div class="bv-ks">${h.topChannel ? `Top: <b>${esc(h.topChannel.name)}</b> ${pctS(h.topChannel.share)}` : '&nbsp;'}</div></div>
         </div>
       </div>
-      ${rivals.length || (d.siblings && d.siblings.length > 1) ? `<div class="bv-rivals">${d.siblings && d.siblings.length > 1 ? `<span class="bv-lbl">SWITCH BRAND</span>${d.siblings.map(s => `<button class="bv-chip${s.self ? ' on' : ''}"${s.self ? '' : go({ brand: s.name })}>${esc(s.name)}</button>`).join('')}` : ''}${rivals.length ? `<span class="bv-lbl" style="margin-left:${d.siblings && d.siblings.length > 1 ? 14 : 0}px">COMPARE WITH</span>${rivals.map(r => `<button class="bv-chip"${go(d.entKind === 'brand' ? { brand: r.key, mb: null } : d.entKind === 'adv' ? { adv: r.key, mb: null, brand: null } : { mb: r.key, brand: null, adv: null })}>${esc(r.key)} <em>${pctS(r.share, 1)}</em></button>`).join('')}` : ''}</div>` : ''}
+      ${jumpRow()}
       ${top.note ? `<div class="bv-note"><span>▸ You opened <b>${esc(top.label || d.name)}</b>. ${top.note}</span><button data-act="dismiss" aria-label="Dismiss">✕</button></div>` : ''}
 
       <section class="bv-card bv-tabcard" id="bv-tab-${ui.tab}" data-tab="${ui.tab}" aria-label="${esc(tabName || '')}">${pane(baseWord)}</section>
@@ -189,6 +190,17 @@
     if (size !== ui.pageSize) { ui.pageSize = size; draw(); }
   }
   window.addEventListener('resize', () => { if (root.classList.contains('on')) { clearTimeout(fit.t); fit.t = setTimeout(fit, 120); } });
+
+  // Quick buttons to move between mother brands (and between the brands of one mother brand) from wherever you are.
+  const jumpAdd = name => ({ mb: name, brand: null, adv: null, ch: null, theme: null });
+  function jumpRow() {
+    const ms = d.mothers || [], sib = d.siblings && d.siblings.length > 1 ? d.siblings : [];
+    if (!ms.length && !sib.length) return '';
+    const shown = ms.slice(0, 7), more = ms.slice(7);
+    return `<div class="bv-rivals">${sib.length ? `<span class="bv-lbl">BRANDS</span>${sib.map(s => `<button class="bv-chip${s.self ? ' on' : ''}"${s.self ? '' : go({ brand: s.name })}>${esc(s.name)}</button>`).join('')}<span class="bv-vsep"></span>` : ''}
+      <span class="bv-lbl">MOTHER BRANDS</span>${shown.map(m => `<button class="bv-chip${m.self ? ' on' : ''}"${m.self ? '' : go(jumpAdd(m.name))}>${esc(m.name)}${m.us ? ' <i class="bv-usdot"></i>' : ''} <em>${pctS(m.share, 1)}</em></button>`).join('')}
+      ${more.length ? `<select class="bv-jump" data-jump="1" aria-label="More mother brands"><option value="">More (${more.length}) ▾</option>${more.map(m => `<option value="${esc(m.name)}">${esc(m.name)} · ${pctS(m.share, 1)}</option>`).join('')}</select>` : ''}</div>`;
+  }
 
   const metricToggle = () => `<span class="bv-seg"><button class="${ui.metric === 'spend' ? 'on' : ''}" data-act="metric" data-v="spend">Spend</button><button class="${ui.metric === 'spots' ? 'on' : ''}" data-act="metric" data-v="spots">Spots</button></span>`;
   const paneHead = (title, hint, right) => `<div class="bv-sh"><h3>${title}</h3><span class="bv-hint">${hint}</span>${right || ''}</div>`;
@@ -268,8 +280,8 @@
     const all = d.campaigns[ui.ctab], n = d.adType.counts;
     const { slice, pager } = paged(all);
     return `${paneHead('Campaigns', 'Click a campaign to see where it ran', `<span class="bv-seg"><button class="${ui.ctab === 'C' ? 'on c' : ''}" data-act="ctab" data-v="C">Commercials ${n.C}</button><button class="${ui.ctab === 'V' ? 'on v' : ''}" data-act="ctab" data-v="V">Value additions ${n.V}</button></span>`)}
-      <div class="bv-th bv-th-k"><span>${ui.ctab === 'C' ? 'COMMERCIAL' : 'VALUE ADDITION'} (ADVT_THEME)</span><span class="r">RS MN</span><span class="r">SHARE</span><span class="r">SPOTS</span><span></span></div>
-      ${rowsBox('campaigns', slice.map(r => `<div class="bv-tr bv-tr-k"${go({ theme: r.name, adv: r.advertiser })}><span><b>${esc(r.name)}</b>${usTag(r.us)}<br><small>${esc(r.advertiser)}</small></span><b class="r">${mnNum(r.cur)}</b><span class="r">${pctS(r.share)}</span><span class="r">${nf(r.spots)}</span><span class="bv-go">›</span></div>`).join('') || `<div class="bv-empty">No ${ui.ctab === 'C' ? 'commercials' : 'value additions'} in this selection</div>`)}
+      <div class="bv-th bv-th-k"><span>${ui.ctab === 'C' ? 'COMMERCIAL' : 'VALUE ADDITION'} (ADVT_THEME)</span><span>BRAND</span><span class="r">RS MN</span><span class="r">SHARE</span><span class="r">SPOTS</span><span></span></div>
+      ${rowsBox('campaigns', slice.map(r => `<div class="bv-tr bv-tr-k"${go({ theme: r.name, adv: r.advertiser })}><span><b>${esc(r.name)}</b>${usTag(r.us)}<br><small>${esc(r.advertiser)}</small></span><span class="bv-bc">${r.brand ? `<button class="bv-lk2"${go({ brand: r.brand, theme: null, adv: null })} title="Open this brand">${esc(r.brand)}</button>${r.brands > 1 ? ` <small>+${r.brands - 1} more</small>` : ''}` : '–'}</span><b class="r">${mnNum(r.cur)}</b><span class="r">${pctS(r.share)}</span><span class="r">${nf(r.spots)}</span><span class="bv-go">›</span></div>`).join('') || `<div class="bv-empty">No ${ui.ctab === 'C' ? 'commercials' : 'value additions'} in this selection</div>`)}
       ${pager}`;
   }
 
@@ -325,6 +337,10 @@
       ui.page = 0;
       load();
     }
+  });
+  root.addEventListener('change', e => {
+    const sel = e.target.closest('[data-jump]');
+    if (sel && sel.value) push(jumpAdd(sel.value), sel.value);
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && root.classList.contains('on') && !$('catModal').classList.contains('on')) close(); });
 

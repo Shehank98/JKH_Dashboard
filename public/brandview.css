@@ -176,6 +176,15 @@ body.bv-open{overflow:hidden}
 .bv-dbars{flex:1;min-height:60px;height:auto;max-width:none}
 .bv-dbb{height:calc(100% - 22px)}
 .bv-pane-fill{flex:1;min-height:0}
-@media (max-height:760px){.bv-h1{font-size:20px}.bv-kv{font-size:17px}.bv-kpi{padding:6px 10px}.bv-main-tabs button{padding:8px 12px}.bv-rivals{display:none}}
+@media (max-height:760px){.bv-h1{font-size:20px}.bv-kv{font-size:17px}.bv-kpi{padding:6px 10px}.bv-main-tabs button{padding:8px 12px}}
 @media (max-width:1180px){.bv-head{flex-direction:column;align-items:stretch}.bv-ctl .bv-seg:nth-of-type(2){display:none}}
 .bv-dbars{max-height:230px}
+
+.bv-th-k,.bv-tr-k{grid-template-columns:minmax(0,1.7fr) minmax(0,1.1fr) 76px 64px 72px 18px}
+.bv-bc{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.bv-lk2{border:none;background:none;font:inherit;font-weight:700;color:#2F5DBF;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px}
+.bv-fc{display:inline-block;background:#EEF2FB;color:#3F5480;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;margin-right:5px}
+.bv-vsep{width:1px;height:20px;background:#DDE3EF;margin:0 6px;flex-shrink:0}
+.bv-usdot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#FF8A3D;margin-left:2px}
+.bv-jump{border:1px solid #DDE3EF;background:#fff;border-radius:20px;padding:4px 10px;font:inherit;font-size:11.5px;font-weight:700;color:#4A5570;cursor:pointer}
+.bv-rivals .bv-chip.on em{color:#C5CEE3}
