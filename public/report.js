@@ -114,41 +114,134 @@
     } catch (e) { /* leave the screen as it is */ }
   }
 
-  // ---------- the deck ----------
-  function deckBuilder(title, footerText, aiOn) {
+  // ---------- the deck, in the Ogilvy PowerPoint format ----------
+  // White, black, red and grey; a light serif headline; thin sans copy; "OGILVY" up the left edge and the page number on the right;
+  // geometric strips and breaker art. Swap SERIF / SANS below if the Ogilvy fonts are installed on the machines that open the file.
+  const RED = 'EE4044', GREYC = 'A5A5A7', BLACK = '000000', SERIF = 'Georgia', SANS = 'Calibri Light';
+  const rng = seed => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const svgPng = (svg, w, h, scale = 2) => new Promise(res => {
+    const img = new Image();
+    img.onload = () => { const c = document.createElement('canvas'); c.width = w * scale; c.height = h * scale; c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); res(c.toDataURL('image/png')); };
+    img.onerror = () => res(null);
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+  const STRIPES = (id, a, b) => `<pattern id="${id}" patternUnits="userSpaceOnUse" width="16" height="16" patternTransform="rotate(45)"><rect width="16" height="16" fill="#${a}"/><rect width="8" height="16" fill="#${b}"/></pattern>`;
+  // A row of square tiles (circles, rings, quarter circles, stripes) cut off at the bottom edge of the slide, like the template strip.
+  function stripSvg(wIn, hIn, tileIn, seed) {
+    const W = wIn * 100, H = hIn * 100, T = tileIn * 100, r = rng(seed);
+    let defs = STRIPES('s1', RED, BLACK) + STRIPES('s2', GREYC, BLACK) + STRIPES('s3', 'FFFFFF', RED), body = '';
+    const kinds = 8;
+    for (let i = 0, x = 0; x < W; i++, x += T) {
+      const k = Math.floor(r() * kinds), c = x + T / 2, m = T / 2;
+      body += [
+        `<rect x="${x}" y="0" width="${T}" height="${T}" fill="#${GREYC}"/><circle cx="${c}" cy="${m}" r="${T * .3}" fill="#${RED}"/>`,
+        `<rect x="${x}" y="0" width="${T}" height="${T}" fill="#${BLACK}"/><circle cx="${c}" cy="${m}" r="${T * .3}" fill="none" stroke="#fff" stroke-width="${T * .12}"/>`,
+        `<rect x="${x}" y="0" width="${T}" height="${T}" fill="#${RED}"/><circle cx="${c}" cy="${m}" r="${T * .36}" fill="#fff"/>`,
+        `<rect x="${x}" y="0" width="${T}" height="${T}" fill="url(#s1)"/>`,
+        `<rect x="${x}" y="0" width="${T}" height="${T}" fill="#fff"/><circle cx="${c}" cy="${m}" r="${T * .46}" fill="#${BLACK}"/>`,
+        `<rect x="${x}" y="0" width="${T}" height="${T}" fill="#${GREYC}"/><path d="M${x} 0 H${x + T} A${T} ${T} 0 0 1 ${x} ${T} Z" fill="#${BLACK}"/>`,
+        `<rect x="${x}" y="0" width="${T}" height="${T}" fill="#fff"/><path d="M${x + T} 0 V${T} H${x} A${T} ${T} 0 0 1 ${x + T} 0 Z" fill="#${RED}"/>`,
+        `<rect x="${x}" y="0" width="${T}" height="${T}" fill="url(#s2)"/><circle cx="${c}" cy="${m}" r="${T * .22}" fill="#${RED}"/>`,
+      ][k];
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs>${defs}</defs>${body}</svg>`;
+  }
+  // Overlapping circles for the breaker slides, on a grey, black or red page.
+  function clusterSvg(bg) {
+    const W = 560, H = 750;
+    const pal = { grey: [BLACK, RED, 'S1', 'S2'], black: [RED, GREYC, 'S1', 'S2'], red: [BLACK, 'FFFFFF', GREYC, 'S4'] }[bg];
+    const spots = [[250, 20, 90, 0], [150, 100, 82, 2], [300, 260, 82, 1], [420, 190, 80, 3], [180, 440, 82, 1], [290, 420, 80, 3], [440, 520, 80, 2], [120, 650, 80, 0], [330, 730, 80, 1], [500, 60, 70, 0], [500, 640, 80, 0]];
+    const defs = STRIPES('S1', RED, BLACK) + STRIPES('S2', GREYC, BLACK) + STRIPES('S4', 'FFFFFF', BLACK);
+    const body = spots.map(([x, y, rad, k]) => { const f = pal[k]; const fill = /^S/.test(f) ? `url(#${f})` : `#${f}`; return `<circle cx="${x}" cy="${y}" r="${rad}" fill="${fill}"/>`; }).join('');
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs>${defs}</defs>${body}</svg>`;
+  }
+  const dataUrl = url => fetch(url).then(r => r.blob()).then(b => new Promise(ok => { const f = new FileReader(); f.onload = () => ok(f.result); f.readAsDataURL(b); })).catch(() => null);
+  async function makeArt() {
+    const logo = await dataUrl('/ogilvy-orbit-chub.png'), lim = logo ? await imgOf(logo) : null;
+    return {
+      logo: lim, cover: await svgPng(stripSvg(13.33, 1.1, 1.9, 7), 1333, 110),
+      agenda: await svgPng(stripSvg(13.33, 0.9, 1.4, 11), 1333, 90),
+      grey: await svgPng(clusterSvg('grey'), 560, 750), black: await svgPng(clusterSvg('black'), 560, 750), red: await svgPng(clusterSvg('red'), 560, 750),
+    };
+  }
+  const MONTHS = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  function deckBuilder(title, sourceText, aiOn, art) {
     const deck = new window.PptxGenJS();
     deck.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 in
-    deck.title = title; deck.company = 'Ogilvy'; deck.author = 'Ogilvy Orbit Chub';
+    deck.title = title; deck.company = 'Ogilvy'; deck.author = 'Ogilvy';
     let n = 0;
-    const pending = [];
-    const base = (headline, sub) => {
-      const s = deck.addSlide(); n++;
-      s.background = { color: 'FFFFFF' };
-      s.addText(headline, { x: 0.45, y: 0.2, w: 12.4, h: 0.55, fontFace: 'Georgia', fontSize: 22, color: INK, margin: 0, fit: 'shrink', valign: 'middle' });
-      if (sub) s.addText(sub, { x: 0.45, y: 0.76, w: 12.4, h: 0.3, fontFace: 'Calibri', fontSize: 11.5, color: GREY, margin: 0 });
-      s.addText(footerText, { x: 0.45, y: 7.13, w: 9, h: 0.25, fontFace: 'Calibri', fontSize: 9, color: '9AA3BC', margin: 0 });
-      s.addText(`Ogilvy Orbit – Chub · ${n}`, { x: 9.4, y: 7.13, w: 3.5, h: 0.25, fontFace: 'Calibri', fontSize: 9, color: '9AA3BC', align: 'right', margin: 0 });
-      return s;
+    const pics = [];
+    const frame = (s, dark) => { // the quiet furniture of the format: OGILVY up the left edge, page number on the right
+      s.addText('OGILVY', { x: 0.02, y: 3.1, w: 0.3, h: 1.3, vert: 'vert270', fontFace: SANS, fontSize: 8, charSpacing: 2, color: dark ? 'FFFFFF' : BLACK, align: 'center', margin: 0 });
+      s.addText(String(n), { x: 12.9, y: 3.55, w: 0.35, h: 0.3, fontFace: SANS, fontSize: 9, color: dark ? 'FFFFFF' : BLACK, align: 'center', margin: 0 });
     };
+    const slide = (bg, dark) => { const s = deck.addSlide(); n++; s.background = { color: bg }; frame(s, dark); return s; };
+    const clean = t => String(t || '').replace(/^\d[a-z]? · /, '');
     return {
       deck,
-      picture(headline, sub, im, note) {
+      cover(titleText, sub, chips) {
+        const s = slide('FFFFFF', false);
+        if (art.logo) { const h = 0.42, w = h * art.logo.w / art.logo.h; s.addImage({ data: art.logo.url, x: 0.5, y: 0.3, w, h }); }
+        s.addText(MONTHS, { x: 5.2, y: 0.32, w: 2.9, h: 0.3, fontFace: SANS, fontSize: 12, color: BLACK, align: 'center', margin: 0 });
+        s.addText('© all rights reserved', { x: 9.6, y: 0.32, w: 3.25, h: 0.3, fontFace: SANS, fontSize: 12, color: BLACK, align: 'right', margin: 0 });
+        s.addText([{ text: titleText, options: { breakLine: true } }, { text: sub }], { x: 0.7, y: 1.35, w: 11.8, h: 3.4, fontFace: SERIF, fontSize: 54, color: BLACK, valign: 'top', margin: 0, fit: 'shrink', lineSpacingMultiple: 0.95 });
+        s.addText(chips, { x: 0.75, y: 4.9, w: 11.5, h: 1.2, fontFace: SANS, fontSize: 14, color: '555555', valign: 'top', margin: 0 });
+        if (art.cover) s.addImage({ data: art.cover, x: 0, y: 6.4, w: 13.33, h: 1.1 });
+      },
+      agenda(items) {
+        const s = slide('FFFFFF', false);
+        s.addText('Agenda', { x: 2.6, y: 0.5, w: 8, h: 1.7, fontFace: SERIF, fontSize: 80, color: BLACK, margin: 0, valign: 'middle' });
+        items.forEach(([num, name, desc], i) => {
+          const y = 2.45 + i * 1.2;
+          s.addText(String(num).padStart(2, '0'), { x: 4.6, y, w: 1.0, h: 0.6, fontFace: SERIF, fontSize: 30, color: RED, margin: 0, valign: 'top' });
+          s.addText([{ text: name, options: { fontSize: 20, color: BLACK, breakLine: true } }, { text: desc, options: { fontSize: 12.5, color: '555555' } }], { x: 5.9, y: y + 0.02, w: 6.6, h: 1.0, fontFace: SANS, margin: 0, valign: 'top' });
+        });
+        if (art.agenda) s.addImage({ data: art.agenda, x: 0, y: 6.6, w: 13.33, h: 0.9 });
+      },
+      divider(num, headline, lines) { // the breaker slide: grey, black, then red
+        const kind = ['grey', 'black', 'red'][(Number(num) - 1) % 3] || 'grey', dark = kind === 'black';
+        const s = slide({ grey: GREYC, black: BLACK, red: RED }[kind], dark), ink = dark ? 'FFFFFF' : BLACK;
+        s.addText(String(num).padStart(2, '0'), { x: 0.85, y: 2.3, w: 2, h: 0.7, fontFace: SERIF, fontSize: 30, color: dark ? RED : 'FFFFFF', margin: 0 });
+        s.addText(headline, { x: 0.85, y: 3.0, w: 6.4, h: 1.9, fontFace: SERIF, fontSize: 50, color: ink, margin: 0, valign: 'top', fit: 'shrink' });
+        s.addText(lines, { x: 0.85, y: 5.0, w: 6.2, h: 1.5, fontFace: SANS, fontSize: 14, color: ink, margin: 0, valign: 'top' });
+        if (art[kind]) s.addImage({ data: art[kind], x: 7.45, y: 0, w: 5.88, h: 7.5 });
+      },
+      closing(text) {
+        const s = slide(BLACK, true);
+        s.addText(text, { x: 0.85, y: 2.9, w: 6.4, h: 1.6, fontFace: SERIF, fontSize: 60, color: 'FFFFFF', margin: 0 });
+        s.addText(sourceText, { x: 0.85, y: 4.6, w: 6.2, h: 0.8, fontFace: SANS, fontSize: 13, color: 'FFFFFF', margin: 0, valign: 'top' });
+        if (art.black) s.addImage({ data: art.black, x: 7.45, y: 0, w: 5.88, h: 7.5 });
+      },
+      // A screenshot slide. The picture is placed in finish(), once we know whether it has insights beside it.
+      picture(headline, sub, im) {
         if (!im) return;
-        const s = base(headline, sub), aw = 12.43, ah = aiOn ? 4.9 : 5.8, sc = Math.min(aw / im.w, ah / im.h), w = im.w * sc, h = im.h * sc;
-        s.addImage({ data: im.url, x: 0.45 + (aw - w) / 2, y: 1.18 + (ah - h) / 2, w, h });
-        if (aiOn && im.text) pending.push({ s, headline, text: im.text });
+        let sec = '', head = headline;
+        const m = String(headline).match(/^\d[a-z]? · ([^:]+): (.+)$/);
+        if (m) { sec = m[1]; head = m[2][0].toUpperCase() + m[2].slice(1); }
+        const subs = [sec, clean(sub)].filter(Boolean).join(' · ');
+        const s = slide('FFFFFF', false);
+        s.addText(head, { x: 0.85, y: 0.3, w: 11.7, h: 0.8, fontFace: SERIF, fontSize: 30, color: BLACK, margin: 0, valign: 'top', fit: 'shrink' });
+        s.addText(subs, { x: 0.85, y: 1.1, w: 11.7, h: 0.3, fontFace: SANS, fontSize: 12.5, color: RED, margin: 0 });
+        s.addText(`Source: ${sourceText}`, { x: 0.85, y: 7.08, w: 9, h: 0.25, fontFace: SANS, fontSize: 8, color: '777777', margin: 0 });
+        pics.push({ s, im, headline: head, text: im.text, notes: '' });
       },
-      pending,
-      divider(num, headline, lines) {
-        const s = deck.addSlide(); n++;
-        s.background = { color: INK };
-        s.addText(String(num), { x: 0.8, y: 2.0, w: 2, h: 1.6, fontFace: 'Georgia', fontSize: 96, color: 'FF8A3D', margin: 0 });
-        s.addText(headline, { x: 0.8, y: 3.6, w: 11.5, h: 0.9, fontFace: 'Georgia', fontSize: 36, color: 'FFFFFF', margin: 0 });
-        s.addText(lines, { x: 0.8, y: 4.6, w: 11.5, h: 1.6, fontFace: 'Calibri', fontSize: 15, color: 'C5CEE3', margin: 0, valign: 'top' });
-      },
-      text(headline, sub, runs) {
-        const s = base(headline, sub);
-        s.addText(runs, { x: 0.8, y: 1.4, w: 11.7, h: 5.4, fontFace: 'Calibri', fontSize: 16, color: INK, valign: 'top', margin: 0, paraSpaceAfter: 8 });
+      pending: pics, // slides still waiting for their insights
+      finish() {
+        for (const p of pics) {
+          const has = !!p.notes, ax = 0.85, ay = 1.6, aw = has ? 8.75 : 11.65, ah = 5.3, sc = Math.min(aw / p.im.w, ah / p.im.h), w = p.im.w * sc, h = p.im.h * sc;
+          p.s.addImage({ data: p.im.url, x: ax + (aw - w) / 2, y: ay + (ah - h) / 2, w, h });
+          if (has) {
+            const items = p.notes.split('\n').map(l => l.replace(/^[•\-*]\s*/, '').trim()).filter(Boolean).slice(0, 3);
+            p.s.addText('Key insights', { x: 9.95, y: 1.6, w: 2.9, h: 0.3, fontFace: SANS, fontSize: 13, color: RED, margin: 0 });
+            items.forEach((t, i) => {
+              const y = 2.05 + i * 1.6;
+              p.s.addText(String(i + 1).padStart(2, '0'), { x: 9.95, y, w: 0.5, h: 0.3, fontFace: SERIF, fontSize: 12, color: RED, margin: 0, valign: 'top' });
+              p.s.addShape('line', { x: 10.45, y: y + 0.12, w: 2.4, h: 0, line: { color: BLACK, width: 0.75 } });
+              p.s.addText(t, { x: 10.45, y: y + 0.22, w: 2.4, h: 1.25, fontFace: SANS, fontSize: 11.5, color: BLACK, margin: 0, valign: 'top', fit: 'shrink' });
+            });
+            p.s.addNotes(p.notes);
+          }
+        }
       },
       count: () => n,
     };
@@ -172,26 +265,22 @@
       const spotPeriod = $('periodText').textContent.replace(/\s+/g, ' ').trim();
       const pgName = st.pg;
       const footer = `${pgName} · ${spotPeriod}`;
-      const B = deckBuilder(`${pgName}: full report`, footer, !!o.ai);
+      const art = await makeArt();
+      const B = deckBuilder(`${pgName}: full report`, footer, !!o.ai, art);
       const chips = [...document.querySelectorAll('#chips .chip')].filter(c => c.id !== 'busyChip').map(c => c.textContent.trim()).filter(Boolean);
 
-      // cover and contents
-      const cover = B.deck.addSlide();
-      cover.background = { color: INK };
-      cover.addText('OGILVY ORBIT – CHUB', { x: 0.8, y: 0.7, w: 8, h: 0.4, fontFace: 'Calibri', fontSize: 12, color: 'FF8A3D', bold: true, charSpacing: 4, margin: 0 });
-      cover.addText(`${pgName}`, { x: 0.8, y: 2.0, w: 11.7, h: 1.2, fontFace: 'Georgia', fontSize: 48, color: 'FFFFFF', margin: 0 });
-      cover.addText('Media investment review', { x: 0.8, y: 3.2, w: 11.7, h: 0.7, fontFace: 'Georgia', fontSize: 26, color: 'C5CEE3', margin: 0 });
-      cover.addText([{ text: spotPeriod, options: { breakLine: true, bold: true } }, { text: chips.join(' · '), options: { fontSize: 12 } }], { x: 0.8, y: 4.4, w: 11.7, h: 1.2, fontFace: 'Calibri', fontSize: 16, color: 'FFFFFF', margin: 0, valign: 'top' });
-      cover.addText(`Prepared ${new Date().toLocaleDateString([], { dateStyle: 'long' })}`, { x: 0.8, y: 6.7, w: 8, h: 0.3, fontFace: 'Calibri', fontSize: 11, color: '9AA3BC', margin: 0 });
+      // cover and agenda
+      B.cover(pgName, 'Media investment review', [{ text: spotPeriod, options: { breakLine: true, bold: true, color: BLACK, fontSize: 18 } }, { text: chips.join('  ·  ') }]);
       const flow = [];
-      if (o.spot || o.cat) flow.push(['1', 'Overall analysis', [o.spot ? 'Spot Log dashboard: trend, share of spend, channel mix, duration mix, every view' : '', o.cat ? 'Category dashboard: investment, sub categories, monthly by brand, mother brands, channel preference' : ''].filter(Boolean)]);
-      if (o.adv) flow.push(['2', 'Advertiser analysis', ['The category\'s advertisers, then campaigns, value additions, channels and months for each selected advertiser']]);
-      if (o.br) flow.push(['3', 'Brand analysis', [`The top ${o.brN} mother brands, one by one: advertisers, medium split, channel mix, duration mix, brands and campaigns`]]);
-      step('Cover and contents');
-      B.text('Contents', `${pgName} · ${spotPeriod}`, flow.flatMap(([num, name, lines]) => [{ text: `${num}   ${name}`, options: { bold: true, fontSize: 20, breakLine: true } }, ...lines.map(l => ({ text: l, options: { fontSize: 13, color: GREY, breakLine: true, indentLevel: 1 } }))]));
+      if (o.spot || o.cat) flow.push([flow.length + 1, 'Overall analysis', [o.spot ? 'Spot Log dashboard: trend, share of spend, channel mix and duration mix' : '', o.cat ? 'Category dashboard: investment, sub categories, brands, mother brands and channel preference' : ''].filter(Boolean).join('. ')]);
+      if (o.adv) flow.push([flow.length + 1, 'Advertiser analysis', 'The category\'s advertisers, then campaigns, value additions, channels and months for each selected advertiser']);
+      if (o.br) flow.push([flow.length + 1, 'Brand analysis', `The top ${o.brN} mother brands, one by one: advertisers, medium split, channel mix, duration mix, brands and campaigns`]);
+      const no = {}; flow.forEach(f => { no[f[1]] = f[0]; });
+      step('Cover and agenda');
+      B.agenda(flow);
 
       // ===== 1 · Overall analysis =====
-      if (o.spot || o.cat) B.divider(1, 'Overall analysis', flow[0][2].join('\n'));
+      if (o.spot || o.cat) B.divider(no['Overall analysis'], 'Overall analysis', flow[0][2]);
       if (o.spot) {
         await showMode(false);
         const head = id => ($(id).textContent || '').trim();
@@ -279,7 +368,7 @@
       // ===== 2 · Advertiser analysis (the Spot Log click-through, tab by tab) =====
       if (o.adv) {
         await showMode(false);
-        B.divider(2, 'Advertiser analysis', 'The category\'s advertisers, then each selected advertiser: its campaigns in the period with spend, share and spots, then its value additions, channels and months.');
+        B.divider(no['Advertiser analysis'], 'Advertiser analysis', 'The category\'s advertisers, then each selected advertiser: its campaigns in the period with spend, share and spots, then its value additions, channels and months.');
         document.body.classList.add('rpt');
         const grab = async tab => { O.spot.cap.setDetailTab(tab); await wait(350); const box = $('modal').querySelector('.mbox'); return shotEl(box, '#FFFFFF'); };
         try {
@@ -306,7 +395,7 @@
         await showMode(true);
         const cards = O.catHelp.cards().slice(0, o.brN);
         const catPeriod = $('catPeriodText').textContent.replace(/\s+/g, ' ').trim();
-        B.divider(3, 'Brand analysis', `The top ${cards.length} mother brands one by one: who runs the brand, its medium split, channel mix, duration mix, its brands with Commercials against Value additions, and its campaigns.`);
+        B.divider(no['Brand analysis'], 'Brand analysis', `The top ${cards.length} mother brands one by one: who runs the brand, its medium split, channel mix, duration mix, its brands with Commercials against Value additions, and its campaigns.`);
         try {
           for (const c of cards) {
             step(`${c.name}: opening`);
@@ -338,20 +427,20 @@
         step('Starting the AI model (the first note is the slowest)');
         try { await ask('warm up', 'Spend 100 Mn. Share 20%.'); } catch (e) { if (e.message === 'Stopped') throw e; firstErr = e.message; }
         for (let i = 0; i < B.pending.length && !(failed >= 3); i++) {
-          const { s, headline, text } = B.pending[i];
-          step(`Writing notes: slide ${i + 1} of ${B.pending.length}${written ? ` (${written} done)` : ''}`);
+          const p = B.pending[i];
+          step(`Writing insights: slide ${i + 1} of ${B.pending.length}${written ? ` (${written} done)` : ''}`);
+          if (!p.text) continue;
           let notes = '';
           for (let tryNo = 0; tryNo < 2 && !notes; tryNo++) {
-            try { notes = await ask(headline, text); } catch (e) { if (e.message === 'Stopped') throw e; firstErr = firstErr || e.message; }
+            try { notes = await ask(p.headline, p.text); } catch (e) { if (e.message === 'Stopped') throw e; firstErr = firstErr || e.message; }
           }
           if (!notes) { failed++; continue; }
-          failed = 0; written++;
-          s.addShape('rect', { x: 0.45, y: 6.12, w: 0.06, h: 0.95, fill: { color: 'FF8A3D' }, line: { color: 'FF8A3D', width: 0 } });
-          s.addText(notes, { x: 0.62, y: 6.12, w: 12.2, h: 0.95, fontFace: 'Calibri', fontSize: 11.5, color: INK, valign: 'middle', margin: 0, fit: 'shrink', paraSpaceAfter: 2 });
-          s.addNotes(notes);
+          failed = 0; written++; p.notes = notes;
         }
         aiNote = written === B.pending.length ? '' : written ? `AI notes written on ${written} of ${B.pending.length} slides. The rest failed: ${firstErr}` : `No AI notes were written: ${firstErr || 'the model did not answer'}`;
       }
+      B.closing('Thank you');
+      B.finish();
       step('Writing the PowerPoint file');
       const file = `${pgName.replace(/[^A-Za-z0-9]+/g, '_')}_Full_report_${new Date().toISOString().slice(0, 10)}.pptx`;
       await B.deck.writeFile({ fileName: file });
