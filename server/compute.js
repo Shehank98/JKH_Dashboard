@@ -106,6 +106,7 @@ function resolve(ds, f) {
     mediumId: D.MEDIA.indexOf(f.medium),
     chId: f.channel ? dicts.channel.indexOf(f.channel) : -1,
     dpId: f.daypart ? D.DAYPARTS.indexOf(f.daypart) : -1,
+    slot: D.slotId(f.slot),
     role, mineIds, comps: compIds.filter(i => role[i] === 2),
     // Ad type: 0 = all, 1 = commercials only, 2 = sponsorship items only.
     adType: f.adType === 'Sponsorship' ? 2 : f.adType === 'Commercial' ? 1 : 0,
@@ -119,7 +120,8 @@ const yearLabel = (y, fy) => (fy ? `FY ${String(y).slice(2)}/${String(y + 1).sli
 function dashboard(ds, f) {
   const { dicts, cols } = ds;
   const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
-  const { pgId, from, to, pFrom, pTo, mediumId, chId, dpId, role, mineIds, comps, adType, prodMask } = resolve(ds, f);
+  const { pgId, from, to, pFrom, pTo, mediumId, chId, dpId, slot, role, mineIds, comps, adType, prodMask } = resolve(ds, f);
+  const hourCol = cols.hour || new Uint8Array(cols.pg.length).fill(255);
   const excluded = excludedThemes(ds, !!f.tagCommercial);
   // Month Drill Down never picks a sponsorship item as the lead campaign, except when only sponsorships are shown.
   const skipCampaign = adType === 2 ? null : excluded;
@@ -157,7 +159,7 @@ function dashboard(ds, f) {
     const c = ch[i], md = chMed[c];
     if (mediumId >= 0 && md !== mediumId) continue;
     if (chId >= 0 && c !== chId) continue;
-    if (dpId >= 0 && dp[i] !== dpId) continue;
+    if ((dpId >= 0 && dp[i] !== dpId) || (slot && !D.slotOk(slot, hourCol[i]))) continue;
     if (adType && (excluded[theme[i]] ? 2 : 1) !== adType) continue;
     const a = adv[i], v = cost[i], isMine = role[a] === 1, w = wN ? wN[i] : 1;
 
@@ -341,7 +343,7 @@ function dashboard(ds, f) {
     const c = ch[i];
     if (mediumId >= 0 && chMed[c] !== mediumId) continue;
     if (chId >= 0 && c !== chId) continue;
-    if (dpId >= 0 && dp[i] !== dpId) continue;
+    if ((dpId >= 0 && dp[i] !== dpId) || (slot && !D.slotOk(slot, hourCol[i]))) continue;
     if (adType && (excluded[theme[i]] ? 2 : 1) !== adType) continue;
     const y = yOf(mon[i]) - y0, a = adv[i], v = cost[i];
     yCat[y] += v;
@@ -393,7 +395,8 @@ function detail(ds, f, scope = {}) {
   const { dicts, cols } = ds;
   const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
   const base = resolve(ds, f);
-  const { pgId, mediumId, chId, dpId, role, adType, prodMask } = base;
+  const { pgId, mediumId, chId, dpId, slot, role, adType, prodMask } = base;
+  const hourCol = cols.hour || new Uint8Array(cols.pg.length).fill(255);
   let { from, to } = base;
   // A year cell of the SOS table covers that whole year of data, whatever the dashboard dates are.
   if (scope.year) {
@@ -435,6 +438,7 @@ function detail(ds, f, scope = {}) {
   const monCol = cols.mon;
 
   const wN = cols.n || null, prodCol = cols.product;
+  const themeBrand = new Map(); // campaign (advertiser + theme) -> spend per brand, to name the brand behind each campaign
   for (let i = 0, n = pg.length; i < n; i++) {
     if (pg[i] !== pgId) continue;
     if (prodMask && !prodMask[prodCol[i]]) continue;
@@ -442,7 +446,7 @@ function detail(ds, f, scope = {}) {
     const c = ch[i], md = chMed[c];
     if (mediumId >= 0 && md !== mediumId) continue;
     if (chId >= 0 && c !== chId) continue;
-    if (dpId >= 0 && dp[i] !== dpId) continue;
+    if ((dpId >= 0 && dp[i] !== dpId) || (slot && !D.slotOk(slot, hourCol[i]))) continue;
     if (adType && (excluded[theme[i]] ? 2 : 1) !== adType) continue;
     if (d < rFrom || d > rTo || (mon >= 0 && monCol[i] !== mon)) continue;
     // Category spend over exactly the same days as the selection, for a fair share of category.
@@ -471,6 +475,7 @@ function detail(ds, f, scope = {}) {
     const key = a * nTheme + theme[i];
     const t = themes.get(key);
     if (t) { t[0] += v; t[1] += w; } else themes.set(key, [v, w]);
+    if (prodCol && !ds.meta.cube) { let tb = themeBrand.get(key); if (!tb) { tb = new Map(); themeBrand.set(key, tb); } tb.set(prodCol[i], (tb.get(prodCol[i]) || 0) + v); }
   }
 
   const advertisers = [];
@@ -484,8 +489,13 @@ function detail(ds, f, scope = {}) {
   advertisers.sort((x, y) => y.spend - x.spend);
   const allCampaigns = [...themes].map(([key, v]) => {
     const t = key % nTheme, a = (key - t) / nTheme;
-    return { name: dicts.theme[t], advertiser: dicts.adv[a], role: role[a] === 1 ? 'mine' : role[a] === 2 ? 'comp' : '', va: excluded[t] === 1, spend: v[0], spots: v[1] };
+    const tb = [...(themeBrand.get(key) || [])].sort((x, y) => y[1] - x[1]);
+    return { name: dicts.theme[t], advertiser: dicts.adv[a], role: role[a] === 1 ? 'mine' : role[a] === 2 ? 'comp' : '', va: excluded[t] === 1,
+      brand: tb.length && dicts.product ? dicts.product[tb[0][0]] : '', brands: tb.length, spend: v[0], spots: v[1] };
   }).sort((x, y) => y.spend - x.spend);
+  // Totals over every campaign of each type (the lists below keep the top 50 of each).
+  const campaignTotals = { C: { spend: 0, spots: 0, count: 0 }, V: { spend: 0, spots: 0, count: 0 } };
+  for (const c of allCampaigns) { const t = campaignTotals[c.va ? 'V' : 'C']; t.spend += c.spend; t.spots += c.spots; t.count++; }
   // Top 50 commercials and top 50 value additions, so each tab is complete on its own.
   const campaigns = [...allCampaigns.filter(c => !c.va).slice(0, 50), ...allCampaigns.filter(c => c.va).slice(0, 50)].sort((x, y) => y.spend - x.spend);
   const channels = [];
@@ -501,7 +511,7 @@ function detail(ds, f, scope = {}) {
   }
   return {
     scope, total, spots, mineTotal,
-    advertisers, campaigns, channels, months: monthsOut,
+    advertisers, campaigns, campaignTotals, channels, months: monthsOut,
   };
 }
 

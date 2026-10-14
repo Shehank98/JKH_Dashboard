@@ -9,13 +9,13 @@ const D = require('./derive');
 const { guessMother, keyOf, clean } = require('./brand-derive');
 
 const THEMES = ['Commercials', 'Value additions -BB']; // the second name is recognised as a value addition by derive.js
-const VERSION = 1;
+const VERSION = 2; // 2: the time-of-day dimension is prime / non prime time (version 1 kept daypart numbers; still opens)
 
 // Detail levels: how finely a cube is cut. Every extra dimension multiplies the number of records.
-//   full      month, channel, product group, advertiser, mother brand, sub category, daypart, ad length and the campaign
+//   full      month, channel, product group, advertiser, mother brand, sub category, prime time or not, ad length and the campaign
 //             (Advt_Theme), so campaigns, Value additions and the Duration Mix work exactly as in the full file
 //   standard  the same without ad length (the Duration Mix card is left out)
-//   compact   without ad length and daypart (the Duration Mix card and the daypart filter are left out)
+//   compact   without ad length and prime time (the Duration Mix card and the prime time filter are left out)
 const LEVELS = ['full', 'standard', 'compact'];
 
 // lookup(pg, brand) -> { mother, sub } | null (the shared Brand Map). opts.pg locks the cube to one product group.
@@ -64,7 +64,7 @@ function buildCube(ds, lookup, opts) {
       sec = keepDur && durRaw ? D.durSecondsOf(raw, th === 1) : NaN;
       du = keepDur && durRaw ? D.durBucketOf(raw, th === 1) : 255;
     }
-    const dpv = keepDp ? cols.dp[i] : 4;
+    const dpv = keepDp ? D.slotOf(cols.hour ? cols.hour[i] : 255) : 0; // 0 neither, 1 prime time, 2 non prime time
     const pr = prodFor(cols.pg[i], hasProduct ? cols.product[i] : 0);
     const thv = keepTheme ? cols.theme[i] : th;
     const key = cols.mon[i] + ',' + cols.pg[i] + ',' + cols.adv[i] + ',' + pr + ',' + cols.ch[i] + ',' + dpv + ',' + du + ',' + thv + ',' + hr;
@@ -104,7 +104,7 @@ function buildCube(ds, lookup, opts) {
 
 // The cube as an engine dataset (typed arrays, the same shape as a loaded spot log).
 function unpackCube(cube) {
-  if (!cube || cube.v !== VERSION) throw new Error('This shared dashboard was made by a different version. Ask for a new link.');
+  if (!cube || (cube.v !== VERSION && cube.v !== 1)) throw new Error('This shared dashboard was made by a different version. Ask for a new link.');
   const { dicts: d, cols: c } = cube;
   const n = c.mon.length;
   const day = new Int32Array(n), mon = Int32Array.from(c.mon);
@@ -112,6 +112,12 @@ function unpackCube(cube) {
   const durRaw = new Float32Array(n);
   for (let i = 0; i < n; i++) durRaw[i] = c.ns[i] > 0 ? c.sec[i] / c.ns[i] : NaN;
   const zero8 = new Uint8Array(n);
+  // A cube only knows prime time, non prime time or neither, so each record gets an hour inside that slot.
+  const hourOf = (dp, ver) => {
+    const h = new Uint8Array(n).fill(255);
+    for (let i = 0; i < n; i++) h[i] = ver === 1 ? ([9, 14, 20, 255, 255][dp[i]] ?? 255) : dp[i] === 1 ? 20 : dp[i] === 2 ? 12 : 255;
+    return h;
+  };
   const lastMon = cube.meta.maxMon;
   return {
     meta: {
@@ -127,9 +133,9 @@ function unpackCube(cube) {
     },
     cols: {
       pg: Int32Array.from(c.pg), adv: Int32Array.from(c.adv), ch: Int32Array.from(c.ch), theme: Int32Array.from(c.th),
-      day, mon, dp: Uint8Array.from(c.dp), dur: Uint8Array.from(c.du), durRaw, bq: new Uint8Array(n).fill(2),
+      day, mon, dp: new Uint8Array(n).fill(4), dur: Uint8Array.from(c.du), durRaw, bq: new Uint8Array(n).fill(2),
       cost: Float64Array.from(c.cost), prog: new Int32Array(n), adPos: new Int32Array(n),
-      brk: zero8, pos: zero8, ads: zero8, hour: new Uint8Array(n).fill(255),
+      brk: zero8, pos: zero8, ads: zero8, hour: hourOf(c.dp, cube.v),
       product: Int32Array.from(c.pr), n: Int32Array.from(c.n), ns: Int32Array.from(c.ns),
     },
   };

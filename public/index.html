@@ -343,6 +343,7 @@ tr[data-detail]:hover td{background:#F6F8FC}
 .mtabs{display:flex;gap:4px;padding:0 20px;border-bottom:1px solid #EEF1F7}
 .mtabs button{border:none;background:none;font-size:12px;font-weight:700;color:#8A93AD;padding:9px 12px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
 .mtabs button[hidden]{display:none}
+.mbody tr.totrow td{background:#F6F8FC;font-weight:800;border-bottom:2px solid #DDE3EF}
 .mtabs button.on{color:#1A1F36;border-bottom-color:#FF8A3D}
 .mbody{flex:1;overflow-y:auto;padding:6px 20px 14px;min-height:160px}
 .mbody table td{font-size:11.5px;padding:7px 8px}
@@ -438,8 +439,13 @@ tr.me .sharebar{background:#FF8A3D}
         </div>
         <div class="flabel">Channel</div>
         <select class="inp" id="fChannel"></select>
-        <div id="fDaypartWrap"><div class="flabel">Daypart</div>
-        <select class="inp" id="fDaypart"></select></div>
+        <div id="fSlotWrap"><div class="flabel">Time of day <span class="cnt">by Advt_time</span></div>
+        <div class="segbar" id="fSlot">
+          <button class="seg on" data-v="">All</button>
+          <button class="seg" data-v="PT">Prime time</button>
+          <button class="seg" data-v="NPT">Non prime time</button>
+        </div>
+        <div class="hint">Prime time is 6pm to 11pm. Non prime time is 7am to 6pm. Ads aired between 11pm and 7am, and Press (no time), are only in All.</div></div>
       </div>
       <div class="sec" id="secBrand" style="display:none">
         <div class="sech"><span class="n">4</span> Brands</div>
@@ -669,7 +675,7 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
   <div class="card" id="cardDur">
     <div class="chead"><div class="ctitle"><h3 id="h-dur">Duration Mix</h3></div>
-      <div class="tgl" data-durmed><button data-v="All" class="on">TV + Radio</button><button data-v="TV">TV</button><button data-v="Radio">Radio</button></div></div>
+      <div class="tgl" data-durmed><button data-v="TV" class="on">TV</button><button data-v="Radio">Radio</button></div></div>
     <div class="fill" id="duration"></div>
   </div>
 </div>

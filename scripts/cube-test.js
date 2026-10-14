@@ -26,7 +26,7 @@ const file = process.argv[2] || path.join(__dirname, '..', 'samples', 'sample_42
   const cds = unpackCube(JSON.parse(json));
   const base = { pg: pgName, from: '2026-01-01', to: '2026-06-30', mine: [ds.dicts.adv[0]], comps: ds.dicts.adv.slice(1, 4), tagCommercial: false, yearType: 'CY' };
   const near = (a, b, what) => assert.ok(Math.abs(a - b) <= Math.max(2, Math.abs(b) * 1e-6), `${what}: ${a} vs ${b}`);
-  for (const extra of [{}, { adType: 'Commercial' }, { medium: 'TV' }, { daypart: 'Prime' }]) {
+  for (const extra of [{}, { adType: 'Commercial' }, { medium: 'TV' }, { slot: 'PT' }, { slot: 'NPT' }]) {
     const f = { ...base, ...extra };
     const a = compute.dashboard(ds, f), b = compute.dashboard(cds, f);
     near(b.kpis ? b.kpis.category : b.sos.total.spend, a.kpis ? a.kpis.category : a.sos.total.spend, 'category');

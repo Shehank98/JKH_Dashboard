@@ -47,6 +47,7 @@ function competitorIntel(ds, f, meta = {}) {
   const mediumId = D.MEDIA.indexOf(f.medium);
   const chId = f.channel ? dicts.channel.indexOf(f.channel) : -1;
   const dpId = f.daypart ? D.DAYPARTS.indexOf(f.daypart) : -1;
+  const slot = D.slotId(f.slot);
   const adType = f.adType === 'Sponsorship' ? 2 : f.adType === 'Commercial' ? 1 : 0;
   const role = new Uint8Array(nAdv);
   for (const n of f.comps || []) { const i = dicts.adv.indexOf(n); if (i >= 0) role[i] = 2; }
@@ -57,6 +58,7 @@ function competitorIntel(ds, f, meta = {}) {
   const breakIds = hasDetail ? dicts.adPos.map(breakOf) : [];
 
   const { pg, adv, ch, theme, day, mon, dp, cost } = cols;
+  const hourCol = cols.hour || new Uint8Array(pg.length).fill(255);
   const durRaw = cols.durRaw || null;
   const chMed = dicts.channelMedium;
   const A = new Map(); // advertiser id -> aggregates
@@ -81,7 +83,7 @@ function competitorIntel(ds, f, meta = {}) {
     const c = ch[i], md = chMed[c];
     if (mediumId >= 0 && md !== mediumId) continue;
     if (chId >= 0 && c !== chId) continue;
-    if (dpId >= 0 && dp[i] !== dpId) continue;
+    if ((dpId >= 0 && dp[i] !== dpId) || (slot && !D.slotOk(slot, hourCol[i]))) continue;
     const sponsor = excluded[theme[i]] === 1;
     if (adType && (sponsor ? 2 : 1) !== adType) continue;
     const a = adv[i], v = cost[i], x = get(a);
@@ -222,7 +224,7 @@ function competitorIntel(ds, f, meta = {}) {
     generatedAt: new Date().toISOString(), generatedBy: meta.user || '', source: { app: 'Ogilvy Orbit Chub Live Dashboard', file: ds.meta.fileName || '' },
     currency: 'LKR', spendBasis: 'rate card',
     filters: { category: f.pg, from: toIso(from), to: toIso(to), months: nMonths, medium: f.medium || 'All', channel: f.channel || 'All',
-      daypart: f.daypart || 'All', adType: { Sponsorship: 'Value Additions', Commercial: 'Commercials' }[f.adType] || 'All',
+      daypart: f.daypart || 'All', timeOfDay: { PT: 'Prime time', NPT: 'Non prime time' }[f.slot] || 'All', adType: { Sponsorship: 'Value Additions', Commercial: 'Commercials' }[f.adType] || 'All',
       tagCountsAs: f.tagCommercial ? 'Commercial' : 'Value Addition', mine: f.mine || [], competitors: f.comps || [] },
     totals: { spend: Math.round(catSpend), spots: catSpots, advertisers: ids.length },
     lists: { positionsInBreak: POSITIONS, breaksInProgramme: BREAKS, lengths: D.DUR_BUCKETS, dayparts: D.DAYPARTS, days: DAYS },
