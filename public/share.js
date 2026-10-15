@@ -53,7 +53,7 @@
         if (!s || my !== s.seq) return;
         s.cube = r.cube; s.records = r.cube.meta.records; s.bytes = JSON.stringify(r.cube).length;
         s.catBytes = 0; s.catRows = 0;
-        if (s.withCat && s.catAvail && s.mode !== 'custom') {
+        if (s.withCat && s.catAvail) {
           const pack = await O.engine.call('buildCategoryCube', { pg: s.lockPg ? st.pg : '' });
           if (!s || my !== s.seq) return;
           const cs = O.catState ? O.catState() : null;
@@ -81,11 +81,13 @@
           <div class="sh-l">What the client can see</div>
           <div class="sh-levels">${LEVELS.map(([k, n, d]) => `<label class="sh-lv${s.level === k ? ' on' : ''}"><input type="radio" name="shLv" value="${k}" ${s.level === k ? 'checked' : ''}><b>${n}</b><span>${d}</span></label>`).join('')}</div>
           <label class="sh-ck"><input type="checkbox" id="shLock" ${s.lockPg ? 'checked' : ''}><span>Share only <b>${esc(st.pg)}</b> <small>(other product groups are not included in the link at all)</small></span></label>
-          <label class="sh-ck${s.catAvail ? '' : ' off'}"><input type="checkbox" id="shCat" ${s.withCat && s.catAvail ? 'checked' : ''} ${s.catAvail ? '' : 'disabled'}><span>Include the <b>Category dashboard</b> <small>${s.catAvail ? '(the client gets a “Switch to Category” button. It shows mother brands, brand names and sub categories for the product group)' : '(not available: load your main file first so the Category data is built)'}</small></span></label>
+          <label class="sh-ck${s.catAvail ? '' : ' off'}${s.mode === 'custom' ? ' cu-hide' : ''}"><input type="checkbox" id="shCat" ${s.withCat && s.catAvail ? 'checked' : ''} ${s.catAvail ? '' : 'disabled'}><span>Include the <b>Category dashboard</b> <small>${s.catAvail ? '(the client gets a “Switch to Category” button. It shows mother brands, brand names and sub categories for the product group)' : '(not available: load your main file first so the Category data is built)'}</small></span></label>
           <label class="sh-ck"><input type="checkbox" id="shState" ${s.withFilters ? 'checked' : ''}><span>Open with my current filters <small>(advertisers, dates, medium…; the client can change them)</small></span></label>
           <div class="sh-l">What to send</div>
           <div class="sh-levels sh-modes">${[['full', 'Full dashboard', 'Everything, as it is today: the Spot Log dashboard (and the Category dashboard if ticked).'], ['custom', 'Customized dashboard', 'Only the charts you pick, arranged the way you want. The client can still filter and click through.']].map(([k, n, d]) => `<label class="sh-lv${s.mode === k ? ' on' : ''}"><input type="radio" name="shMode" value="${k}" ${s.mode === k ? 'checked' : ''}><b>${n}</b><span>${d}</span></label>`).join('')}</div>
           ${s.mode === 'custom' ? `<div class="share-sum"><div style="flex:1"><b>${s.layout ? s.layout.items.filter(i => i.k !== 'text').length + ' chart(s)' : 'Nothing designed yet'}</b>${s.layout ? ' on your canvas' : ''}<br><small>${s.layout ? 'Open the canvas to change it.' : 'Open the canvas, drag the charts you want, then come back here.'}</small></div><button class="btn pri" id="shDesign">${s.layout ? 'Edit the dashboard' : 'Design the dashboard'} ›</button></div>
+          <label class="sh-ck${s.catAvail ? '' : ' off'}"><input type="checkbox" id="shCat2" ${s.withCat && s.catAvail ? 'checked' : ''} ${s.catAvail ? '' : 'disabled'}><span>Add the <b>Category dashboard</b> <small>${s.catAvail ? '(the client gets a “Switch to Category” button)' : '(open the Category dashboard once, with its data loaded, to enable this)'}</small></span></label>
+          ${s.withCat && s.catAvail ? `<div class="share-sum"><div style="flex:1"><b>Category dashboard</b><br><small>${s.layout && s.layout.cat ? 'Customized: ' + s.layout.cat.items.filter(i => i.k !== 'text').length + ' chart(s)' : 'Shown whole, as it is today'}</small></div><button class="btn pri" id="shDesignCat">Customize it ›</button></div>` : ''}
           <div class="sh-l">Filters the client gets <small>(click to switch off)</small></div>
           <div class="sh-chips">${[['period', 'Period'], ['adv', 'Advertisers'], ['medium', 'Medium and channel'], ['slot', 'Prime time'], ['adType', 'Ad type'], ['tag', 'Tag as commercial']].map(([k, n]) => `<button type="button" class="sh-chip${s.cf[k] ? ' on' : ''}" data-cf="${k}">${n}</button>`).join('')}</div>` : ''}
           <div class="sh-status" id="shStatus"></div>
@@ -106,18 +108,22 @@
   }
 
   // The canvas: the Share window steps aside while the agency designs, and comes back with the layout.
-  function designLayout() {
+  async function designLayout(tab) {
     if (!window.CUSTOM) { O.toast('The layout tool did not load'); return; }
     if ($('shTitle')) { s.title = $('shTitle').value; s.client = $('shClient').value; s.expires = $('shExp').value; }
+    const hasCat = !!(s.withCat && s.catAvail);
+    if (hasCat && O.catEnsure) await O.catEnsure(); // the Category panels need their data drawn before they can be placed
+    if (!s) return;
     root.classList.remove('on');
-    window.CUSTOM.openBuilder({ layout: s.layout, level: s.level, filters: s.cf, onDone: layout => { if (!s) return; if (layout) s.layout = layout; root.classList.add('on'); draw(); } });
+    window.CUSTOM.openBuilder({ layout: s.layout, level: s.level, filters: s.cf, hasCat, tab: tab === 'cat' ? 'cat' : 'spot', onDone: layout => { if (!s) return; if (layout) s.layout = layout; root.classList.add('on'); draw(); } });
   }
-  async function editShared(token, level) {
+  async function editShared(token, level, hasCat) {
+    if (hasCat && O.catEnsure) await O.catEnsure();
     try {
       const j = await api('/api/shared-dashboards/' + encodeURIComponent(token) + '/layout');
       if (!j.layout) { O.toast('This link has no customized layout'); return; }
       root.classList.remove('on');
-      window.CUSTOM.openBuilder({ layout: j.layout, level: level || 'full', filters: j.layout.filters, onDone: async layout => {
+      window.CUSTOM.openBuilder({ layout: j.layout, level: level || 'full', filters: j.layout.filters, hasCat: !!hasCat, onDone: async layout => {
         if (s) root.classList.add('on');
         if (!layout) return;
         try { await api('/api/shared-dashboards/' + encodeURIComponent(token) + '/layout', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ layout: { ...layout, filters: j.layout.filters } }) }); O.toast('The link now shows the new layout'); }
@@ -152,7 +158,7 @@
       const expired = x.expiresAt && new Date(x.expiresAt).getTime() <= now;
       return `<tr><td class="bm-b" title="${esc(x.title)}">${esc(x.title)}${x.clientName ? ` <small>· ${esc(x.clientName)}</small>` : ''}</td>
         <td class="bm-by">${esc(new Date(x.createdAt).toLocaleDateString([], { dateStyle: 'medium' }))}<br><small>${expired ? 'Expired' : x.expiresAt ? 'Expires ' + esc(new Date(x.expiresAt).toLocaleDateString([], { dateStyle: 'medium' })) : 'No expiry'} · ${nf(x.views)} view${x.views === 1 ? '' : 's'}</small></td>
-        <td><button class="btn ghost bm-undo" data-copy="${esc(x.url)}">Copy</button> ${x.custom ? `<button class="btn ghost bm-undo" data-edit="${esc(x.token)}" data-level="${esc(x.level || 'full')}">Edit layout</button> ` : ''}<button class="btn ghost bm-undo" data-off="${esc(x.token)}">Turn off</button></td></tr>`;
+        <td><button class="btn ghost bm-undo" data-copy="${esc(x.url)}">Copy</button> ${x.custom ? `<button class="btn ghost bm-undo" data-edit="${esc(x.token)}" data-level="${esc(x.level || 'full')}" data-cat="${x.category ? 1 : 0}">Edit layout</button> ` : ''}<button class="btn ghost bm-undo" data-off="${esc(x.token)}">Turn off</button></td></tr>`;
     }).join('')}</tbody></table>`;
   }
 
@@ -196,11 +202,12 @@
     const t = e.target;
     if (t === root || t.id === 'shX' || t.id === 'shCancel' || t.id === 'shDone') { close(); return; }
     if (t.id === 'shGo') { generate(); return; }
-    if (t.id === 'shDesign') { designLayout(); return; }
+    if (t.id === 'shDesign') { designLayout('spot'); return; }
+    if (t.id === 'shDesignCat') { designLayout('cat'); return; }
     const cf = t.closest('[data-cf]');
     if (cf) { s.cf[cf.dataset.cf] = s.cf[cf.dataset.cf] ? 0 : 1; draw(); return; }
     const ed = t.closest('[data-edit]');
-    if (ed) { editShared(ed.dataset.edit, ed.dataset.level); return; }
+    if (ed) { editShared(ed.dataset.edit, ed.dataset.level, ed.dataset.cat === '1'); return; }
     if (t.id === 'shFilter') { O.spot.copyFilterLink(); return; }
     if (t.id === 'shCopy') {
       try { await navigator.clipboard.writeText($('shLink').value); O.toast('Link copied'); } catch (err) { $('shLink').select(); }
@@ -220,7 +227,7 @@
     if (t.name === 'shLv') { s.level = t.value; draw(); preview(); }
     else if (t.name === 'shMode') { s.mode = t.value; draw(); preview(); }
     else if (t.id === 'shLock') { s.lockPg = t.checked; preview(); }
-    else if (t.id === 'shCat') { s.withCat = t.checked; preview(); }
+    else if (t.id === 'shCat' || t.id === 'shCat2') { s.withCat = t.checked; if (!t.checked && s.layout) delete s.layout.cat; draw(); preview(); }
     else if (t.id === 'shState') s.withFilters = t.checked;
     else if (t.id === 'shExp') s.expires = t.value;
   });

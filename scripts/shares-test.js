@@ -54,6 +54,12 @@ const json = body => ({ method: 'POST', headers: { 'Content-Type': 'application/
     assert.deepStrictEqual(after.layout.items.map(i => i.k), ['sos'], 'the same link shows the new layout');
     assert.strictEqual(after.layout.items[0].c, 8, 'a chart cannot run off the right edge');
     assert.strictEqual(after.level, 'full', 'the rest of the link is untouched');
+    // the Category dashboard can be customized too: only its own charts are accepted there
+    const withCat = await call('/api/shared-dashboards/' + cm.body.token + '/layout', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ layout: { items: [{ k: 'sos', c: 0, r: 1, w: 4, h: 6 }], cat: { items: [{ k: 'cat_left', c: 0, r: 1, w: 7, h: 10 }, { k: 'trend', c: 0, r: 1, w: 3, h: 3 }, { k: 'cat_right', c: 9, r: 1, w: 8, h: 10 }] } } }) });
+    assert.strictEqual(withCat.status, 200);
+    const cl = (await call('/api/shared-dashboards/' + cm.body.token)).body.lockedFilters.layout;
+    assert.deepStrictEqual(cl.cat.items.map(i => i.k), ['cat_left', 'cat_right'], 'a Spot Log chart cannot sit on the Category canvas');
+    assert.strictEqual(cl.cat.items[1].c, 4, 'a Category chart cannot run off the right edge');
     assert.strictEqual((await call('/api/shared-dashboards/' + cm.body.token + '/layout', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ layout: { items: [] } }) })).status, 400);
     const clist = (await call('/api/shared-dashboards')).body.shares;
     assert.ok(clist.find(x => x.token === cm.body.token).custom, 'the list says which links are customized');

@@ -30,23 +30,32 @@ CREATE INDEX IF NOT EXISTS shared_dashboards_by ON shared_dashboards (created_by
 `;
 
 // The customized dashboard layout the agency designed: which cards, where, how big. Small, plain JSON; anything else is dropped.
-const WIDGETS = ['kpi1', 'kpi2', 'kpi3', 'medium', 'trend', 'drill', 'sos', 'mix', 'dur', 'text'];
-function cleanLayout(v) {
-  if (!v || typeof v !== 'object' || !Array.isArray(v.items)) return null;
+const SPOT_WIDGETS = ['kpi1', 'kpi2', 'kpi3', 'medium', 'trend', 'drill', 'sos', 'mix', 'dur', 'text'];
+const CAT_WIDGETS = ['cat_cards', 'cat_left', 'cat_right', 'text'];
+function cleanItems(list, allowed) {
   const int = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(n) || 0)));
   const seen = new Set(), items = [];
-  for (const it of v.items.slice(0, 40)) {
-    if (!it || !WIDGETS.includes(it.k) || (it.k !== 'text' && seen.has(it.k))) continue;
+  for (const it of (Array.isArray(list) ? list : []).slice(0, 40)) {
+    if (!it || !allowed.includes(it.k) || (it.k !== 'text' && seen.has(it.k))) continue;
     seen.add(it.k);
     const w = int(it.w, 1, 12), o = { k: it.k, c: int(it.c, 0, 11), r: int(it.r, 1, 200), w, h: int(it.h, 1, 40) };
     if (o.c + o.w > 12) o.c = 12 - o.w;
     if (it.k === 'text') o.t = { h: String(it.t && it.t.h || '').slice(0, 160), b: String(it.t && it.t.b || '').slice(0, 1200) };
     items.push(o);
   }
+  return items;
+}
+function cleanLayout(v) {
+  if (!v || typeof v !== 'object' || !Array.isArray(v.items)) return null;
+  const items = cleanItems(v.items, SPOT_WIDGETS);
   if (!items.length) return null;
   const f = v.filters && typeof v.filters === 'object' ? v.filters : {};
   const filters = {}; for (const k of ['period', 'adv', 'medium', 'slot', 'adType', 'tag']) filters[k] = f[k] === false || f[k] === 0 ? 0 : 1;
-  return { v: 1, items, filters, popups: v.popups === false ? false : true };
+  const out = { v: 1, items, filters, popups: v.popups === false ? false : true };
+  // The Category dashboard can be customized too. No charts there means the client gets it whole, as it is.
+  const cat = cleanItems(v.cat && v.cat.items, CAT_WIDGETS);
+  if (cat.length) out.cat = { items: cat };
+  return out;
 }
 
 const iso = v => (v ? new Date(v).toISOString() : null);
@@ -164,7 +173,7 @@ async function createShares(dataDir) {
     r.get('/', agency, wrap(async (req, res) => {
       const all = auth && auth.adminOf && auth.adminOf(req);
       const rows = await store.list(all ? null : req.user.email);
-      res.json({ shares: rows.map(m => ({ ...metaOf(m), custom: !!(m.lockedFilters && m.lockedFilters.layout), level: (m.lockedFilters && m.lockedFilters.level) || '', url: `${origin(req)}/share/${m.token || m.share_token}` })).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))) });
+      res.json({ shares: rows.map(m => ({ ...metaOf(m), custom: !!(m.lockedFilters && m.lockedFilters.layout), level: (m.lockedFilters && m.lockedFilters.level) || '', category: !!(m.lockedFilters && m.lockedFilters.category), url: `${origin(req)}/share/${m.token || m.share_token}` })).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))) });
     }));
     // The agency edits the layout of a link it already sent: the same link shows the new layout.
     const owned = async (req) => {

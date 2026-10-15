@@ -1432,7 +1432,10 @@
     if (busy) return;
     busy = true;
     const toCat = !document.body.classList.contains('mode-cat');
-    const out = $(toCat ? 'viewSpot' : 'viewCat'), inn = $(toCat ? 'viewCat' : 'viewSpot');
+    // A customized client dashboard has its own two views in place of these.
+    const cuS = $('viewCustom') && document.body.classList.contains('custom-client') ? $('viewCustom') : $('viewSpot');
+    const cuC = $('viewCustomCat') && document.body.classList.contains('has-cu-cat') ? $('viewCustomCat') : $('viewCat');
+    const out = toCat ? cuS : cuC, inn = toCat ? cuC : cuS;
     $('drawerToggle').checked = false; $('catDrawerToggle').checked = false; closeModal();
     out.classList.add(toCat ? 'leave-left' : 'leave-right');
     setTimeout(() => {
@@ -1461,10 +1464,13 @@
       if (mode === 'cat') { document.body.classList.add('mode-cat'); applyModeText(); ensureStarted(); }
     } catch (e) { toast('Category data: ' + e.message); }
   }
+  // For the customized dashboard (custom.js): redraw the charts to the size of the box they now sit in, and make sure the data is drawn at all.
+  const relayoutCat = () => { if (!data) return; try { updateStrip(); renderChart(data, null); renderCi(data); if (slideR) renderCp(); } catch (e) { /* drawn on the next render */ } };
+  O.catEnsure = async () => { try { await ensureStarted(); } catch (e) { /* the page shows its own message */ } return !!data; };
   O.catState = () => JSON.parse(JSON.stringify(state));
   // For the brand view (brandview.js): the dashboard's filters and period names.
   O.catHelp = {
-    filters: () => data.filters, cards: () => (data ? data.cards.map(c => ({ name: c.name, mine: !!c.mine })) : []), hasData: () => !!data, yearType: () => state.yearType, pg: () => (data ? data.filters.pg : state.pg),
+    relayout: relayoutCat, filters: () => data.filters, cards: () => (data ? data.cards.map(c => ({ name: c.name, mine: !!c.mine })) : []), hasData: () => !!data, yearType: () => state.yearType, pg: () => (data ? data.filters.pg : state.pg),
     periodLabel: (a, b, yt) => periodLabel(a, b, yt), monLabel: key => monLabel(key), short: r => periodLabel(r[0], r[1], state.yearType), rangesLabel: list => rangesLabel(list, state.yearType),
   };
   // The main file was loaded (or the shared Brand Map changed): the Category data was rebuilt, so show it.
