@@ -31,7 +31,7 @@ CREATE INDEX IF NOT EXISTS shared_dashboards_by ON shared_dashboards (created_by
 
 // The customized dashboard layout the agency designed: which cards, where, how big. Small, plain JSON; anything else is dropped.
 const SPOT_WIDGETS = ['kpi1', 'kpi2', 'kpi3', 'medium', 'trend', 'drill', 'sos', 'mix', 'dur', 'text'];
-const CAT_WIDGETS = ['cat_cards', 'cat_left', 'cat_right', 'text'];
+const CAT_WIDGETS = ['cat_cards', 'cat_invest', 'cat_monthly', 'cat_mb', 'cat_pref', 'text'];
 function cleanItems(list, allowed) {
   const int = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(n) || 0)));
   const seen = new Set(), items = [];

@@ -19,15 +19,17 @@
     mix: { el: 'cardMix', name: 'Channel mix', min: [4, 6], def: [4, 8], hint: 'Top 5 or all channels' },
     dur: { el: 'cardDur', name: 'Duration mix', min: [4, 6], def: [4, 8], hint: 'Needs the Full level' },
     text: { el: null, name: 'Text box', min: [2, 2], def: [6, 2], hint: 'A headline and a message' },
-    cat_cards: { el: 'catS1', name: 'Mother brand cards', min: [6, 5], def: [12, 5], hint: 'Headline, total and brand cards', scope: 'cat' },
-    cat_left: { el: 'catLeft', name: 'Category investment and monthly by brand', min: [6, 8], def: [7, 10], hint: 'Slides between the two charts', scope: 'cat' },
-    cat_right: { el: 'catS3', name: 'Investment by mother brand and channel preference', min: [4, 8], def: [5, 10], hint: 'Tables, mix and channel preference', scope: 'cat' },
+    cat_cards: { el: 'catS1', name: 'Mother brand cards', min: [6, 6], def: [12, 6], hint: 'Headline, total and brand cards', scope: 'cat' },
+    cat_invest: { el: 'catS0', name: 'Category investment', min: [5, 8], def: [6, 10], hint: 'Years, halves or quarters; flips to sub categories', scope: 'cat' },
+    cat_monthly: { el: 'catS2', name: 'Monthly investment by brand', min: [5, 8], def: [6, 10], hint: 'By month, quarter, half or year', scope: 'cat' },
+    cat_mb: { el: 'catR0', name: 'Investment by mother brand', min: [4, 8], def: [5, 10], hint: 'Tables; flips to mix and contribution', scope: 'cat' },
+    cat_pref: { el: 'catR1', name: 'Channel preference by brands', min: [5, 8], def: [6, 10], hint: 'The top 5 brands, spend by channel', scope: 'cat', needs: 'pref' },
   };
-  const ORDER = ['kpi1', 'kpi2', 'kpi3', 'medium', 'trend', 'drill', 'sos', 'mix', 'dur', 'text', 'cat_cards', 'cat_left', 'cat_right'];
+  const ORDER = ['kpi1', 'kpi2', 'kpi3', 'medium', 'trend', 'drill', 'sos', 'mix', 'dur', 'text', 'cat_cards', 'cat_invest', 'cat_monthly', 'cat_mb', 'cat_pref'];
 const SPOT_KEYS = ORDER.filter(k => !(CAT[k].scope === 'cat')), CAT_KEYS = ORDER.filter(k => CAT[k].scope === 'cat');
-  const CAT_EXAMPLE = [['cat_cards', 0, 1, 12, 5], ['cat_left', 0, 6, 7, 10], ['cat_right', 7, 6, 5, 10]];
+  const CAT_EXAMPLE = [['cat_cards', 0, 1, 12, 6], ['cat_invest', 0, 7, 6, 10], ['cat_monthly', 6, 7, 6, 10], ['cat_mb', 0, 17, 6, 10], ['cat_pref', 6, 17, 6, 10]];
   const EXAMPLE = [['text', 0, 1, 12, 2], ['kpi1', 0, 3, 4, 2], ['kpi2', 4, 3, 4, 2], ['kpi3', 8, 3, 4, 2], ['medium', 0, 5, 3, 7], ['trend', 3, 5, 6, 7], ['drill', 9, 5, 3, 7], ['sos', 0, 12, 4, 8], ['mix', 4, 12, 4, 8], ['dur', 8, 12, 4, 8]];
-  const unavailable = (k, level) => k === 'dur' && level && level !== 'full';
+  const unavailable = (k, level) => (k === 'dur' && level && level !== 'full') || (CAT[k] && CAT[k].needs === 'pref' && !(O.catHelp && O.catHelp.prefAvail && O.catHelp.prefAvail()) && level !== 'client');
 
   // ---------- the cards live here while they are on the grid; restoreAll() puts them back where they came from ----------
   const snaps = new Map();
@@ -58,7 +60,7 @@ const SPOT_KEYS = ORDER.filter(k => !(CAT[k].scope === 'cat')), CAT_KEYS = ORDER
       st.items.forEach(o => { if (o !== a && overlap(a, o)) { o.r = a.r + a.h; queue.push(o); } });
     }
   }
-  const pushHist = () => { st.hist.push(JSON.stringify(st.items.map(i => ({ ...i })))); if (st.hist.length > 40) st.hist.shift(); };
+  const pushHist = () => { st.items.forEach(readText); st.hist.push(JSON.stringify(st.items.map(i => ({ ...i })))); if (st.hist.length > 40) st.hist.shift(); };
   const setItems = list => { st.items = list; st[st.tab] = list; };
   function load(layout, catLayout) {
     st.sel = null; st.hist = []; st.next = 1; st.tab = 'spot';
@@ -126,6 +128,7 @@ const SPOT_KEYS = ORDER.filter(k => !(CAT[k].scope === 'cat')), CAT_KEYS = ORDER
   function cellAt(grid, x, y) { const m = metrics(grid); return { c: Math.floor((x - m.r.left) / m.colP), r: Math.floor((y - m.r.top) / m.rowP) + 1 }; }
   function showGhost(grid, c, r, w, h) { if (!ghost) { ghost = document.createElement('div'); ghost.className = 'cu-ghost'; grid.appendChild(ghost); } ghost.style.gridColumn = `${c + 1} / span ${w}`; ghost.style.gridRow = `${r} / span ${h}`; }
   const hideGhost = () => { if (ghost) { ghost.remove(); ghost = null; } };
+  const wantPref = on => { try { if (O.catHelp && O.catHelp.wantPref) O.catHelp.wantPref(on); } catch (e) { /* the chart appears on the next render */ } };
   const relayout = () => { try { if (O.spot && O.spot.relayout) O.spot.relayout(); } catch (e) { /* the charts redraw on the next render */ } try { if (O.catHelp && O.catHelp.relayout) O.catHelp.relayout(); } catch (e) { /* likewise */ } };
 
   function addWidget(k, c, r) {
@@ -148,6 +151,7 @@ const SPOT_KEYS = ORDER.filter(k => !(CAT[k].scope === 'cat')), CAT_KEYS = ORDER
   function paintBuilder(relay) {
     sync(B.grid, st.edit);
     $('cbCount').textContent = st.items.filter(i => i.k !== 'text').length + ' charts';
+    wantPref(st.cat.some(i => i.k === 'cat_pref'));
     paintLib();
     if (relay) relayout();
   }
@@ -207,7 +211,7 @@ const SPOT_KEYS = ORDER.filter(k => !(CAT[k].scope === 'cat')), CAT_KEYS = ORDER
       setItems(ex.filter(e => !unavailable(e[0], B.level)).map(e => ({ id: st.next++, k: e[0], c: e[1], r: e[2], w: e[3], h: e[4], t: e[0] === 'text' ? { h: 'Maliban leads the category', b: 'Add your key message for the client here.' } : undefined })));
       st.sel = null; resetCells(); paintBuilder(true);
     });
-    $('cbPrev').addEventListener('click', () => { st.edit = !st.edit; st.sel = null; page.classList.toggle('previewing', !st.edit); $('cbPrev').textContent = st.edit ? 'Preview as client' : 'Back to editing'; resetCells(); paintBuilder(true); });
+    $('cbPrev').addEventListener('click', () => { st.items.forEach(readText); st.edit = !st.edit; st.sel = null; page.classList.toggle('previewing', !st.edit); $('cbPrev').textContent = st.edit ? 'Preview as client' : 'Back to editing'; resetCells(); paintBuilder(true); });
     $('cbTabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) switchTab(b.dataset.t); });
     $('cbSave').addEventListener('click', () => finish(true));
     $('cbCancel').addEventListener('click', () => finish(false));
@@ -230,7 +234,7 @@ const SPOT_KEYS = ORDER.filter(k => !(CAT[k].scope === 'cat')), CAT_KEYS = ORDER
     st.spot.forEach(readText); st.cat.forEach(readText);
     const layout = save ? exportLayout(B.filters) : null;
     const cb = B.onDone, was = B;
-    resetCells(); restoreAll(); relayout();
+    resetCells(); restoreAll(); wantPref(false); relayout();
     document.body.classList.remove('cb-open'); page.classList.remove('on', 'previewing'); B = null; st.edit = false; st.tab = 'spot'; st.items = st.spot;
     if (cb) cb(save ? layout : null, was);
   }
@@ -279,6 +283,7 @@ const SPOT_KEYS = ORDER.filter(k => !(CAT[k].scope === 'cat')), CAT_KEYS = ORDER
     mountClient('viewCustom', st.spot, 'cuClientGrid');
     if (st.cat.length) { document.body.classList.add('has-cu-cat'); mountClient('viewCustomCat', st.cat, 'cuClientCatGrid'); }
     lockFilters(layout.filters);
+    wantPref(st.cat.some(i => i.k === 'cat_pref'));
     // cards that the data level cannot fill (for example Duration mix below Full) leave no empty hole
     cells.forEach(cell => { const n = cellNode(cell); if (n && n.style.display === 'none') cell.style.display = 'none'; });
     requestAnimationFrame(() => requestAnimationFrame(relayout));

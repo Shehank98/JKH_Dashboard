@@ -323,7 +323,7 @@
     const d = data, yt = state.yearType, R = d.ranges;
     const { cur, yoy, prev } = labelsOf(d);
     const f = d.filters;
-    checkCp().then(() => { if (slideR) renderCp(); });
+    checkCp().then(() => { if (slideR || cpForce) renderCp(); });
     heading($('catTitle'), 's1', `Leading ${f.pg} Brands by Investment`);
     const topN = f.top === 0 ? null : Math.min(f.top, d.brandCount);
     const scope = (f.comps && f.comps.length) ? `${d.shown} mother brands (mine and selected competitors)` : topN == null ? `All ${d.brandCount} mother brands` : `Top ${topN} mother brands`;
@@ -405,7 +405,7 @@
     window.addEventListener('mouseup', () => { if (down) { down = false; g.classList.remove('drag'); } });
     g.addEventListener('click', e => { if (moved) { e.stopImmediatePropagation(); e.preventDefault(); moved = false; } }, true);
   })();
-  window.addEventListener('resize', () => { if (data && slideR && document.body.classList.contains('mode-cat')) { clearTimeout(cpTimer); cpTimer = setTimeout(renderCp, 150); } });
+  window.addEventListener('resize', () => { if (data && (slideR || cpForce) && (document.body.classList.contains('mode-cat') || cpForce)) { clearTimeout(cpTimer); cpTimer = setTimeout(renderCp, 150); } });
   window.addEventListener('resize', () => { if (data && document.body.classList.contains('mode-cat')) { updateStrip(); renderChart(data, null); renderCi(data); } });
 
   // ---------- Category behaviour, month by month ----------
@@ -893,7 +893,7 @@
   // For each mother brand shown (and the whole category) how its spend in the selected period splits across channels.
   // Needs the Category data built from the main file (channels come from the spot log), so the slide tab only shows then.
   const cp = { medium: 'TV', data: null, key: '', seq: 0 };
-  let slideR = false, cpAvail = false;
+  let slideR = false, cpAvail = false, cpForce = false; // cpForce: Channel preference sits on its own in a customized dashboard, so it is drawn without the slide tab
   const CHAN_COL = [[/derana/i, '8C8C8C'], [/hiru/i, '0B2A6F'], [/sirasa/i, 'E8141B'], [/swarna/i, 'FFC900'], [/itn/i, 'F28B93'], [/siyatha/i, '7B3FA0'], [/shakthi/i, '00A859'], [/vasantham/i, '8B4A2B'], [/varnam/i, '8FD14F'], [/supreme/i, '111111'], [/rupavahini|rupa/i, 'C2410C']];
   const CHAN_FALL = ['1E88E5', '00ACC1', 'E91E63', 'F5A300', '455A64', '9C27B0', '5B6B2F', '2F5A9E', 'B84A93', '0A3EA6'];
   const chanHex = (s, k) => (s.other ? 'C5CEE3' : ((CHAN_COL.find(([re]) => re.test(s.name)) || [])[1] || CHAN_FALL[k % CHAN_FALL.length]));
@@ -1465,12 +1465,12 @@
     } catch (e) { toast('Category data: ' + e.message); }
   }
   // For the customized dashboard (custom.js): redraw the charts to the size of the box they now sit in, and make sure the data is drawn at all.
-  const relayoutCat = () => { if (!data) return; try { updateStrip(); renderChart(data, null); renderCi(data); if (slideR) renderCp(); } catch (e) { /* drawn on the next render */ } };
+  const relayoutCat = () => { if (!data) return; try { updateStrip(); renderChart(data, null); renderCi(data); if (slideR || cpForce) renderCp(); } catch (e) { /* drawn on the next render */ } };
   O.catEnsure = async () => { try { await ensureStarted(); } catch (e) { /* the page shows its own message */ } return !!data; };
   O.catState = () => JSON.parse(JSON.stringify(state));
   // For the brand view (brandview.js): the dashboard's filters and period names.
   O.catHelp = {
-    relayout: relayoutCat, filters: () => data.filters, cards: () => (data ? data.cards.map(c => ({ name: c.name, mine: !!c.mine })) : []), hasData: () => !!data, yearType: () => state.yearType, pg: () => (data ? data.filters.pg : state.pg),
+    relayout: relayoutCat, prefAvail: () => cpAvail, wantPref: on => { cpForce = !!on; if (on && data) renderCp(); }, filters: () => data.filters, cards: () => (data ? data.cards.map(c => ({ name: c.name, mine: !!c.mine })) : []), hasData: () => !!data, yearType: () => state.yearType, pg: () => (data ? data.filters.pg : state.pg),
     periodLabel: (a, b, yt) => periodLabel(a, b, yt), monLabel: key => monLabel(key), short: r => periodLabel(r[0], r[1], state.yearType), rangesLabel: list => rangesLabel(list, state.yearType),
   };
   // The main file was loaded (or the shared Brand Map changed): the Category data was rebuilt, so show it.
