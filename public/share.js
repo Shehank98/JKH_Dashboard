@@ -28,7 +28,7 @@
   function open() {
     if (!O.spot || !O.spot.hasData()) { O.toast('Load a data file first'); return; }
     const st = O.spot.getState();
-    s = { level: 'standard', lockPg: true, withFilters: true, title: `${st.pg} · Mine vs competitors`, client: '', expires: '', map: null, cube: null, withCat: true, catAvail: false, catBytes: 0, catRows: 0, bytes: 0, records: 0, building: false, seq: 0, result: null, shares: null, err: '', busy: false };
+    s = { mode: 'full', layout: null, cf: { period: 1, adv: 1, medium: 1, slot: 1, adType: 1, tag: 1 }, level: 'standard', lockPg: true, withFilters: true, title: `${st.pg} · Mine vs competitors`, client: '', expires: '', map: null, cube: null, withCat: true, catAvail: false, catBytes: 0, catRows: 0, bytes: 0, records: 0, building: false, seq: 0, result: null, shares: null, err: '', busy: false };
     root.classList.add('on');
     draw();
     loadShares();
@@ -53,7 +53,7 @@
         if (!s || my !== s.seq) return;
         s.cube = r.cube; s.records = r.cube.meta.records; s.bytes = JSON.stringify(r.cube).length;
         s.catBytes = 0; s.catRows = 0;
-        if (s.withCat && s.catAvail) {
+        if (s.withCat && s.catAvail && s.mode !== 'custom') {
           const pack = await O.engine.call('buildCategoryCube', { pg: s.lockPg ? st.pg : '' });
           if (!s || my !== s.seq) return;
           const cs = O.catState ? O.catState() : null;
@@ -83,6 +83,11 @@
           <label class="sh-ck"><input type="checkbox" id="shLock" ${s.lockPg ? 'checked' : ''}><span>Share only <b>${esc(st.pg)}</b> <small>(other product groups are not included in the link at all)</small></span></label>
           <label class="sh-ck${s.catAvail ? '' : ' off'}"><input type="checkbox" id="shCat" ${s.withCat && s.catAvail ? 'checked' : ''} ${s.catAvail ? '' : 'disabled'}><span>Include the <b>Category dashboard</b> <small>${s.catAvail ? '(the client gets a “Switch to Category” button. It shows mother brands, brand names and sub categories for the product group)' : '(not available: load your main file first so the Category data is built)'}</small></span></label>
           <label class="sh-ck"><input type="checkbox" id="shState" ${s.withFilters ? 'checked' : ''}><span>Open with my current filters <small>(advertisers, dates, medium…; the client can change them)</small></span></label>
+          <div class="sh-l">What to send</div>
+          <div class="sh-levels sh-modes">${[['full', 'Full dashboard', 'Everything, as it is today: the Spot Log dashboard (and the Category dashboard if ticked).'], ['custom', 'Customized dashboard', 'Only the charts you pick, arranged the way you want. The client can still filter and click through.']].map(([k, n, d]) => `<label class="sh-lv${s.mode === k ? ' on' : ''}"><input type="radio" name="shMode" value="${k}" ${s.mode === k ? 'checked' : ''}><b>${n}</b><span>${d}</span></label>`).join('')}</div>
+          ${s.mode === 'custom' ? `<div class="share-sum"><div style="flex:1"><b>${s.layout ? s.layout.items.filter(i => i.k !== 'text').length + ' chart(s)' : 'Nothing designed yet'}</b>${s.layout ? ' on your canvas' : ''}<br><small>${s.layout ? 'Open the canvas to change it.' : 'Open the canvas, drag the charts you want, then come back here.'}</small></div><button class="btn pri" id="shDesign">${s.layout ? 'Edit the dashboard' : 'Design the dashboard'} ›</button></div>
+          <div class="sh-l">Filters the client gets <small>(click to switch off)</small></div>
+          <div class="sh-chips">${[['period', 'Period'], ['adv', 'Advertisers'], ['medium', 'Medium and channel'], ['slot', 'Prime time'], ['adType', 'Ad type'], ['tag', 'Tag as commercial']].map(([k, n]) => `<button type="button" class="sh-chip${s.cf[k] ? ' on' : ''}" data-cf="${k}">${n}</button>`).join('')}</div>` : ''}
           <div class="sh-status" id="shStatus"></div>
           <p class="sh-note">${s.level === 'full' ? 'The client opens with <b>Tag counted as a ' + (st.tagCommercial ? 'commercial' : 'value addition') + '</b>, as in your filters, and can change it.' : 'Ad type: <b>Tag is counted as a ' + (st.tagCommercial ? 'commercial' : 'value addition') + '</b>, as in your filters. The client cannot change it at this level; use Full for that.'}</p>
           <p class="sh-note">The client sees monthly totals by channel, advertiser, mother brand and sub category, and can filter them, but never the raw spot log: no programmes, brand names, times or individual spots${s.level === 'full' ? ' (campaign names are included at this level)' : ', and no campaign names'}. Anyone with the link can open it, so share it only with the client.</p>
@@ -98,6 +103,27 @@
         <span class="sh-err" id="shErr"></span>
         ${s.result ? '<button class="btn pri" id="shDone">Done</button>' : '<button class="btn ghost" id="shCancel">Cancel</button><button class="btn pri" id="shGo">Generate link</button>'}</div></div>`;
     paintStatus(); paintList();
+  }
+
+  // The canvas: the Share window steps aside while the agency designs, and comes back with the layout.
+  function designLayout() {
+    if (!window.CUSTOM) { O.toast('The layout tool did not load'); return; }
+    if ($('shTitle')) { s.title = $('shTitle').value; s.client = $('shClient').value; s.expires = $('shExp').value; }
+    root.classList.remove('on');
+    window.CUSTOM.openBuilder({ layout: s.layout, level: s.level, filters: s.cf, onDone: layout => { if (!s) return; if (layout) s.layout = layout; root.classList.add('on'); draw(); } });
+  }
+  async function editShared(token, level) {
+    try {
+      const j = await api('/api/shared-dashboards/' + encodeURIComponent(token) + '/layout');
+      if (!j.layout) { O.toast('This link has no customized layout'); return; }
+      root.classList.remove('on');
+      window.CUSTOM.openBuilder({ layout: j.layout, level: level || 'full', filters: j.layout.filters, onDone: async layout => {
+        if (s) root.classList.add('on');
+        if (!layout) return;
+        try { await api('/api/shared-dashboards/' + encodeURIComponent(token) + '/layout', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ layout: { ...layout, filters: j.layout.filters } }) }); O.toast('The link now shows the new layout'); }
+        catch (e) { O.toast('Could not save the layout: ' + e.message); }
+      } });
+    } catch (e) { O.toast('Could not open the layout: ' + e.message); }
   }
 
   function paintStatus() {
@@ -126,7 +152,7 @@
       const expired = x.expiresAt && new Date(x.expiresAt).getTime() <= now;
       return `<tr><td class="bm-b" title="${esc(x.title)}">${esc(x.title)}${x.clientName ? ` <small>· ${esc(x.clientName)}</small>` : ''}</td>
         <td class="bm-by">${esc(new Date(x.createdAt).toLocaleDateString([], { dateStyle: 'medium' }))}<br><small>${expired ? 'Expired' : x.expiresAt ? 'Expires ' + esc(new Date(x.expiresAt).toLocaleDateString([], { dateStyle: 'medium' })) : 'No expiry'} · ${nf(x.views)} view${x.views === 1 ? '' : 's'}</small></td>
-        <td><button class="btn ghost bm-undo" data-copy="${esc(x.url)}">Copy</button> <button class="btn ghost bm-undo" data-off="${esc(x.token)}">Turn off</button></td></tr>`;
+        <td><button class="btn ghost bm-undo" data-copy="${esc(x.url)}">Copy</button> ${x.custom ? `<button class="btn ghost bm-undo" data-edit="${esc(x.token)}" data-level="${esc(x.level || 'full')}">Edit layout</button> ` : ''}<button class="btn ghost bm-undo" data-off="${esc(x.token)}">Turn off</button></td></tr>`;
     }).join('')}</tbody></table>`;
   }
 
@@ -143,7 +169,8 @@
     s.busy = true; paintStatus(); $('shErr').textContent = ''; $('shGo').textContent = 'Saving…';
     try {
       const st = O.spot.getState();
-      const body = JSON.stringify({ title, clientName: s.client, expiresAt, lockedFilters: { pg: s.lockPg ? st.pg : '', level: s.level, category: !!s.catRows }, state: s.withFilters ? st : null, cube: s.cube });
+      if (s.mode === 'custom' && !(s.layout && s.layout.items.length)) { s.busy = false; paintStatus(); $('shGo').textContent = 'Generate link'; $('shErr').textContent = 'Design the dashboard first, or choose Full dashboard'; return; }
+      const body = JSON.stringify({ title, clientName: s.client, expiresAt, lockedFilters: { pg: s.lockPg ? st.pg : '', level: s.level, category: !!s.catRows }, state: s.withFilters ? st : null, layout: s.mode === 'custom' ? { ...s.layout, filters: s.cf } : null, cube: s.cube });
       let res;
       try {
         // Compressed on the way up (the data cube is highly repetitive), plain if this browser cannot compress.
@@ -169,6 +196,11 @@
     const t = e.target;
     if (t === root || t.id === 'shX' || t.id === 'shCancel' || t.id === 'shDone') { close(); return; }
     if (t.id === 'shGo') { generate(); return; }
+    if (t.id === 'shDesign') { designLayout(); return; }
+    const cf = t.closest('[data-cf]');
+    if (cf) { s.cf[cf.dataset.cf] = s.cf[cf.dataset.cf] ? 0 : 1; draw(); return; }
+    const ed = t.closest('[data-edit]');
+    if (ed) { editShared(ed.dataset.edit, ed.dataset.level); return; }
     if (t.id === 'shFilter') { O.spot.copyFilterLink(); return; }
     if (t.id === 'shCopy') {
       try { await navigator.clipboard.writeText($('shLink').value); O.toast('Link copied'); } catch (err) { $('shLink').select(); }
@@ -186,6 +218,7 @@
     if (!s) return;
     const t = e.target;
     if (t.name === 'shLv') { s.level = t.value; draw(); preview(); }
+    else if (t.name === 'shMode') { s.mode = t.value; draw(); preview(); }
     else if (t.id === 'shLock') { s.lockPg = t.checked; preview(); }
     else if (t.id === 'shCat') { s.withCat = t.checked; preview(); }
     else if (t.id === 'shState') s.withFilters = t.checked;

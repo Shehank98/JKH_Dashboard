@@ -148,7 +148,8 @@
   // Makes sure the browser engine holds the current Brand Map (the brand view needs it) and the Category data is built from it.
   // Resolves true when the full brand view can be used.
   async function ensureMap() {
-    if (document.body.classList.contains('share-mode')) return false;
+    // A client's link already holds mother brand and sub category in its data, so the full brand view works without the Brand Map.
+    if (document.body.classList.contains('share-mode')) { try { return !!(await O.engine.call('catStatus')).sharedBrandView; } catch (e) { return false; } }
     await sync();
     const s = await O.engine.call('catStatus');
     if (!s.canDerive || !s.derived) return false;

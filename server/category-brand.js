@@ -18,10 +18,11 @@ const MONTHS = D.MONTHS, MED = D.MEDIA;
 const keyToMon = k => { const [y, m] = String(k).split('-').map(Number); return y * 12 + m - 1; };
 const monthKey = i => `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}`;
 const mk = () => ({ s: [0, 0, 0], n: [0, 0, 0], c: [0, 0], cn: [0, 0] });
-function add(a, fl, v, isC) {
-  if (fl & 1) { a.s[0] += v; a.n[0]++; if (isC) { a.c[0] += v; a.cn[0]++; } }
-  if (fl & 2) { a.s[1] += v; a.n[1]++; if (isC) { a.c[1] += v; a.cn[1]++; } }
-  if (fl & 4) { a.s[2] += v; a.n[2]++; }
+function add(a, fl, v, isC, w) {
+  if (w === undefined) w = 1;
+  if (fl & 1) { a.s[0] += v; a.n[0] += w; if (isC) { a.c[0] += v; a.cn[0] += w; } }
+  if (fl & 2) { a.s[1] += v; a.n[1] += w; if (isC) { a.c[1] += v; a.cn[1] += w; } }
+  if (fl & 4) { a.s[2] += v; a.n[2] += w; }
 }
 const get = (map, key) => { let a = map.get(key); if (!a) { a = mk(); map.set(key, a); } return a; };
 const arr = (map, key, len) => { let a = map.get(key); if (!a) { a = new Float64Array(len); map.set(key, a); } return a; };
@@ -88,6 +89,8 @@ function brandView(ds, lookup, f, scope, opts) {
 
   const { pg, adv, ch, theme, mon, cost, product } = cols;
   const chMed = dicts.channelMedium;
+  // A shared dashboard's records stand for several spots (cols.n) and for several timed spots (cols.ns); the full file is one record per spot.
+  const wN = cols.n || null, wS = cols.ns || null;
   for (let i = 0, n = pg.length; i < n; i++) {
     if (pg[i] !== pgId) continue;
     const m = mon[i];
@@ -105,18 +108,19 @@ function brandView(ds, lookup, f, scope, opts) {
     if (sVt === 1 && !isC) continue;
     if (sVt === 2 && isC) continue;
     const v = cost[i] / 1000, a = adv[i], mb = prodMb[p];
+    const w = wN ? wN[i] : 1, wd = wS ? wS[i] : 1;
     // Context: the category the brand is compared with.
-    add(cat, fl, v, isC);
+    add(cat, fl, v, isC, w);
     const ek = level === 'brand' ? p : level === 'adv' ? a : mb;
-    add(get(ent, ek), fl, v, isC);
-    add(get(mbEnt, mb), fl, v, isC);
+    add(get(ent, ek), fl, v, isC, w);
+    add(get(mbEnt, mb), fl, v, isC, w);
     if ((fl & 1) && mine[a]) mineMb.add(mb);
     if (fl & 1) {
       const k = kOf[m - lo];
-      catMonthly[k] += v; add(catMed[md], 1, v, isC); catVt[isC ? 0 : 1] += v; add(get(catByCh, c), 1, v, isC);
+      catMonthly[k] += v; add(catMed[md], 1, v, isC, w); catVt[isC ? 0 : 1] += v; add(get(catByCh, c), 1, v, isC, w);
       arr(entMonthly, ek, len)[k] += v;
       if (mine[a]) mineEnt.add(ek);
-      if (bucket < NB) { durC.counts[bucket]++; const sec = D.durSecondsOf(raw, !isC); if (sec > 0) { durC.sum += sec; durC.n++; } }
+      if (bucket < NB) { durC.counts[bucket] += wd; const sec = D.durSecondsOf(raw, !isC); if (sec > 0) { durC.sum += sec * wd; durC.n += wd; } }
     }
     // The brand being looked at.
     if (sMb >= 0 && mb !== sMb) continue;
@@ -125,24 +129,24 @@ function brandView(ds, lookup, f, scope, opts) {
     if (sAdv >= 0 && a !== sAdv) continue;
     if (sTheme >= 0 && th !== sTheme) continue;
     if (scSub >= 0 && prodSub[p] !== scSub) continue;
-    add(num, fl, v, isC);
+    add(num, fl, v, isC, w);
     if (mine[a]) numMine = true;
-    add(medAcc[md], fl, v, isC);
-    add(get(byCh, c), fl, v, isC);
-    add(get(byAdv, a), fl, v, isC);
-    add(get(byTheme, a * nTheme + th), fl, v, isC);
+    add(medAcc[md], fl, v, isC, w);
+    add(get(byCh, c), fl, v, isC, w);
+    add(get(byAdv, a), fl, v, isC, w);
+    add(get(byTheme, a * nTheme + th), fl, v, isC, w);
     if (fl & 1) { const tk = a * nTheme + th; let tb = themeBrand.get(tk); if (!tb) { tb = new Map(); themeBrand.set(tk, tb); } tb.set(p, (tb.get(p) || 0) + v); }
     if (childKind) {
       const ck = childKind === 'mb' ? mb : p;
-      add(get(children, ck), fl, v, isC);
+      add(get(children, ck), fl, v, isC, w);
       if (mine[a]) mineChild.add(ck);
       if (fl & 1) { arr(childMonthly, ck, len)[kOf[m - lo]] += v; childCh.set(ck * nCh + c, (childCh.get(ck * nCh + c) || 0) + v); }
     }
-    if ((fl & 1) && bucket < NB) { durB.counts[bucket]++; const sec = D.durSecondsOf(raw, !isC); if (sec > 0) { durB.sum += sec; durB.n++; } }
+    if ((fl & 1) && bucket < NB) { durB.counts[bucket] += wd; const sec = D.durSecondsOf(raw, !isC); if (sec > 0) { durB.sum += sec * wd; durB.n += wd; } }
     if (fl & 1) {
       const k = kOf[m - lo];
-      mCur[k] += v; mN[k]++;
-      if (isC) { mC[k] += v; mCn[k]++; } else { mV[k] += v; mVn[k]++; }
+      mCur[k] += v; mN[k] += w;
+      if (isC) { mC[k] += v; mCn[k] += w; } else { mV[k] += v; mVn[k] += w; }
     }
     if (fl & 2) mYoy[kOf[m + 12 - lo]] += v;
   }
@@ -222,6 +226,8 @@ function brandView(ds, lookup, f, scope, opts) {
   const topCh = channels[0] || null;
   return {
     filters: { pg: f.pg, sub: f.sub || '' }, tagCommercial: tag, level, entKind, childKind,
+    // A shared dashboard holds mother brand and sub category only (no brand names), and campaign names only at the Full level.
+    limits: { brands: !(ds.meta && ds.meta.cube), campaigns: !(ds.meta && ds.meta.cube && ds.meta.level !== 'full') },
     ranges: win.ranges, months: len,
     name: main ? main.v : f.pg, kind: main ? kindNames[main.k] : 'Category', parts, us: numMine,
     head: {
@@ -249,7 +255,7 @@ function brandView(ds, lookup, f, scope, opts) {
       sos: pct(a.s[0], catMed[k].s[0]), catShare: pct(catMed[k].s[0], cat.s[0]), catCur: catMed[k].s[0],
     })),
     duration: {
-      buckets: D.DUR_BUCKETS, hasLengths: !!durRaw,
+      buckets: D.DUR_BUCKETS, hasLengths: !!durRaw && !(ds.meta && ds.meta.cube && ds.meta.level !== 'full'),
       brand: { counts: durB.counts, acd: durB.n ? durB.sum / durB.n : null }, cat: { counts: durC.counts, acd: durC.n ? durC.sum / durC.n : null },
     },
     channels, advertisers, campaigns, monthsList,

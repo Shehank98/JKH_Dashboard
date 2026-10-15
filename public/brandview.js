@@ -99,15 +99,17 @@
   // ---------- drawing ----------
   // The whole view fits the window: nothing scrolls. Long lists are paged, and the page size follows the window height.
   const ROWH = { advertisers: 44, channels: 44, campaigns: 50, children: 52, months: 44 };
+  const subOnly = () => !!(d && d.limits && !d.limits.brands);
   function tabList() {
-    const kids = d.childKind === 'mb' ? 'Mother brands' : 'Brands';
+    const kids = d.childKind === 'mb' ? 'Mother brands' : subOnly() ? 'Sub categories' : 'Brands';
+    // A client's shared dashboard has no ad lengths below the Full level, no campaign names below it either, and no brand names at all.
     return [
       ['advertisers', 'Advertisers', d.advertisers.length],
       ['medium', 'Medium split', d.mediums.filter(m => m.cur > 0).length],
       ['channels', 'Channel mix', d.channels.length],
-      ['duration', 'Duration mix', null],
+      ...(d.duration.hasLengths ? [['duration', 'Duration mix', null]] : []),
       ...(d.childKind ? [['children', `${kids} · Commercials vs VA`, d.children.length]] : []),
-      ['campaigns', 'Campaigns', d.adType.counts.C + d.adType.counts.V],
+      ...(!d.limits || d.limits.campaigns ? [['campaigns', 'Campaigns', d.adType.counts.C + d.adType.counts.V]] : []),
       ['months', 'Months', d.monthsList.length],
     ];
   }
@@ -266,16 +268,17 @@
 
   // 5. The brands (or mother brands) inside, with Commercials and Value additions and the ratio.
   function childrenPane() {
-    const kids = d.childKind === 'mb' ? 'mother brand' : 'brand';
+    const kids = d.childKind === 'mb' ? 'mother brand' : subOnly() ? 'sub category' : 'brand';
+    const shown = r => (d.childKind !== 'mb' && subOnly() ? (r.sub || r.name) : r.name);
     const curLabel = O.catHelp.rangesLabel(d.ranges.curList || [d.ranges.cur]);
     const sp = d.head.split, [cS, vS] = cvOf(sp), tS = cS + vS, pc = tS ? (cS / tS) * 100 : 0;
     const fmt = v => (ui.metric === 'spots' ? `${nf(v)} spots` : mnTxt(v));
     const { slice, pager } = paged(d.children);
-    return `${paneHead(`${d.childKind === 'mb' ? 'Mother brands' : 'Brands'} in ${esc(d.name)}`, `Click a ${kids} to open its own full view. Click the bar to see only those ads.`, metricToggle())}
+    return `${paneHead(`${d.childKind === 'mb' ? 'Mother brands' : subOnly() ? 'Sub categories' : 'Brands'} in ${esc(d.name)}`, `Click a ${kids} to open its own full view. Click the bar to see only those ads.`, metricToggle())}
       <div class="bv-bigbar"><button class="bv-bp" style="width:${Math.max(pc, 14)}%;background:${CC};color:#fff"${go({ vt: 'C' })}>Commercials · ${fmt(cS)} · ${nf(pc, 0)}%</button><button class="bv-bp" style="width:${Math.max(100 - pc, 14)}%;background:${VC};color:#1A1F36"${go({ vt: 'V' })}>Value additions · ${fmt(vS)} · ${nf(100 - pc, 0)}%</button></div>
       <div class="bv-th bv-t-chh" style="margin-top:8px"><span>${kids.toUpperCase()}</span><span class="r">${esc(curLabel.length > 12 ? 'SELECTED' : curLabel)}</span><span class="r">${ui.cmp === 'prev' ? 'PREVIOUS' : 'LAST YEAR'}</span><span class="r">GROWTH</span><span class="r">SHARE</span><span class="r">${ui.metric === 'spots' ? 'COMM. SPOTS' : 'COMMERCIALS'}</span><span class="r">${ui.metric === 'spots' ? 'VA SPOTS' : 'VALUE ADD.'}</span><span>RATIO</span><span>MONTH BY MONTH</span><span></span></div>
       ${rowsBox('children', slice.map(r => `<div class="bv-tr bv-t-chh"${go(d.childKind === 'mb' ? { mb: r.name, brand: null, adv: null } : { brand: r.name })}>
-        <span class="bv-nm"><b>${esc(r.name)}</b>${usTag(r.us)}${r.sub ? `<br><small>${esc(r.sub)}</small>` : ''}</span>
+        <span class="bv-nm"><b>${esc(shown(r))}</b>${usTag(r.us)}${r.sub && !subOnly() ? `<br><small>${esc(r.sub)}</small>` : ''}</span>
         <b class="r">${mnNum(r.cur)}</b><span class="r mut">${baseOf(r) > 0 ? mnNum(baseOf(r)) : '–'}</span><b class="r">${growth(r.cur, baseOf(r))}</b><b class="r">${pctS(r.share)}</b>
         <span class="r">${ui.metric === 'spots' ? nf(r.Cn) : mnNum(r.C)}</span><span class="r">${ui.metric === 'spots' ? nf(r.Vn) : mnNum(r.V)}</span>
         <span class="bv-rt">${ratioBar(r, 100)}<b>${ratioTxt(r)}</b></span><span>${spark(r.monthly, 100, 28)}</span><span class="bv-go">›</span></div>`).join('') || '<div class="bv-empty">No spend in this selection</div>')}

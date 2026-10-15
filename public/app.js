@@ -1532,8 +1532,10 @@
   // Share opens the client-dashboard dialog (share.js); the old filters-only link stays inside it.
   $('shareBtn').addEventListener('click', () => { if (window.SHAREDASH) window.SHAREDASH.open(); else copyFilterLink(); });
   // For the full report (report.js): pictures of the dashboard and its cards, and the click-through pop-up.
+  const relayout = () => { if (data) { renderTrend(data); if (typeof renderSos === 'function') renderSos(data); } };
   const reportHooks = () => ({ dashboard: captureDashboard, card: captureCard, openDetail: scope => openDetail(scope, true), setDetailTab: t => { detailTab = t; renderDetailBody(); }, closeDetail });
-  window.ORBIT.spot = { getState: () => JSON.parse(JSON.stringify(state)), hasData: () => !!overview && !isCube(), dataMeta: () => (overview ? overview.meta : null), copyFilterLink, get cap() { return reportHooks(); }, fileName: () => (overview && overview.meta ? overview.meta.fileName : '') };
+  window.ORBIT.spot = { getState: () => JSON.parse(JSON.stringify(state)), hasData: () => !!overview && !isCube(), dataMeta: () => (overview ? overview.meta : null), copyFilterLink, get cap() { return reportHooks(); },
+    relayout, fileName: () => (overview && overview.meta ? overview.meta.fileName : '') };
 
   // ---------- signed-in user ----------
   const userMenu = $('userMenu');
@@ -1574,6 +1576,7 @@
       if (init.category) { window.ORBIT.shareCatState = j.cube.category.state || null; document.body.classList.remove('share-nocat'); window.ORBIT.ready = true; document.dispatchEvent(new Event('orbit:ready')); }
       sharePayload.cube = null;
       await loadOverview(false);
+      if (j.lockedFilters && j.lockedFilters.layout && window.CUSTOM) window.CUSTOM.enterClient(j.lockedFilters.layout);
     } catch (e) { fail('Could not open this dashboard', e.message); }
   }
 

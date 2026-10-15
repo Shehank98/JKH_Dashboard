@@ -29,6 +29,26 @@ CREATE TABLE IF NOT EXISTS shared_dashboards (
 CREATE INDEX IF NOT EXISTS shared_dashboards_by ON shared_dashboards (created_by);
 `;
 
+// The customized dashboard layout the agency designed: which cards, where, how big. Small, plain JSON; anything else is dropped.
+const WIDGETS = ['kpi1', 'kpi2', 'kpi3', 'medium', 'trend', 'drill', 'sos', 'mix', 'dur', 'text'];
+function cleanLayout(v) {
+  if (!v || typeof v !== 'object' || !Array.isArray(v.items)) return null;
+  const int = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(n) || 0)));
+  const seen = new Set(), items = [];
+  for (const it of v.items.slice(0, 40)) {
+    if (!it || !WIDGETS.includes(it.k) || (it.k !== 'text' && seen.has(it.k))) continue;
+    seen.add(it.k);
+    const w = int(it.w, 1, 12), o = { k: it.k, c: int(it.c, 0, 11), r: int(it.r, 1, 200), w, h: int(it.h, 1, 40) };
+    if (o.c + o.w > 12) o.c = 12 - o.w;
+    if (it.k === 'text') o.t = { h: String(it.t && it.t.h || '').slice(0, 160), b: String(it.t && it.t.b || '').slice(0, 1200) };
+    items.push(o);
+  }
+  if (!items.length) return null;
+  const f = v.filters && typeof v.filters === 'object' ? v.filters : {};
+  const filters = {}; for (const k of ['period', 'adv', 'medium', 'slot', 'adType', 'tag']) filters[k] = f[k] === false || f[k] === 0 ? 0 : 1;
+  return { v: 1, items, filters, popups: v.popups === false ? false : true };
+}
+
 const iso = v => (v ? new Date(v).toISOString() : null);
 const metaOf = r => ({ token: r.share_token || r.token, title: r.title, clientName: r.client_name ?? r.clientName ?? '', createdBy: r.created_by ?? r.createdBy,
   expiresAt: iso(r.expires_at ?? r.expiresAt), createdAt: iso(r.created_at ?? r.createdAt), revokedAt: iso(r.revoked_at ?? r.revokedAt), views: r.views || 0, lastViewed: iso(r.last_viewed ?? r.lastViewed) });
@@ -56,6 +76,7 @@ function fileStore(dataDir) {
       return fs.readdirSync(dir).filter(n => n.endsWith('.meta.json')).map(n => readJson(path.join(dir, n))).filter(m => m && (!email || m.createdBy === email));
     },
     async revoke(token, at) { const m = readJson(f(token, 'meta')); if (m) { m.revokedAt = at; writeJson(f(token, 'meta'), m); } },
+    async setLayout(token, layout) { const m = readJson(f(token, 'meta')); if (!m) return false; m.lockedFilters = { ...(m.lockedFilters || {}), layout }; writeJson(f(token, 'meta'), m); return true; },
     async touch(token) { const m = readJson(f(token, 'meta')); if (m) { m.views = (m.views || 0) + 1; m.lastViewed = new Date().toISOString(); writeJson(f(token, 'meta'), m); } },
     async close() {},
   };
@@ -84,6 +105,7 @@ function pgStore(url) {
       return q.rows.map(fromRow);
     },
     async revoke(token, at) { await pool.query('UPDATE shared_dashboards SET revoked_at = $2 WHERE share_token = $1', [token, at]); },
+    async setLayout(token, layout) { const q = await pool.query("UPDATE shared_dashboards SET locked_filters = jsonb_set(coalesce(locked_filters, '{}'::jsonb), '{layout}', $2::jsonb) WHERE share_token = $1", [token, JSON.stringify(layout)]); return q.rowCount > 0; },
     async touch(token) { await pool.query('UPDATE shared_dashboards SET views = views + 1, last_viewed = now() WHERE share_token = $1', [token]); },
     async close() { await pool.end(); },
   };
@@ -129,10 +151,12 @@ async function createShares(dataDir) {
         if (t.getTime() <= Date.now()) throw fail(400, 'The expiry date must be in the future');
         expiresAt = t.toISOString();
       }
+      const lf = b.lockedFilters && typeof b.lockedFilters === 'object' ? { ...b.lockedFilters } : null;
+      if (lf) { delete lf.layout; if (b.layout) { const L = cleanLayout(b.layout); if (!L) throw fail(400, 'The customized dashboard layout is not valid'); lf.layout = L; } }
       const token = crypto.randomBytes(24).toString('base64url');
       const createdBy = req.user.email;
       await store.insert({
-        token, title, clientName: clean(b.clientName, 140), createdBy, cube, lockedFilters: b.lockedFilters && typeof b.lockedFilters === 'object' ? b.lockedFilters : null,
+        token, title, clientName: clean(b.clientName, 140), createdBy, cube, lockedFilters: lf,
         state: b.state && typeof b.state === 'object' ? b.state : null, expiresAt, createdAt: new Date().toISOString(),
       });
       res.json({ token, url: `${origin(req)}/share/${token}`, expiresAt });
@@ -140,7 +164,23 @@ async function createShares(dataDir) {
     r.get('/', agency, wrap(async (req, res) => {
       const all = auth && auth.adminOf && auth.adminOf(req);
       const rows = await store.list(all ? null : req.user.email);
-      res.json({ shares: rows.map(m => ({ ...metaOf(m), url: `${origin(req)}/share/${m.token || m.share_token}` })).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))) });
+      res.json({ shares: rows.map(m => ({ ...metaOf(m), custom: !!(m.lockedFilters && m.lockedFilters.layout), level: (m.lockedFilters && m.lockedFilters.level) || '', url: `${origin(req)}/share/${m.token || m.share_token}` })).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))) });
+    }));
+    // The agency edits the layout of a link it already sent: the same link shows the new layout.
+    const owned = async (req) => {
+      if (!TOKEN_RE.test(req.params.token)) throw fail(404, 'Not found');
+      const m = await store.get(req.params.token, false);
+      if (!m) throw fail(404, 'Not found');
+      if (m.createdBy !== req.user.email && !(auth && auth.adminOf && auth.adminOf(req))) throw fail(403, 'Only the person who shared it can change it');
+      return m;
+    };
+    r.get('/:token/layout', agency, wrap(async (req, res) => { const m = await owned(req); res.json({ layout: (m.lockedFilters && m.lockedFilters.layout) || null }); }));
+    r.put('/:token/layout', agency, express.json({ limit: '1mb' }), wrap(async (req, res) => {
+      await owned(req);
+      const L = cleanLayout(req.body && req.body.layout);
+      if (!L) throw fail(400, 'The customized dashboard layout is not valid');
+      await store.setLayout(req.params.token, L);
+      res.json({ ok: true });
     }));
     r.delete('/:token', agency, wrap(async (req, res) => {
       if (!TOKEN_RE.test(req.params.token)) throw fail(404, 'Not found');
@@ -168,4 +208,4 @@ async function createShares(dataDir) {
   return { router, close: () => store.close(), storage: store.kind };
 }
 
-module.exports = { createShares };
+module.exports = { createShares, cleanLayout };

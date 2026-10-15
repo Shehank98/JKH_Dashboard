@@ -53,6 +53,17 @@ async function idbDo(mode, fn) {
 
 let owner = 'local';
 let dataset = null;
+// Mother brand and sub category of each brand. A client's shared cube already holds them (its products are mother + sub category).
+function brandLookup() {
+  if (sharedMode) {
+    const d = need().dicts, m = new Map();
+    d.product.forEach((p, i) => m.set(p, { mother: d.productMother[i], sub: d.productSub[i] }));
+    return (pg, b) => m.get(b) || null;
+  }
+  if (!heldLookup) throw new Error('The Brand Map is not loaded yet.');
+  const { keyOf } = requireLib('brand-derive');
+  return (pg, b) => heldLookup.get(keyOf(pg, b)) || null;
+}
 let heldLookup = null, heldVersion = null; // the Brand Map the Category data was built with, for the brand view
 let sharedMode = false; // a client's data cube: nothing is read from or written to this browser's storage
 let pending = null; // a file that has been read but whose brands are not confirmed yet
@@ -129,18 +140,14 @@ const handlers = {
   },
   // Full brand view for a click in the Category dashboard (channels, ad types and campaigns come from the main file).
   catBrand({ filters, scope, tagCommercial }) {
-    if (!heldLookup) throw new Error('The Brand Map is not loaded yet.');
-    const { keyOf } = requireLib('brand-derive');
-    return requireLib('category-brand').brandView(need(), (pg, b) => heldLookup.get(keyOf(pg, b)) || null, filters || {}, scope || {}, { tagCommercial: !!tagCommercial });
+    return requireLib('category-brand').brandView(need(), brandLookup(), filters || {}, scope || {}, { tagCommercial: !!tagCommercial });
   },
   // Channel preference by brands (the extra chart of the Category dashboard).
   catChannelPref({ filters, brands, medium }) {
-    if (!heldLookup) throw new Error('The Brand Map is not loaded yet.');
-    const { keyOf } = requireLib('brand-derive');
-    return requireLib('category-brand').channelPreference(need(), (pg, b) => heldLookup.get(keyOf(pg, b)) || null, filters || {}, { brands: brands || [], medium: medium || '' });
+    return requireLib('category-brand').channelPreference(need(), brandLookup(), filters || {}, { brands: brands || [], medium: medium || '' });
   },
   // What the Category data currently is, so the page can tell when the Brand Map has moved on.
-  catStatus() { return { has: !!catDataset, derived: !sharedMode && !!(catDataset && catDataset.meta.derived), mapVersion: catDataset ? catDataset.meta.mapVersion : null, mapHeld: heldVersion, canDerive: !!(dataset && dataset.dicts.product) }; },
+  catStatus() { return { sharedBrandView: !!(sharedMode && dataset && dataset.meta.hasMap && catDataset), has: !!catDataset, derived: !sharedMode && !!(catDataset && catDataset.meta.derived), mapVersion: catDataset ? catDataset.meta.mapVersion : null, mapHeld: heldVersion, canDerive: !!(dataset && dataset.dicts.product) }; },
   async cancelIngest() { pending = null; return { ok: true }; },
   // The Brand Map changed (someone edited it): rebuild the Category data from the saved main file.
   async rederiveCategory({ map, version }) {
