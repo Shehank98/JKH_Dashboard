@@ -1301,7 +1301,7 @@
     document.head.appendChild(el);
   });
   // Exports carry the stacked Ogilvy Orbit Chub logo (the screen keeps the one-line logo).
-  const EXPORT_LOGO = 'ogilvy-orbit-chub-stacked.png';
+  const EXPORT_LOGO = '/ogilvy-orbit-chub-stacked.png'; // absolute: a client's link lives under /share/, where a relative path would not find it
   const imgSize = src => new Promise(ok => { const i = new Image(); i.onload = () => ok({ w: i.naturalWidth, h: i.naturalHeight }); i.onerror = () => ok({ w: 1, h: 1 }); i.src = src; });
 
   // Renders the whole dashboard (every card) to one JPEG, leaving out the drawer, menus and buttons.
