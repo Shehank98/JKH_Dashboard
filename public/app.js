@@ -1309,7 +1309,11 @@
     await loadScript('/vendor/html-to-image/html-to-image.js');
     $('drawerToggle').checked = false;
     await new Promise(r => setTimeout(r, 320));
-    const b = document.body, w = b.offsetWidth, h = b.offsetHeight;
+    const b = document.body, w = b.offsetWidth;
+    // A customized dashboard can be taller than the window: the picture takes the whole canvas, not just what is on screen.
+    const cu = [...document.querySelectorAll('.cu-scroll')].find(e => e.offsetParent !== null);
+    const extra = b.classList.contains('custom-client') && cu ? Math.max(0, cu.scrollHeight - cu.clientHeight) : 0;
+    const h = b.offsetHeight + extra;
     const logo = document.querySelector('.logo img'), screenLogo = logo.getAttribute('src');
     logo.setAttribute('src', EXPORT_LOGO); logo.classList.add('xlogo');
     await logo.decode().catch(() => {});
@@ -1317,7 +1321,7 @@
     const skip = new Set(['drawer', 'drawerToggle', 'catDrawer', 'catDrawerToggle', 'catModal', 'toast', 'overlay', 'filterBtn', 'tright', 'modal', 'tip', 'exportStage', 'rpModal']);
     const url = await window.htmlToImage.toJpeg(b, {
       quality: 0.95, pixelRatio: 2, backgroundColor: '#F4F6FA', width: w, height: h,
-      style: { transform: 'none' },
+      style: extra ? { transform: 'none', height: h + 'px' } : { transform: 'none' },
       filter: node => !(node.id && skip.has(node.id)) && !(node.classList && node.classList.contains('scrim')),
     }).finally(() => { b.classList.remove('exporting'); logo.setAttribute('src', screenLogo); logo.classList.remove('xlogo'); });
     return { url, w, h };
@@ -1346,6 +1350,13 @@
     ['01_KPIs', 'kpis'], ['02_Medium_Split', 'cardMedium'], ['03_Monthly_Spend_Trend', 'cardTrend'], ['04_Month_Drill_Down', 'cardDrill'],
     ['05_Share_of_Spend', 'cardSos'], ['06_Channel_Mix', 'cardMix'], ['07_Duration_Mix', 'cardDur'],
   ];
+  // A customized client dashboard hands over only the charts that are on it, never the ones the agency left out.
+  function exportParts() {
+    if (!document.body.classList.contains('custom-client')) return EXPORT_PARTS;
+    const placed = id => !!($(id) && $(id).closest('#cuClientGrid'));
+    const kp = [['01_Total_category_spend', 'k1'], ['01_My_advertiser_spend', 'k2'], ['01_Share_of_spend', 'k3']];
+    return [...kp, ...EXPORT_PARTS.filter(p => p[1] !== 'kpis')].filter(p => placed(p[1]));
+  }
   async function exportImage() {
     toast('Preparing JPG images');
     try {
@@ -1355,13 +1366,13 @@
       zip.file('00_Full_Dashboard.jpg', b64(url), { base64: true });
       document.body.classList.add('exporting');
       try {
-        for (const [name, id] of EXPORT_PARTS) zip.file(`${name}.jpg`, b64(await captureCard($(id))), { base64: true });
+        for (const [name, id] of exportParts()) zip.file(`${name}.jpg`, b64(await captureCard($(id))), { base64: true });
       } finally { document.body.classList.remove('exporting'); }
       const blob = await zip.generateAsync({ type: 'blob' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = fileBase() + '_JPG.zip'; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      toast('ZIP downloaded: full dashboard + 7 charts');
+      toast(`ZIP downloaded: full dashboard + ${exportParts().length} chart${exportParts().length === 1 ? '' : 's'}`);
     } catch (e) { toast('Export failed: ' + e.message); }
   }
   async function exportPdf() {

@@ -124,8 +124,10 @@ const SPOT_KEYS = ORDER.filter(k => !(CAT[k].scope === 'cat')), CAT_KEYS = ORDER
   // ---------- builder ----------
   let page = null, B = null; // B = { onDone, level, grid }
   let ghost = null, op = null, dragKey = null;
-  function metrics(grid) { const r = grid.getBoundingClientRect(), colW = (r.width - (COLS - 1) * GAP) / COLS; return { r, colP: colW + GAP, rowP: ROW + GAP }; }
-  function cellAt(grid, x, y) { const m = metrics(grid); return { c: Math.floor((x - m.r.left) / m.colP), r: Math.floor((y - m.r.top) / m.rowP) + 1 }; }
+  // The page shrinks (a CSS scale) in windows smaller than 1280 x 720, so pointer positions are divided by that scale.
+  const scale = () => parseFloat(document.body.style.getPropertyValue('--s')) || 1;
+  function metrics(grid) { const r = grid.getBoundingClientRect(), sc = scale(), colW = (r.width / sc - (COLS - 1) * GAP) / COLS; return { r, sc, colP: colW + GAP, rowP: ROW + GAP }; }
+  function cellAt(grid, x, y) { const m = metrics(grid); return { c: Math.floor((x - m.r.left) / m.sc / m.colP), r: Math.floor((y - m.r.top) / m.sc / m.rowP) + 1 }; }
   function showGhost(grid, c, r, w, h) { if (!ghost) { ghost = document.createElement('div'); ghost.className = 'cu-ghost'; grid.appendChild(ghost); } ghost.style.gridColumn = `${c + 1} / span ${w}`; ghost.style.gridRow = `${r} / span ${h}`; }
   const hideGhost = () => { if (ghost) { ghost.remove(); ghost = null; } };
   const wantPref = on => { try { if (O.catHelp && O.catHelp.wantPref) O.catHelp.wantPref(on); } catch (e) { /* the chart appears on the next render */ } };
@@ -290,5 +292,14 @@ const SPOT_KEYS = ORDER.filter(k => !(CAT[k].scope === 'cat')), CAT_KEYS = ORDER
     window.addEventListener('resize', () => requestAnimationFrame(relayout));
   }
 
-  window.CUSTOM = { openBuilder, enterClient, WIDGETS: CAT };
+  // A layout designed at one data level cannot keep charts the level cannot fill (for example Duration mix below Full).
+  function prune(layout, level) {
+    if (!layout) return layout;
+    const keep = list => (list || []).filter(i => !unavailable(i.k, level));
+    const out = { ...layout, items: keep(layout.items) };
+    if (layout.cat) out.cat = { items: keep(layout.cat.items) };
+    return out.items.length ? out : null;
+  }
+
+  window.CUSTOM = { openBuilder, enterClient, prune, WIDGETS: CAT };
 })();

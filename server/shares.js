@@ -114,7 +114,7 @@ function pgStore(url) {
       return q.rows.map(fromRow);
     },
     async revoke(token, at) { await pool.query('UPDATE shared_dashboards SET revoked_at = $2 WHERE share_token = $1', [token, at]); },
-    async setLayout(token, layout) { const q = await pool.query("UPDATE shared_dashboards SET locked_filters = jsonb_set(coalesce(locked_filters, '{}'::jsonb), '{layout}', $2::jsonb) WHERE share_token = $1", [token, JSON.stringify(layout)]); return q.rowCount > 0; },
+    async setLayout(token, layout) { const q = await pool.query("UPDATE shared_dashboards SET locked_filters = jsonb_set(CASE WHEN jsonb_typeof(locked_filters) = 'object' THEN locked_filters ELSE '{}'::jsonb END, '{layout}', $2::jsonb) WHERE share_token = $1", [token, JSON.stringify(layout)]); return q.rowCount > 0; },
     async touch(token) { await pool.query('UPDATE shared_dashboards SET views = views + 1, last_viewed = now() WHERE share_token = $1', [token]); },
     async close() { await pool.end(); },
   };

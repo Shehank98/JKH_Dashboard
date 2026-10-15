@@ -224,7 +224,7 @@
   root.addEventListener('change', e => {
     if (!s) return;
     const t = e.target;
-    if (t.name === 'shLv') { s.level = t.value; draw(); preview(); }
+    if (t.name === 'shLv') { s.level = t.value; if (s.layout && window.CUSTOM) { const kept = window.CUSTOM.prune(s.layout, s.level); if (kept && kept.items.length !== s.layout.items.length) O.toast('Charts this data level cannot show were taken off your canvas'); s.layout = kept; } draw(); preview(); }
     else if (t.name === 'shMode') { s.mode = t.value; draw(); preview(); }
     else if (t.id === 'shLock') { s.lockPg = t.checked; preview(); }
     else if (t.id === 'shCat' || t.id === 'shCat2') { s.withCat = t.checked; if (!t.checked && s.layout) delete s.layout.cat; draw(); preview(); }

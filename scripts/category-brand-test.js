@@ -105,5 +105,22 @@ const sum = (a, k) => a.reduce((s, x) => s + x[k], 0);
   assert.ok(Array.isArray(mbv.sos.self) && mbv.sos.self.every(v => v == null || Number.isFinite(v)), 'sos series is a plain list of numbers');
   assert.strictEqual(JSON.stringify(mbv).includes('NaN'), false);
   assert.throws(() => brandView(ds, lookup, f, { mb: 'No such' }, {}), /Unknown mother brand/);
+  // a client's shared cube (records that stand for several spots) gives the same brand view numbers as the full file
+  const { buildCube, unpackCube } = require('../server/cube');
+  for (const level of ['full', 'standard', 'compact']) {
+    const cube = buildCube(ds, lookup, { level, pg: f.pg });
+    const cds = unpackCube(JSON.parse(JSON.stringify(cube)));
+    const pm = new Map(); cds.dicts.product.forEach((p, i) => pm.set(p, { mother: cds.dicts.productMother[i], sub: cds.dicts.productSub[i] }));
+    const cv = brandView(cds, (pg, b) => pm.get(b) || null, f, { mb: mbName }, {});
+    near(cv.head.cur, mbv.head.cur, level + ': spend'); near(cv.head.yoy, mbv.head.yoy, level + ': spend last year'); near(cv.head.spots, mbv.head.spots, level + ': spots');
+    near(cv.head.split.C, mbv.head.split.C, level + ': commercials'); near(cv.head.split.V, mbv.head.split.V, level + ': value additions');
+    assert.strictEqual(cv.channels.length, mbv.channels.length, level + ': channels');
+    near(sum(cv.advertisers, 'cur'), mbv.head.cur, level + ': advertisers add up'); near(sum(cv.monthsList, 'spend'), mbv.head.cur, level + ': months add up');
+    assert.strictEqual(cv.limits.brands, false); assert.strictEqual(cv.limits.campaigns, level === 'full');
+    assert.strictEqual(cv.duration.hasLengths, level === 'full', level + ': ad lengths only at Full');
+    if (level === 'full') { assert.strictEqual(cv.adType.counts.C + cv.adType.counts.V, mbv.adType.counts.C + mbv.adType.counts.V, 'same campaigns'); near(cv.duration.brand.counts.reduce((a, x) => a + x, 0), mbv.duration.brand.counts.reduce((a, x) => a + x, 0), 'same number of timed ads'); }
+    assert.strictEqual(JSON.stringify(cv).includes('NaN'), false, level + ': no NaN');
+    assert.ok(channelPreference(cds, (pg, b) => pm.get(b) || null, f, { brands: [mbName], medium: '' }).brands.length === 1, level + ': channel preference works on a cube');
+  }
   console.log('Brand view tests passed');
 })().catch(e => { console.error(e); process.exit(1); });

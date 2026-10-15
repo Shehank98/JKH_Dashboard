@@ -71,3 +71,7 @@ body.custom-client.mode-cat #viewCustomCat{display:flex}
 .cb-tabs[hidden]{display:none}
 .cb-tabs button{font:inherit;font-size:12px;font-weight:700;padding:5px 12px;border:0;background:#fff;color:#6B7590;cursor:pointer}
 .cb-tabs button.on{background:#1A1F36;color:#fff}
+
+/* a customized client dashboard: exports that would hand over charts the agency left out, or assume the fixed layout, are not offered */
+body.custom-client #exportMenu [data-x="ppt"],body.custom-client #exportMenu [data-x="csv"],
+body.custom-client.has-cu-cat #catExportBtn,body.custom-client.has-cu-cat #catExportMenu{display:none!important}
