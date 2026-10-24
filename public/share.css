@@ -32,7 +32,7 @@ body.share-mode .sharebanner{display:flex;align-items:baseline;gap:10px;min-widt
 .sharebanner span{font-size:11.5px;color:#6B7590}
 body.share-nocat #modeBtn,body.share-nocat #viewCat,body.share-nocat #catDrawerToggle,body.share-nocat #catFilterBtn,
 body.share-mode #catShareBtn,body.share-mode .ctab[data-pane="cpData"],body.share-mode #cpData,body.share-mode #cDeleteBtn,
-body.share-mode .bmbtn,body.share-mode #shareBtn,body.share-mode #userBtn,body.share-mode #userMenu,
+body.share-mode .bmbtn,body.share-mode #shareBtn,body.share-mode #plannerBtn,body.share-mode #userBtn,body.share-mode #userMenu,
 body.share-mode .tab[data-pane="paneData"],body.share-mode #paneData,
 body.share-mode #exportMenu [data-x="send"],body.share-mode #exportMenu [data-x="json"],body.share-mode #exportMenu [data-x="plan"],
 body.share-mode #exportMenu hr,body.share-mode #catExportMenu hr,body.share-mode [data-x="report"],body.share-nocampaign label.tick:has(#fTagCommercial){display:none!important}

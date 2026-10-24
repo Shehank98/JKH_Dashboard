@@ -326,6 +326,24 @@ tr[data-detail]:hover td{background:#F6F8FC}
 .tip .h{color:#FFC599;font-weight:700;display:block;margin-bottom:2px}
 .tip .k{color:#8D9ABA;font-size:10px;display:block;margin-top:3px}
 
+
+/* Send to Planner */
+.pl-box{width:min(760px,94%)}
+.pl-body{padding:4px 20px 14px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
+.pl-body label.l{display:block;font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;color:#8A93AD;font-weight:700;margin-bottom:5px}
+.pl-body select,.pl-body input[type=date],.pl-body input[type=search]{width:100%;border:1px solid #DDE3EF;border-radius:8px;padding:8px 10px;font:inherit;font-size:12px;color:#1A1F36;background:#fff}
+.pl-comps{max-height:150px;overflow:auto;border:1px solid #DDE3EF;border-radius:8px;margin-top:6px}
+.pl-comps label{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:12px;cursor:pointer}
+.pl-comps label:hover{background:#F4F6FA}
+.pl-comps label span.n{margin-left:auto;color:#8A93AD;font-size:11px}
+.pl-dates{display:flex;gap:8px}
+.pl-full{grid-column:1/-1}
+.pl-facts{margin:0;padding:10px 12px 10px 30px;max-height:210px;overflow:auto;border:1px solid #EEF1F7;border-radius:8px;background:#FAFBFD;font-size:11.5px;line-height:1.5;color:#2A3350}
+.pl-facts li{margin-bottom:3px}
+.pl-note{font-size:11px;color:#6B7590;margin-top:6px}
+.pl-note.err{color:#B3261E;font-weight:600}
+@media (max-width:760px){.pl-body{grid-template-columns:1fr}}
+
 /* Detail modal */
 .modal{position:fixed;inset:0;z-index:25;background:rgba(20,26,46,.45);display:none;align-items:center;justify-content:center}
 .modal.on{display:flex}
@@ -608,6 +626,7 @@ tr.me .sharebar{background:#FF8A3D}
     </div>
     <button class="fbtn light spot-only" id="exportBtn">Export ▾</button>
     <button class="fbtn light spot-only" id="shareBtn">Share</button>
+    <button class="fbtn light spot-only" id="plannerBtn" title="Send a Competitor Brief to the TV Media Planning Tool">Send to Planner</button>
     <div class="menu spot-only" id="exportMenu">
       <button data-x="jpg"><b>JPG images (ZIP)</b><span>Full dashboard plus each chart as its own JPG</span></button>
       <button data-x="pdf"><b>PDF</b><span>The whole dashboard on one landscape page</span></button>
@@ -779,6 +798,24 @@ tr.me .sharebar{background:#FF8A3D}
 <div class="tip" id="tip"></div>
 <div id="exportStage" style="position:fixed;left:-20000px;top:0;z-index:-1"></div>
 
+<div class="modal" id="plModal">
+  <div class="mbox pl-box" role="dialog" aria-modal="true" aria-labelledby="plTitle">
+    <div class="mhead">
+      <div><h2 id="plTitle">Send to Planner</h2><div class="msub" id="plSub">Builds a Competitor Brief from the current filters: totals and facts only, no raw rows.</div></div>
+      <button class="mx" id="plClose" aria-label="Close">✕</button>
+    </div>
+    <div class="pl-body">
+      <div><label class="l" for="plMine">My advertiser</label><select id="plMine"></select></div>
+      <div><label class="l">Date range</label><div class="pl-dates"><input type="date" id="plFrom" aria-label="From"><input type="date" id="plTo" aria-label="To"></div></div>
+      <div class="pl-full"><label class="l">Competitors <span id="plCompCount" style="text-transform:none;letter-spacing:0"></span></label><input type="search" id="plSearch" placeholder="Search advertisers"><div class="pl-comps" id="plComps"></div></div>
+      <div class="pl-full"><label class="l">Facts the planner will read <span id="plFactCount" style="text-transform:none;letter-spacing:0"></span></label><ol class="pl-facts" id="plFacts"></ol><div class="pl-note" id="plNote"></div></div>
+    </div>
+    <div class="mfoot">
+      <button class="fbtn" id="plSend">Send to Planner</button>
+      <button class="fbtn light" id="plDownload">Download JSON</button>
+    </div>
+  </div>
+</div>
 <div class="modal" id="modal">
   <div class="mbox" role="dialog" aria-modal="true" aria-labelledby="mTitle">
     <div class="mhead">
@@ -812,6 +849,7 @@ tr.me .sharebar{background:#FF8A3D}
 <script src="/brandview.js?v=1"></script>
 <script src="/category.js?v=3"></script>
 <script src="/report.js?v=1"></script>
+<script src="/plannerSend.js?v=1"></script>
 <script src="/custom.js?v=1"></script>
 </body>
 </html>

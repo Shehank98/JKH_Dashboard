@@ -19,7 +19,8 @@
     "test:brandmap": "node scripts/brandmap-test.js",
     "test:cube": "node scripts/cube-test.js",
     "test:shares": "node scripts/shares-test.js",
-    "test:brandview": "node scripts/category-brand-test.js"
+    "test:brandview": "node scripts/category-brand-test.js",
+    "test:brief": "node scripts/planner-brief-test.js"
   },
   "engines": {
     "node": "22.x"

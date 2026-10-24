@@ -14,8 +14,13 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 // Spot-log files are read and analysed in each person's browser (public/engine/worker.js), so people never
 // see or overwrite each other's data and the server holds no datasets. The server handles sign-in and
 // serves the app, including the shared calculation code the browser runs.
-const ENGINE_LIB = ['derive', 'brand-derive', 'cube', 'builder', 'compute', 'planning', 'competitor', 'periods', 'category-builder', 'category', 'category-brand', 'browser-readers'];
+const ENGINE_LIB = ['derive', 'brand-derive', 'cube', 'builder', 'compute', 'planning', 'competitor', 'periods', 'category-builder', 'category', 'category-brand', 'browser-readers', 'plannerBrief'];
 // Where "Send to planning tool" opens. The planning tool must list this dashboard's address as allowed.
+// Send to Planner: the Competitor Brief goes to PLANNER_API_URL/api/competitor-briefs with the bearer token below, sent by
+// this server so the token never reaches the browser. PLANNER_URL is where the planner's pages are (the tab opened afterwards).
+const PLANNER_API_URL = (process.env.PLANNER_API_URL || '').replace(/\/+$/, '');
+const PLANNER_API_TOKEN = process.env.PLANNER_API_TOKEN || '';
+const PLANNER_URL = (process.env.PLANNER_URL || PLANNER_API_URL).replace(/\/+$/, '');
 const PLANNING_TOOL_URL = (process.env.PLANNING_TOOL_URL || 'https://media-planing-v2-copy-production.up.railway.app').replace(/\/+$/, '');
 
 // Sign-in is on unless AUTH_DISABLED=1 (local development and automated tests only).
@@ -65,7 +70,8 @@ function start(auth, brandmap, shares) {
   app.get('/engine/lib/:name.js', (req, res) => {
     if (!ENGINE_LIB.includes(req.params.name)) return res.status(404).end();
     res.setHeader('Cache-Control', 'no-cache');
-    res.type('application/javascript').sendFile(path.join(__dirname, 'server', req.params.name + '.js'));
+    // plannerBrief lives in public/ so it can be loaded and tested on its own.
+    res.type('application/javascript').sendFile(path.join(req.params.name === 'plannerBrief' ? PUBLIC_DIR : path.join(__dirname, 'server'), req.params.name + '.js'));
   });
 
   app.use('/api/brandmap', brandmap.router(express));
@@ -73,7 +79,29 @@ function start(auth, brandmap, shares) {
 
   // Signed-in check for the page (data lives in the browser, not here).
   app.get('/api/status', (req, res) => res.json({ ok: true, data: 'browser' }));
-  app.get('/api/config', (req, res) => res.json({ planningToolUrl: PLANNING_TOOL_URL }));
+  app.get('/api/config', (req, res) => res.json({ planningToolUrl: PLANNING_TOOL_URL, plannerUrl: PLANNER_URL, plannerConfigured: !!(PLANNER_API_URL && PLANNER_API_TOKEN) }));
+
+  // Send to Planner. The brief is passed straight through (nothing is stored here); the planner answers { briefId, url }.
+  app.post('/api/planner/briefs', async (req, res) => {
+    const brief = req.body;
+    if (!PLANNER_API_URL || !PLANNER_API_TOKEN) return res.status(503).json({ error: 'The planner is not set up. Set PLANNER_API_URL and PLANNER_API_TOKEN on this service, or download the JSON.' });
+    if (!brief || brief.schemaVersion !== '1.0' || !Array.isArray(brief.advertisers)) return res.status(400).json({ error: 'This is not a Competitor Brief (schemaVersion 1.0).' });
+    const body = JSON.stringify(brief);
+    if (Buffer.byteLength(body) > 200 * 1024) return res.status(413).json({ error: 'The brief is larger than 200 KB. Choose fewer competitors or a shorter period.' });
+    try {
+      const r = await fetch(PLANNER_API_URL + '/api/competitor-briefs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + PLANNER_API_TOKEN },
+        body,
+        signal: AbortSignal.timeout(20000),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.briefId) return res.status(r.ok ? 502 : r.status === 401 || r.status === 403 ? 502 : r.status).json({ error: j.error || (r.status === 401 || r.status === 403 ? 'The planner refused the token (PLANNER_API_TOKEN).' : `The planner answered ${r.status}.`) });
+      res.json({ briefId: String(j.briefId), url: typeof j.url === 'string' ? j.url : null });
+    } catch (e) {
+      res.status(502).json({ error: 'The planner could not be reached (' + (e.name === 'TimeoutError' ? 'timed out' : e.message) + ').' });
+    }
+  });
 
   app.listen(PORT, () => console.log(`Dashboard running on http://localhost:${PORT} (data files are processed in each browser)`));
 }

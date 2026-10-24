@@ -1,0 +1,1123 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-05-01T09:00:00.000Z",
+  "dataDictionary": {
+    "columns": {
+      "Product_Group": "Product category of the ad",
+      "Advertiser": "Company that paid for the ad",
+      "Product": "Product or brand advertised",
+      "Advt_Theme": "Campaign / ad theme name",
+      "Ads": "Ad identifier",
+      "Channel": "TV, Radio or Press channel (prefix TV - / FM / Radio - tells the medium)",
+      "Program": "Programme the ad aired in",
+      "Dd": "Day of month",
+      "Mn": "Month",
+      "Yr": "Year",
+      "Day": "Day of week",
+      "Prog_time": "Programme start time",
+      "Advt_time": "Time the ad aired (used for Prime / Non-Prime and hour bands)",
+      "AdPos": "Position of the ad within the programme (1 = first ad aired in that programme)",
+      "TotAds": "Total ads aired in that programme",
+      "BrkNo": "Which commercial break of the programme the ad aired in",
+      "PosinBrk": "Position of the ad inside that break (1 = first in break)",
+      "AdsinBrk": "Total ads in that break",
+      "Lng": "Language of the ad",
+      "Dur": "Duration in seconds",
+      "Cost": "Spend at rate card (LKR)"
+    },
+    "definitions": {
+      "primeTime": "Prime Time = Advt_time from 18:00 to 24:00. Non-Prime = 06:00 to 18:00. 00:00 to 06:00 is reported as overnight.",
+      "hourBands": "06-09, 09-12, 12-15, 15-18, 18-21, 21-24 (24-hour clock, start inclusive).",
+      "spot": "One airing or insertion with a rate-card cost above 0 that is not a value-addition item.",
+      "valueAddition": "Free or bonus items: Advt_Theme on the value-addition list (-BB, Com Break, DJ, -Extro, -Intro, -LLogo, Next Card, Tag, Time Check, -Tr) or Cost = 0. They are NOT counted in spots or spend; see each advertiser's valueAddition block.",
+      "shareOfSpend": "Advertiser spend / total spend of all advertisers in the filtered category, in %.",
+      "rank": "Rank by spend among all advertisers in the filtered category (1 = biggest).",
+      "avgCostPerSpot": "Spend / spots, whole LKR.",
+      "placement": "Only TV and Radio. Programme position: first 3 = AdPos <= 3, last 3 = AdPos > TotAds - 3, otherwise middle. Break position: first = PosinBrk 1, last = PosinBrk = AdsinBrk (a single-ad break counts as first), otherwise middle. Press has no break data, so it is skipped.",
+      "duration": "Only TV and Radio. Buckets 5s, 10s, 15s, 20s, 30s, 30s+ (nearest standard length). ACD = average of raw Dur in seconds.",
+      "flighting": "A week (Monday start) is active when the advertiser has at least one spot. A flight is a run of consecutive active weeks. Pattern: continuous = active in 80%+ of the weeks in the period; burst = one flight, or several that fit no other label; pulsing = repeated short flights (3 weeks or less) with short gaps; seasonal = 60%+ of spend in 2 months and active in at most half the months.",
+      "frequency": "spotsPerActiveDay = spots / days with at least one spot. spotsPerProgrammeAiring = TV and Radio spots / distinct programme airings (channel, programme, date) the advertiser appeared in.",
+      "nulls": "null means the value could not be worked out from the data (missing or not applicable), it is never a zero.",
+      "rounding": "Money in whole LKR, percentages to 1 decimal place."
+    }
+  },
+  "context": {
+    "productGroup": "Biscuits",
+    "dateFrom": "2026-01-01",
+    "dateTo": "2026-04-30",
+    "mediums": [
+      "TV",
+      "Radio",
+      "Press"
+    ],
+    "currency": "LKR",
+    "myAdvertiser": "Me",
+    "competitors": [
+      "Rival A",
+      "Rival B"
+    ],
+    "filters": {
+      "productGroup": "Biscuits",
+      "dateFrom": "2026-01-01",
+      "dateTo": "2026-04-30",
+      "medium": "All",
+      "channel": null,
+      "timeOfDay": null,
+      "adType": "All",
+      "tagCountedAsCommercial": false
+    },
+    "valueAdditionRule": "value-addition themes or Cost = 0"
+  },
+  "categorySummary": {
+    "totalSpend": 1600000,
+    "totalSpots": 12,
+    "valueAdditionSpots": 2,
+    "spendByMedium": {
+      "TV": {
+        "spend": 1280000,
+        "spots": 10,
+        "spendPct": 80
+      },
+      "Radio": {
+        "spend": 20000,
+        "spots": 1,
+        "spendPct": 1.3
+      },
+      "Press": {
+        "spend": 300000,
+        "spots": 1,
+        "spendPct": 18.8
+      }
+    },
+    "monthlySpend": [
+      {
+        "month": "2026-01",
+        "spend": 780000,
+        "spots": 6
+      },
+      {
+        "month": "2026-02",
+        "spend": 120000,
+        "spots": 3
+      },
+      {
+        "month": "2026-03",
+        "spend": 700000,
+        "spots": 3
+      },
+      {
+        "month": "2026-04",
+        "spend": 0,
+        "spots": 0
+      }
+    ],
+    "topChannels": [
+      {
+        "channel": "TV - Sirasa TV",
+        "medium": "TV",
+        "spend": 800000,
+        "spots": 4,
+        "sharePct": 50
+      },
+      {
+        "channel": "TV - Derana TV",
+        "medium": "TV",
+        "spend": 380000,
+        "spots": 4,
+        "sharePct": 23.8
+      },
+      {
+        "channel": "Lankadeepa",
+        "medium": "Press",
+        "spend": 300000,
+        "spots": 1,
+        "sharePct": 18.8
+      },
+      {
+        "channel": "TV - Hiru TV",
+        "medium": "TV",
+        "spend": 100000,
+        "spots": 2,
+        "sharePct": 6.3
+      },
+      {
+        "channel": "FM Derana",
+        "medium": "Radio",
+        "spend": 20000,
+        "spots": 1,
+        "sharePct": 1.3
+      }
+    ],
+    "topPrograms": [
+      {
+        "channel": "TV - Sirasa TV",
+        "programme": "Prime News",
+        "spend": 800000,
+        "spots": 4,
+        "sharePct": 50
+      },
+      {
+        "channel": "TV - Derana TV",
+        "programme": "News 1st",
+        "spend": 380000,
+        "spots": 4,
+        "sharePct": 23.8
+      },
+      {
+        "channel": "TV - Hiru TV",
+        "programme": "Morning Show",
+        "spend": 100000,
+        "spots": 2,
+        "sharePct": 6.3
+      },
+      {
+        "channel": "FM Derana",
+        "programme": "Morning Show",
+        "spend": 20000,
+        "spots": 1,
+        "sharePct": 1.3
+      }
+    ]
+  },
+  "advertisers": [
+    {
+      "name": "Me",
+      "role": "mine",
+      "totals": {
+        "spend": 320000,
+        "spots": 4,
+        "avgCostPerSpot": 80000,
+        "shareOfSpendPct": 20,
+        "rank": 2,
+        "rankOf": 4,
+        "firstSpot": "2026-01-05",
+        "lastSpot": "2026-02-04"
+      },
+      "byMedium": {
+        "TV": {
+          "spend": 300000,
+          "spendPct": 93.8,
+          "spots": 3,
+          "spotsPct": 75
+        },
+        "Radio": {
+          "spend": 20000,
+          "spendPct": 6.3,
+          "spots": 1,
+          "spotsPct": 25
+        },
+        "Press": {
+          "spend": 0,
+          "spendPct": 0,
+          "spots": 0,
+          "spotsPct": 0
+        }
+      },
+      "byChannel": [
+        {
+          "channel": "TV - Derana TV",
+          "medium": "TV",
+          "spend": 300000,
+          "spots": 3,
+          "shareOfAdvertiserSpendPct": 93.8
+        },
+        {
+          "channel": "FM Derana",
+          "medium": "Radio",
+          "spend": 20000,
+          "spots": 1,
+          "shareOfAdvertiserSpendPct": 6.3
+        }
+      ],
+      "byProgram": [
+        {
+          "channel": "TV - Derana TV",
+          "programme": "News 1st",
+          "spots": 3,
+          "spend": 300000,
+          "avgCostPerSpot": 100000
+        },
+        {
+          "channel": "FM Derana",
+          "programme": "Morning Show",
+          "spots": 1,
+          "spend": 20000,
+          "avgCostPerSpot": 20000
+        }
+      ],
+      "daypart": {
+        "basis": "TV and Radio spots with an Advt_time",
+        "primePct": {
+          "spots": 75,
+          "spend": 93.8
+        },
+        "nonPrimePct": {
+          "spots": 25,
+          "spend": 6.3
+        },
+        "overnightPct": {
+          "spots": 0,
+          "spend": 0
+        },
+        "hourBands": [
+          {
+            "band": "06-09",
+            "spotsPct": 25,
+            "spendPct": 6.3
+          },
+          {
+            "band": "09-12",
+            "spotsPct": 0,
+            "spendPct": 0
+          },
+          {
+            "band": "12-15",
+            "spotsPct": 0,
+            "spendPct": 0
+          },
+          {
+            "band": "15-18",
+            "spotsPct": 0,
+            "spendPct": 0
+          },
+          {
+            "band": "18-21",
+            "spotsPct": 75,
+            "spendPct": 93.8
+          },
+          {
+            "band": "21-24",
+            "spotsPct": 0,
+            "spendPct": 0
+          }
+        ]
+      },
+      "dayOfWeek": {
+        "spotsPct": {
+          "Mon": 75,
+          "Tue": 0,
+          "Wed": 25,
+          "Thu": 0,
+          "Fri": 0,
+          "Sat": 0,
+          "Sun": 0
+        },
+        "weekdayPct": 100,
+        "weekendPct": 0
+      },
+      "flighting": {
+        "monthly": [
+          {
+            "month": "2026-01",
+            "spots": 3,
+            "spend": 300000
+          },
+          {
+            "month": "2026-02",
+            "spots": 1,
+            "spend": 20000
+          }
+        ],
+        "weekly": [
+          {
+            "weekStart": "2026-01-05",
+            "spots": 1,
+            "spend": 100000
+          },
+          {
+            "weekStart": "2026-01-12",
+            "spots": 1,
+            "spend": 100000
+          },
+          {
+            "weekStart": "2026-01-19",
+            "spots": 1,
+            "spend": 100000
+          },
+          {
+            "weekStart": "2026-02-02",
+            "spots": 1,
+            "spend": 20000
+          }
+        ],
+        "activeWeeks": 4,
+        "periodWeeks": 18,
+        "longestRunWeeks": 3,
+        "flightCount": 2,
+        "flights": [
+          {
+            "from": "2026-01-05",
+            "to": "2026-01-25",
+            "weeks": 3
+          },
+          {
+            "from": "2026-02-02",
+            "to": "2026-02-08",
+            "weeks": 1
+          }
+        ],
+        "pattern": "pulsing",
+        "peakMonth": {
+          "month": "2026-01",
+          "spend": 300000,
+          "spots": 3
+        },
+        "inactiveMonths": []
+      },
+      "campaigns": [
+        {
+          "campaign": "Launch",
+          "firstDate": "2026-01-05",
+          "lastDate": "2026-02-04",
+          "durationDays": 31,
+          "spots": 4,
+          "spend": 320000,
+          "mainChannels": [
+            "TV - Derana TV",
+            "FM Derana"
+          ],
+          "mainDurationSec": 30,
+          "language": "Sinhala"
+        }
+      ],
+      "duration": {
+        "spotsWithDuration": 4,
+        "spotCount": {
+          "5s": 0,
+          "10s": 0,
+          "15s": 1,
+          "20s": 0,
+          "30s": 3,
+          "30s+": 0
+        },
+        "spotPct": {
+          "5s": 0,
+          "10s": 0,
+          "15s": 25,
+          "20s": 0,
+          "30s": 75,
+          "30s+": 0
+        },
+        "acdSeconds": 26.3
+      },
+      "placement": {
+        "basis": "TV and Radio spots only (Press has no break data)",
+        "programmePosition": {
+          "firstThreePct": 75,
+          "lastThreePct": 25,
+          "middlePct": 0,
+          "spotsMeasured": 4
+        },
+        "breakPosition": {
+          "firstPct": 25,
+          "lastPct": 25,
+          "middlePct": 50,
+          "spotsMeasured": 4
+        },
+        "breakNumber": {
+          "break1Pct": 75,
+          "break2Pct": 25,
+          "break3PlusPct": 0
+        },
+        "avgBreakClutter": 4.8
+      },
+      "language": {
+        "Sinhala": 75,
+        "Tamil": 25
+      },
+      "frequency": {
+        "spotsPerActiveDay": 1,
+        "spotsPerProgrammeAiring": 1,
+        "activeDays": 4
+      },
+      "valueAddition": {
+        "spots": 2,
+        "spendAtRate": 50000,
+        "shareOfAiringsPct": 33.3,
+        "topChannels": [
+          {
+            "channel": "TV - Derana TV",
+            "spots": 2
+          }
+        ],
+        "topItems": [
+          {
+            "item": "Launch",
+            "spots": 1
+          },
+          {
+            "item": "-BB",
+            "spots": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "Rival A",
+      "role": "competitor",
+      "totals": {
+        "spend": 1100000,
+        "spots": 5,
+        "avgCostPerSpot": 220000,
+        "shareOfSpendPct": 68.8,
+        "rank": 1,
+        "rankOf": 4,
+        "firstSpot": "2026-01-05",
+        "lastSpot": "2026-03-11"
+      },
+      "byMedium": {
+        "TV": {
+          "spend": 800000,
+          "spendPct": 72.7,
+          "spots": 4,
+          "spotsPct": 80
+        },
+        "Radio": {
+          "spend": 0,
+          "spendPct": 0,
+          "spots": 0,
+          "spotsPct": 0
+        },
+        "Press": {
+          "spend": 300000,
+          "spendPct": 27.3,
+          "spots": 1,
+          "spotsPct": 20
+        }
+      },
+      "byChannel": [
+        {
+          "channel": "TV - Sirasa TV",
+          "medium": "TV",
+          "spend": 800000,
+          "spots": 4,
+          "shareOfAdvertiserSpendPct": 72.7
+        },
+        {
+          "channel": "Lankadeepa",
+          "medium": "Press",
+          "spend": 300000,
+          "spots": 1,
+          "shareOfAdvertiserSpendPct": 27.3
+        }
+      ],
+      "byProgram": [
+        {
+          "channel": "TV - Sirasa TV",
+          "programme": "Prime News",
+          "spots": 4,
+          "spend": 800000,
+          "avgCostPerSpot": 200000
+        }
+      ],
+      "daypart": {
+        "basis": "TV and Radio spots with an Advt_time",
+        "primePct": {
+          "spots": 100,
+          "spend": 100
+        },
+        "nonPrimePct": {
+          "spots": 0,
+          "spend": 0
+        },
+        "overnightPct": {
+          "spots": 0,
+          "spend": 0
+        },
+        "hourBands": [
+          {
+            "band": "06-09",
+            "spotsPct": 0,
+            "spendPct": 0
+          },
+          {
+            "band": "09-12",
+            "spotsPct": 0,
+            "spendPct": 0
+          },
+          {
+            "band": "12-15",
+            "spotsPct": 0,
+            "spendPct": 0
+          },
+          {
+            "band": "15-18",
+            "spotsPct": 0,
+            "spendPct": 0
+          },
+          {
+            "band": "18-21",
+            "spotsPct": 100,
+            "spendPct": 100
+          },
+          {
+            "band": "21-24",
+            "spotsPct": 0,
+            "spendPct": 0
+          }
+        ]
+      },
+      "dayOfWeek": {
+        "spotsPct": {
+          "Mon": 20,
+          "Tue": 40,
+          "Wed": 40,
+          "Thu": 0,
+          "Fri": 0,
+          "Sat": 0,
+          "Sun": 0
+        },
+        "weekdayPct": 100,
+        "weekendPct": 0
+      },
+      "flighting": {
+        "monthly": [
+          {
+            "month": "2026-01",
+            "spots": 2,
+            "spend": 400000
+          },
+          {
+            "month": "2026-03",
+            "spots": 3,
+            "spend": 700000
+          }
+        ],
+        "weekly": [
+          {
+            "weekStart": "2026-01-05",
+            "spots": 2,
+            "spend": 400000
+          },
+          {
+            "weekStart": "2026-03-09",
+            "spots": 3,
+            "spend": 700000
+          }
+        ],
+        "activeWeeks": 2,
+        "periodWeeks": 18,
+        "longestRunWeeks": 1,
+        "flightCount": 2,
+        "flights": [
+          {
+            "from": "2026-01-05",
+            "to": "2026-01-11",
+            "weeks": 1
+          },
+          {
+            "from": "2026-03-09",
+            "to": "2026-03-15",
+            "weeks": 1
+          }
+        ],
+        "pattern": "burst",
+        "peakMonth": {
+          "month": "2026-03",
+          "spend": 700000,
+          "spots": 3
+        },
+        "inactiveMonths": [
+          "2026-02"
+        ]
+      },
+      "campaigns": [
+        {
+          "campaign": "Big Sale",
+          "firstDate": "2026-01-05",
+          "lastDate": "2026-03-11",
+          "durationDays": 66,
+          "spots": 5,
+          "spend": 1100000,
+          "mainChannels": [
+            "TV - Sirasa TV",
+            "Lankadeepa"
+          ],
+          "mainDurationSec": 30,
+          "language": "Sinhala"
+        }
+      ],
+      "duration": {
+        "spotsWithDuration": 4,
+        "spotCount": {
+          "5s": 0,
+          "10s": 0,
+          "15s": 0,
+          "20s": 0,
+          "30s": 4,
+          "30s+": 0
+        },
+        "spotPct": {
+          "5s": 0,
+          "10s": 0,
+          "15s": 0,
+          "20s": 0,
+          "30s": 100,
+          "30s+": 0
+        },
+        "acdSeconds": 30
+      },
+      "placement": {
+        "basis": "TV and Radio spots only (Press has no break data)",
+        "programmePosition": {
+          "firstThreePct": 100,
+          "lastThreePct": 0,
+          "middlePct": 0,
+          "spotsMeasured": 4
+        },
+        "breakPosition": {
+          "firstPct": 50,
+          "lastPct": 25,
+          "middlePct": 25,
+          "spotsMeasured": 4
+        },
+        "breakNumber": {
+          "break1Pct": 100,
+          "break2Pct": 0,
+          "break3PlusPct": 0
+        },
+        "avgBreakClutter": 4
+      },
+      "language": {
+        "Sinhala": 100
+      },
+      "frequency": {
+        "spotsPerActiveDay": 1.3,
+        "spotsPerProgrammeAiring": 1,
+        "activeDays": 4
+      },
+      "valueAddition": {
+        "spots": 0,
+        "spendAtRate": 0,
+        "shareOfAiringsPct": 0,
+        "topChannels": [],
+        "topItems": []
+      }
+    },
+    {
+      "name": "Rival B",
+      "role": "competitor",
+      "totals": {
+        "spend": 100000,
+        "spots": 2,
+        "avgCostPerSpot": 50000,
+        "shareOfSpendPct": 6.3,
+        "rank": 3,
+        "rankOf": 4,
+        "firstSpot": "2026-02-02",
+        "lastSpot": "2026-02-09"
+      },
+      "byMedium": {
+        "TV": {
+          "spend": 100000,
+          "spendPct": 100,
+          "spots": 2,
+          "spotsPct": 100
+        },
+        "Radio": {
+          "spend": 0,
+          "spendPct": 0,
+          "spots": 0,
+          "spotsPct": 0
+        },
+        "Press": {
+          "spend": 0,
+          "spendPct": 0,
+          "spots": 0,
+          "spotsPct": 0
+        }
+      },
+      "byChannel": [
+        {
+          "channel": "TV - Hiru TV",
+          "medium": "TV",
+          "spend": 100000,
+          "spots": 2,
+          "shareOfAdvertiserSpendPct": 100
+        }
+      ],
+      "byProgram": [
+        {
+          "channel": "TV - Hiru TV",
+          "programme": "Morning Show",
+          "spots": 2,
+          "spend": 100000,
+          "avgCostPerSpot": 50000
+        }
+      ],
+      "daypart": {
+        "basis": "TV and Radio spots with an Advt_time",
+        "primePct": {
+          "spots": 0,
+          "spend": 0
+        },
+        "nonPrimePct": {
+          "spots": 100,
+          "spend": 100
+        },
+        "overnightPct": {
+          "spots": 0,
+          "spend": 0
+        },
+        "hourBands": [
+          {
+            "band": "06-09",
+            "spotsPct": 0,
+            "spendPct": 0
+          },
+          {
+            "band": "09-12",
+            "spotsPct": 100,
+            "spendPct": 100
+          },
+          {
+            "band": "12-15",
+            "spotsPct": 0,
+            "spendPct": 0
+          },
+          {
+            "band": "15-18",
+            "spotsPct": 0,
+            "spendPct": 0
+          },
+          {
+            "band": "18-21",
+            "spotsPct": 0,
+            "spendPct": 0
+          },
+          {
+            "band": "21-24",
+            "spotsPct": 0,
+            "spendPct": 0
+          }
+        ]
+      },
+      "dayOfWeek": {
+        "spotsPct": {
+          "Mon": 100,
+          "Tue": 0,
+          "Wed": 0,
+          "Thu": 0,
+          "Fri": 0,
+          "Sat": 0,
+          "Sun": 0
+        },
+        "weekdayPct": 100,
+        "weekendPct": 0
+      },
+      "flighting": {
+        "monthly": [
+          {
+            "month": "2026-02",
+            "spots": 2,
+            "spend": 100000
+          }
+        ],
+        "weekly": [
+          {
+            "weekStart": "2026-02-02",
+            "spots": 1,
+            "spend": 50000
+          },
+          {
+            "weekStart": "2026-02-09",
+            "spots": 1,
+            "spend": 50000
+          }
+        ],
+        "activeWeeks": 2,
+        "periodWeeks": 18,
+        "longestRunWeeks": 2,
+        "flightCount": 1,
+        "flights": [
+          {
+            "from": "2026-02-02",
+            "to": "2026-02-15",
+            "weeks": 2
+          }
+        ],
+        "pattern": "burst",
+        "peakMonth": {
+          "month": "2026-02",
+          "spend": 100000,
+          "spots": 2
+        },
+        "inactiveMonths": []
+      },
+      "campaigns": [
+        {
+          "campaign": "Everyday",
+          "firstDate": "2026-02-02",
+          "lastDate": "2026-02-09",
+          "durationDays": 8,
+          "spots": 2,
+          "spend": 100000,
+          "mainChannels": [
+            "TV - Hiru TV"
+          ],
+          "mainDurationSec": 20,
+          "language": "Sinhala"
+        }
+      ],
+      "duration": {
+        "spotsWithDuration": 2,
+        "spotCount": {
+          "5s": 0,
+          "10s": 0,
+          "15s": 0,
+          "20s": 2,
+          "30s": 0,
+          "30s+": 0
+        },
+        "spotPct": {
+          "5s": 0,
+          "10s": 0,
+          "15s": 0,
+          "20s": 100,
+          "30s": 0,
+          "30s+": 0
+        },
+        "acdSeconds": 20
+      },
+      "placement": {
+        "basis": "TV and Radio spots only (Press has no break data)",
+        "programmePosition": {
+          "firstThreePct": 0,
+          "lastThreePct": 100,
+          "middlePct": 0,
+          "spotsMeasured": 2
+        },
+        "breakPosition": {
+          "firstPct": 50,
+          "lastPct": 0,
+          "middlePct": 50,
+          "spotsMeasured": 2
+        },
+        "breakNumber": {
+          "break1Pct": 50,
+          "break2Pct": 50,
+          "break3PlusPct": 0
+        },
+        "avgBreakClutter": 3
+      },
+      "language": {
+        "Sinhala": 100
+      },
+      "frequency": {
+        "spotsPerActiveDay": 1,
+        "spotsPerProgrammeAiring": 1,
+        "activeDays": 2
+      },
+      "valueAddition": {
+        "spots": 0,
+        "spendAtRate": 0,
+        "shareOfAiringsPct": 0,
+        "topChannels": [],
+        "topItems": []
+      }
+    }
+  ],
+  "comparison": {
+    "shareOfSpend": [
+      {
+        "advertiser": "Rival A",
+        "role": "competitor",
+        "spend": 1100000,
+        "sharePct": 68.8,
+        "rank": 1
+      },
+      {
+        "advertiser": "Me",
+        "role": "mine",
+        "spend": 320000,
+        "sharePct": 20,
+        "rank": 2
+      },
+      {
+        "advertiser": "Rival B",
+        "role": "competitor",
+        "spend": 100000,
+        "sharePct": 6.3,
+        "rank": 3
+      },
+      {
+        "advertiser": "All other advertisers",
+        "role": "other",
+        "spend": 80000,
+        "sharePct": 5,
+        "rank": null
+      }
+    ],
+    "gapsAndOpportunities": [
+      {
+        "type": "channel",
+        "gap": "absent",
+        "name": "TV - Sirasa TV",
+        "medium": "TV",
+        "mySpots": 0,
+        "mySpend": 0,
+        "myShareOfMySpendPct": 0,
+        "competitors": [
+          {
+            "advertiser": "Rival A",
+            "spend": 800000,
+            "spots": 4,
+            "shareOfTheirSpendPct": 72.7
+          }
+        ],
+        "text": "We have 20% share of spend but 0 spots on TV - Sirasa TV where Rival A has 72.7% of its spend (LKR 800,000)."
+      },
+      {
+        "type": "channel",
+        "gap": "absent",
+        "name": "Lankadeepa",
+        "medium": "Press",
+        "mySpots": 0,
+        "mySpend": 0,
+        "myShareOfMySpendPct": 0,
+        "competitors": [
+          {
+            "advertiser": "Rival A",
+            "spend": 300000,
+            "spots": 1,
+            "shareOfTheirSpendPct": 27.3
+          }
+        ],
+        "text": "We have 20% share of spend but 0 spots on Lankadeepa where Rival A has 27.3% of its spend (LKR 300,000)."
+      },
+      {
+        "type": "channel",
+        "gap": "absent",
+        "name": "TV - Hiru TV",
+        "medium": "TV",
+        "mySpots": 0,
+        "mySpend": 0,
+        "myShareOfMySpendPct": 0,
+        "competitors": [
+          {
+            "advertiser": "Rival B",
+            "spend": 100000,
+            "spots": 2,
+            "shareOfTheirSpendPct": 100
+          }
+        ],
+        "text": "We have 20% share of spend but 0 spots on TV - Hiru TV where Rival B has 100% of its spend (LKR 100,000)."
+      },
+      {
+        "type": "programme",
+        "gap": "absent",
+        "name": "Prime News",
+        "channel": "TV - Sirasa TV",
+        "mySpots": 0,
+        "mySpend": 0,
+        "competitors": [
+          {
+            "advertiser": "Rival A",
+            "spend": 800000,
+            "spots": 4,
+            "shareOfTheirSpendPct": 72.7
+          }
+        ],
+        "text": "We have 0 spots on Prime News (TV - Sirasa TV) where Rival A has 4 spots worth LKR 800,000."
+      },
+      {
+        "type": "programme",
+        "gap": "absent",
+        "name": "Morning Show",
+        "channel": "TV - Hiru TV",
+        "mySpots": 0,
+        "mySpend": 0,
+        "competitors": [
+          {
+            "advertiser": "Rival B",
+            "spend": 100000,
+            "spots": 2,
+            "shareOfTheirSpendPct": 100
+          }
+        ],
+        "text": "We have 0 spots on Morning Show (TV - Hiru TV) where Rival B has 2 spots worth LKR 100,000."
+      },
+      {
+        "type": "daypart",
+        "gap": "underweight",
+        "name": "Non-Prime",
+        "myPctOfSpots": 25,
+        "competitorAvgPctOfSpots": 50,
+        "differencePts": 25,
+        "text": "Non-Prime carries 25% of our spots but 50% of the average competitor's spots (25 points more)."
+      },
+      {
+        "type": "daypart",
+        "gap": "underweight",
+        "name": "Hour band 09-12",
+        "myPctOfSpots": 0,
+        "competitorAvgPctOfSpots": 50,
+        "differencePts": 50,
+        "text": "Hour band 09-12 carries 0% of our spots but 50% of the average competitor's spots (50 points more)."
+      },
+      {
+        "type": "month",
+        "gap": "absent",
+        "name": "2026-03",
+        "mySpots": 0,
+        "mySpend": 0,
+        "competitors": [
+          {
+            "advertiser": "Rival A",
+            "spend": 700000,
+            "spots": 3
+          }
+        ],
+        "text": "We have no spots in Mar 2026 while Rival A spends LKR 700,000 (3 spots)."
+      }
+    ]
+  },
+  "facts": [
+    "Rival A has 68.8% share of spend (rank 1 of 4): LKR 1,100,000 over 5 spots, LKR 220,000 per spot.",
+    "Rival A spends 72.7% of its budget on TV - Sirasa TV, mostly in Prime Time (100% of its timed spots).",
+    "We have 20% share of spend but 0 spots on TV - Sirasa TV where Rival A has 72.7% of its spend (LKR 800,000).",
+    "We have 20% share of spend but 0 spots on Lankadeepa where Rival A has 27.3% of its spend (LKR 300,000).",
+    "We have 20% share of spend but 0 spots on TV - Hiru TV where Rival B has 100% of its spend (LKR 100,000).",
+    "We have 0 spots on Prime News (TV - Sirasa TV) where Rival A has 4 spots worth LKR 800,000.",
+    "We have 0 spots on Morning Show (TV - Hiru TV) where Rival B has 2 spots worth LKR 100,000.",
+    "We have 20% share of spend (rank 2 of 4): LKR 320,000 over 4 spots, LKR 80,000 per spot.",
+    "Rival A runs in bursts: 2 flights of 1 week each, peak in Mar 2026, no activity in Feb 2026.",
+    "Rival B has 6.3% share of spend (rank 3 of 4): LKR 100,000 over 2 spots, LKR 50,000 per spot.",
+    "Rival A takes the first position in the break in 50% of spots (last position: 25%), and 100% of its 30s spots are in programme Prime News.",
+    "We spend 93.8% of our budget on TV - Derana TV, mostly in Prime Time (75% of our timed spots).",
+    "Rival B spends 100% of its budget on TV - Hiru TV, mostly in Non-Prime time (100% of its timed spots).",
+    "Non-Prime carries 25% of our spots but 50% of the average competitor's spots (25 points more).",
+    "Hour band 09-12 carries 0% of our spots but 50% of the average competitor's spots (50 points more).",
+    "We have no spots in Mar 2026 while Rival A spends LKR 700,000 (3 spots).",
+    "Rival A uses 30s spots most (100% of TV and Radio spots), average duration 30s.",
+    "We run in pulses: 2 flights of 1 to 3 weeks each, peak in Jan 2026.",
+    "Rival A: 100% of its TV and Radio ads sit in the first 3 positions of the programme and 0% in the last 3.",
+    "We take the first position in the break in 25% of spots (last position: 25%), and 100% of our 30s spots are in programme News 1st.",
+    "Rival A: 100% of its timed spots air between 18:00 and 21:00.",
+    "Rival B runs in bursts: 1 flight of 2 weeks, peak in Feb 2026.",
+    "Rival B takes the first position in the break in 50% of spots (last position: 0%).",
+    "Rival A airs into breaks with an average of 4 ads, 100% of spots in the first break.",
+    "Rival A puts 0% of spots on weekends (100% on weekdays).",
+    "Rival A airs 1.3 spots on an average active day and 1 per programme airing.",
+    "We use 30s spots most (75% of TV and Radio spots), average duration 26.3s.",
+    "Rival A: 100% of its spots are in Sinhala.",
+    "We: 75% of our TV and Radio ads sit in the first 3 positions of the programme and 25% in the last 3.",
+    "Rival B uses 20s spots most (100% of TV and Radio spots), average duration 20s.",
+    "We: 75% of our timed spots air between 18:00 and 21:00.",
+    "Rival B: 0% of its TV and Radio ads sit in the first 3 positions of the programme and 100% in the last 3.",
+    "We air into breaks with an average of 4.8 ads, 75% of spots in the first break.",
+    "Rival B: 100% of its timed spots air between 09:00 and 12:00.",
+    "We put 0% of spots on weekends (100% on weekdays).",
+    "We air 1 spots on an average active day and 1 per programme airing.",
+    "Rival B airs into breaks with an average of 3 ads, 50% of spots in the first break.",
+    "We: 75% of our spots are in Sinhala.",
+    "Rival B puts 0% of spots on weekends (100% on weekdays).",
+    "We: 33.3% of our airings are value additions (2 items), kept out of the spot and spend totals."
+  ],
+  "meta": {
+    "rowsMatched": 14,
+    "warnings": [],
+    "payloadBytes": 19115,
+    "trimmed": []
+  }
+}

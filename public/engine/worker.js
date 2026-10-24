@@ -7,7 +7,7 @@
 importScripts('/vendor/jszip/jszip.min.js');
 
 // ---- a tiny CommonJS loader for the shared modules ----
-const LIB = ['derive', 'brand-derive', 'cube', 'builder', 'compute', 'planning', 'competitor', 'periods', 'category-builder', 'category', 'category-brand', 'browser-readers'];
+const LIB = ['derive', 'brand-derive', 'cube', 'builder', 'compute', 'planning', 'competitor', 'periods', 'category-builder', 'category', 'category-brand', 'browser-readers', 'plannerBrief'];
 const SRC = {}, CACHE = {};
 function requireLib(name) {
   if (name === 'jszip') return self.JSZip;
@@ -211,6 +211,9 @@ const handlers = {
   },
   detail({ filters, scope }) { return requireLib('compute').detail(need(), filters || {}, scope || {}); },
   planning({ filters, user }) { return requireLib('planning').planning(need(), filters || {}, { user: user || '' }); },
+  // Competitor Brief for the TV Media Planning Tool (public/plannerBrief.js). Aggregates and facts only, no raw rows.
+  plannerCandidates({ filters }) { return requireLib('plannerBrief').rankAdvertisers(need(), filters || {}); },
+  plannerBrief({ filters, options }) { return requireLib('plannerBrief').buildBrief(need(), filters || {}, options || {}); },
   competitor({ filters, user }) { return requireLib('competitor').competitorIntel(need(), filters || {}, { user: user || '' }); },
 };
 const monKey = m => `${Math.floor(m / 12)}-${String((m % 12) + 1).padStart(2, '0')}`;

@@ -28,11 +28,11 @@ class Dict {
 class Builder {
   constructor() {
     this.pg = new Dict(); this.adv = new Dict(); this.channel = new Dict(); this.theme = new Dict();
-    this.program = new Dict(); this.adPos = new Dict(); this.product = new Dict();
+    this.program = new Dict(); this.adPos = new Dict(); this.product = new Dict(); this.lng = new Dict();
     // prog/adPos: programme and which break of it (Start / Mid / End); brk: break number; pos/ads: slot in the
     // break and ads in that break (0 = not given); hour: hour the ad aired (255 = no time, e.g. Press).
     this.cols = { pg: [], adv: [], ch: [], theme: [], day: [], mon: [], dp: [], dur: [], durRaw: [], bq: [], cost: [],
-      prog: [], adPos: [], brk: [], pos: [], ads: [], hour: [], product: [] };
+      prog: [], adPos: [], brk: [], pos: [], ads: [], hour: [], product: [], lng: [], adPosN: [], totAds: [] };
     this.hasProduct = false;
     this.header = null; // array index -> key
     this.rows = 0; this.skipped = 0; this.scanned = 0;
@@ -87,6 +87,10 @@ class Builder {
     c.prog.push(this.program.id(r.program));
     c.adPos.push(this.adPos.id(r.adPos));
     const small = v => { const n = D.parseNumber(v); return Number.isFinite(n) && n > 0 ? Math.min(255, Math.round(n)) : 0; };
+    // Numeric AdPos (1 = first ad of the programme) and TotAds (ads in the programme), 0 when not a number; Lng (language).
+    const big = v => { const n = D.parseNumber(v); return Number.isFinite(n) && n > 0 ? Math.min(65535, Math.round(n)) : 0; };
+    c.adPosN.push(big(r.adPos)); c.totAds.push(big(r.totAds));
+    c.lng.push(r.lng == null || String(r.lng).trim() === '' ? -1 : this.lng.id(r.lng));
     c.brk.push(small(r.brkNo)); c.pos.push(small(r.posInBrk)); c.ads.push(small(r.adsInBrk));
     const dur = D.parseNumber(r.dur);
     c.dur.push(D.stdDurIndex(dur));
@@ -107,6 +111,7 @@ class Builder {
       cost: Float64Array.from(c.cost),
       product: Int32Array.from(c.product),
       prog: Int32Array.from(c.prog), adPos: Int32Array.from(c.adPos),
+      lng: Int32Array.from(c.lng), adPosN: Uint16Array.from(c.adPosN), totAds: Uint16Array.from(c.totAds),
       brk: Uint8Array.from(c.brk), pos: Uint8Array.from(c.pos), ads: Uint8Array.from(c.ads), hour: Uint8Array.from(c.hour),
     };
     this.cols = null;
@@ -121,7 +126,7 @@ class Builder {
       meta: { ...meta, rows: this.rows, skipped: this.skipped, minDay, maxDay, hasProduct: this.hasProduct },
       dicts: {
         pg: this.pg.list, adv: this.adv.list, channel: channels, theme: this.theme.list,
-        program: this.program.list, adPos: this.adPos.list, product: this.product.list,
+        program: this.program.list, adPos: this.adPos.list, product: this.product.list, lng: this.lng.list,
         channelMedium: channels.map(D.mediumOf), channelName: channels.map(D.channelNameOf),
       },
       cols,

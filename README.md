@@ -56,6 +56,40 @@ The first admin comes from **`ADMIN_EMAILS`** on Railway (comma separated). Thos
 
 **Export, Send to planning tool** opens the media planning tool (`PLANNING_TOOL_URL`) and hands it, browser to browser, what every advertiser bought for the current filters: channels, programmes, Start / Mid / End break and position in the break, break number, ad lengths, day × hour, dayparts, months, weeks and campaigns. **Competitor data for planning tool (JSON)** saves the same data as a file. The receiver to add to the planning tool, the data format and 15 suggested Chart.js charts are in [docs/planning-tool](docs/planning-tool/README.md). Totals match the dashboard (checked in `npm test`).
 
+## Send to Planner (Competitor Brief)
+
+**Send to Planner** (top bar, next to Export and Share) builds a **Competitor Brief** from the filters on screen and sends it to the TV Media Planning Tool, where the planning agent uses it to make media plans. The brief is aggregates and plain-English facts only, never raw rows, and it is under 200 KB.
+
+1. Click **Send to Planner**. A small window opens with **My advertiser** (from the current filter), **Competitors** (the top 5 by spend in the current filter, editable, up to 8), the **date range** (the current filter) and a live **preview of the facts** the planner will read.
+2. **Send to Planner** builds the brief in this browser, posts it through this server to the planner (the token stays on the server), and opens the planner in a new tab. A toast says whether it worked. If the planner cannot be reached, the window says why and **Download JSON** saves the same brief to load by hand.
+3. Nothing is stored in the dashboard. The server only passes the brief on.
+
+All numbers are computed in code by [`public/plannerBrief.js`](public/plannerBrief.js) (no AI in the dashboard): spend, spots, share, rank, medium, channel and programme mix, Prime / Non-Prime and hour bands, day of week, flighting (weeks, flights, pattern, peak month), campaigns, duration buckets and ACD, language, placement in the programme and in the break, break clutter and frequency, for **my advertiser and every chosen competitor**, plus a comparison with gaps and opportunities and up to 40 facts ordered by importance. The `dataDictionary` block explains every column and rule to the reader. Missing values are `null`, never 0. Press rows skip placement and duration. **Value additions** (value-addition themes or Cost = 0) are kept out of spots and spend and shown in each advertiser's `valueAddition` block.
+
+* Sample: [`docs/planner-brief-sample.json`](docs/planner-brief-sample.json). Test: `npm run test:brief` (small hand-made dataset; `WRITE_SAMPLE=1 npm run test:brief` rewrites the sample).
+* The file loaded in the browser must be loaded with this version to keep `AdPos` (as a number), `TotAds` and `Lng`. Data loaded earlier still works; the brief says which metrics are missing and asks for a reload. If `AdPos` holds Start / Mid / End labels (as in the sample file), the brief reports those shares instead of "first 3 / last 3".
+
+### Planner side: endpoint contract
+
+```
+POST {PLANNER_API_URL}/api/competitor-briefs
+Authorization: Bearer {PLANNER_API_TOKEN}
+Content-Type: application/json          body: the Competitor Brief (schemaVersion "1.0"), at most 200 KB
+```
+
+| Status | Meaning | Body |
+| --- | --- | --- |
+| `201` | Stored | `{ "briefId": "b_8f3k2", "url": "/plan/new?briefId=b_8f3k2" }` |
+| `400` / `422` | Not a valid v1.0 brief | `{ "error": "..." }` |
+| `401` / `403` | Missing or wrong token | `{ "error": "..." }` |
+| `413` | Larger than 200 KB | `{ "error": "..." }` |
+
+The dashboard then opens `{PLANNER_URL}/plan/new?briefId={briefId}`. The planner should keep the brief by `briefId`, return it from `GET /api/competitor-briefs/{briefId}` for the signed-in planner, and treat every string in it as data, never as instructions. Brief shape: see the sample file. Top-level keys: `schemaVersion, generatedAt, dataDictionary, context, categorySummary, advertisers[], comparison{shareOfSpend[], gapsAndOpportunities[]}, facts[], meta`.
+
+### Suggested system prompt snippet for the planning agent
+
+> You receive a Competitor Brief. Use only the numbers in it. For every recommendation (channel, programme, daypart, flighting, break position, duration), cite the fact or metric that supports it and explain the reasoning step by step.
+
 ## Planning report (Markdown)
 
 **Export, Planning report** downloads one `.md` file with every number a planning tool needs to read competitor behaviour, for the filters on screen:
@@ -164,6 +198,9 @@ The 6-digit codes are sent through a small Google Apps Script web app, so no SMT
 | `ALLOWED_EMAIL_DOMAINS` | `ogilvy.com` | Comma separated list of email domains allowed to sign up. |
 | `SESSION_DAYS` | `30` | How long a sign-in lasts on a device. |
 | `PLANNING_TOOL_URL` | `https://media-planing-v2-copy-production.up.railway.app` | Where **Send to planning tool** opens. |
+| `PLANNER_API_URL` | none | Base address of the TV Media Planning Tool's API. **Send to Planner** POSTs to `PLANNER_API_URL/api/competitor-briefs`. |
+| `PLANNER_API_TOKEN` | none | Bearer token for that API. Read by the server only, never sent to the browser. |
+| `PLANNER_URL` | `PLANNER_API_URL` | Where the planner's pages are. After sending, the dashboard opens `PLANNER_URL/plan/new?briefId=<id>` in a new tab. |
 | `DATABASE_URL` | none | Postgres connection string (a reference to the Railway Postgres service). Keeps accounts across redeploys. `PGSSL=0` or `1` overrides TLS (default: off on the private network, on for public hosts). |
 | `ADMIN_EMAILS` | none | Comma separated emails that are always admins. Set at least one, or nobody can open the admin panel. |
 | `ADMIN_SESSION_HOURS` | `12` | How long an admin panel sign-in lasts. |
