@@ -126,6 +126,12 @@ function durSecondsOf(raw, sponsor) {
   return sponsor ? DURATIONS[0] : NaN;
 }
 
+// Prime time is 18:00 to 23:00 and non prime time 07:00 to 18:00, by the hour the ad aired. Ads aired from 23:00 to 07:00,
+// and Press (no time), belong to neither and are only in All.
+const slotId = v => (v === 'PT' ? 1 : v === 'NPT' ? 2 : 0);
+const slotOf = hour => (hour >= 18 && hour < 23 ? 1 : hour >= 7 && hour < 18 ? 2 : 0);
+const slotOk = (slot, hour) => (slot === 1 ? hour >= 18 && hour < 23 : slot === 2 ? hour >= 7 && hour < 18 : true);
+
 function parseNumber(v) {
   if (v == null || v === '') return NaN;
   if (typeof v === 'number') return v;
@@ -136,5 +142,5 @@ function parseNumber(v) {
 module.exports = {
   MEDIA, DAYPARTS, DAYPART_TIMES, DURATIONS, DUR_BUCKETS, BREAK_QUALITY, MONTHS,
   mediumOf, channelNameOf, daypartOf, stdDurIndex, breakQualityOf,
-  dayNumber, parseTime, parseNumber, isExcludedTheme, EXCLUDED_THEMES, durBucketOf, durSecondsOf,
+  dayNumber, parseTime, parseNumber, slotId, slotOf, slotOk, isExcludedTheme, EXCLUDED_THEMES, durBucketOf, durSecondsOf,
 };

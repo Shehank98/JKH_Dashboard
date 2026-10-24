@@ -7,23 +7,33 @@
   const C = {
     orange: '#FF8A3D', deep: '#E4702A', oTints: ['#FF8A3D', '#FFA766', '#FFC599', '#FFDCC0'],
     blues: ['#2F5DBF', '#5B8DEF', '#8FB2F5', '#BFD3F6'],
-    medium: ['#2F5DBF', '#5B8DEF', '#A8C2F2'],
+    medium: ['#2F5DBF', '#FF8A3D', '#1FA97A'],       // TV blue, Radio orange, Press green: three clearly different hues
     compLines: ['#5B8DEF', '#9AA6C4', '#C7CEDF', '#2F5DBF', '#8FB2F5', '#B4BCD0', '#1E3F8A', '#A8C2F2', '#BFD3F6'],
     // Light to dark as the ads get longer: 5s, 15s, 20s, 30s, 30s+
     durMine: ['#FFD2AE', '#FFAA6E', '#FF8A3D', '#D9661F', '#9E4510'], durComp: ['#BFD3F6', '#7FA5EE', '#4474D6', '#1E3F8A', '#0D2257'],
   };
 
+  // A client opens /share/<token>: a read-only dashboard over a data cube, with no upload, Brand Map or planning tools.
+  const SHARE = (location.pathname.match(/^\/share\/([A-Za-z0-9_-]+)/) || [])[1] || null;
+  let sharePayload = null;
+  if (SHARE) document.body.classList.add('share-mode', 'share-nocat');
+  const isCube = () => !!(overview && overview.meta && overview.meta.cube);
+  // A shared cube made at the Full level keeps campaign names, so campaigns, Value additions and the Tag tick box all work.
+  const noCampaigns = () => isCube() && !overview.meta.campaigns;
+
   // ---------- state ----------
   let overview = null;      // product groups, date bounds
   let options = { advertisers: [], channels: [] };
   let data = null;          // last dashboard response
-  const state = { from: '', to: '', pg: '', mine: [], comps: [], medium: 'All', channel: '', daypart: '', adType: 'All', tagCommercial: false };
+  const state = { from: '', to: '', pg: '', mine: [], comps: [], medium: 'All', channel: '', slot: '', adType: 'All', tagCommercial: false, yearType: 'CY', mb: '', sub: '' };
   let pendingFile = null;
   const hiddenSeries = new Set();                // trend lines switched off from the legend
   const mixView = { mx: 'bars' };                // channel mix: Top 5 bars or heatmap
   const heatSide = { mx: 'cat' };                // heatmap: category or mine
   let mixMedium = 'TV';                          // channel mix: TV, Radio or Press
-  let durMedium = 'All';
+  let durMedium = 'TV';
+  const trendUi = { flip: 'lines', part: 'yoy', side: 'cat', hideInc: false }; // trend card: lines or stacked bars
+  let sosFlip = 'table';                         // SOS By year / By month: table or chart
   let sosView = 'period';                        // SOS table: whole period or by month                         // duration mix: All (TV + Radio), TV or Radio
 
   // ---------- helpers ----------
@@ -37,7 +47,7 @@
   // The data engine runs in this browser (engine/worker.js): the file the person chooses is read, analysed
   // and saved here, under their account, and is never sent to the server.
   const engine = (() => {
-    const w = new Worker('engine/worker.js?v=1');
+    const w = new Worker('/engine/worker.js?v=1');
     let seq = 0;
     const pending = new Map();
     w.onmessage = e => {
@@ -60,6 +70,7 @@
   window.__lastDetail = null;
   window.__engineCall = (cmd, args) => engine.call(cmd, args);
   let me = null; // signed-in person, owner of the data saved in this browser
+  window.ORBIT = { engine, ready: false, esc, nf: (v, d = 0) => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }), toast: m => toast(m) };
 
   const nf = (v, d = 0) => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
   function money(v, withLkr = true) {
@@ -124,8 +135,13 @@
   $('ovBtn').addEventListener('click', () => { if (!overview) showPane('paneData'); });
 
   // ---------- persistence of the viewer's last filters ----------
-  function saveState() { try { localStorage.setItem('cas-filters', JSON.stringify(state)); } catch (e) { /* storage unavailable */ } }
+  const store = SHARE ? sessionStorage : localStorage, storeKey = SHARE ? 'share-filters-' + SHARE : 'cas-filters';
+  function saveState() { try { store.setItem(storeKey, JSON.stringify(state)); } catch (e) { /* storage unavailable */ } }
   function readSaved() {
+    if (SHARE) {
+      try { const mine = JSON.parse(sessionStorage.getItem(storeKey) || 'null'); if (mine) return mine; } catch (e) { /* none yet */ }
+      return sharePayload && sharePayload.state ? sharePayload.state : null;
+    }
     try {
       if (location.hash.length > 1) return JSON.parse(decodeURIComponent(location.hash.slice(1)));
     } catch (e) { /* bad share link */ }
@@ -174,16 +190,34 @@
     setUploadStatus(`Reading ${file.name} on this computer…`);
     busyChip('Reading file · 0%');
     try {
-      const r = await engine.call('ingest', { file }, p => {
+      const onProg = p => {
         const pct = Math.round(p.pct * 100);
         setProgress(pct);
         setUploadStatus(p.saving ? `Saving ${nf(p.rows)} rows in this browser…` : `Reading ${file.name}: ${pct}% · ${nf(p.rows)} rows`);
         busyChip(`Reading file · ${pct}%`);
-      });
+      };
+      let r = await engine.call('ingest', { file }, onProg);
+      if (r.needsMap) {
+        // Every brand must have a mother brand in the shared Brand Map before the file is loaded.
+        setProgress(-1);
+        setUploadStatus('Checking brands against the shared Brand Map…');
+        busyChip('Checking brands');
+        let map;
+        try { map = await window.BRANDMAP.confirm(r.pairs, file.name); } catch (e) { await engine.call('cancelIngest'); throw new Error('Could not check brands with the shared Brand Map: ' + e.message); }
+        if (!map) {
+          await engine.call('cancelIngest');
+          setUploadStatus('Cancelled. Nothing was loaded, your current data is unchanged.');
+          $('uploadBtn').disabled = false;
+          return;
+        }
+        r = await engine.call('commitIngest', { map: map.rows, version: map.version }, onProg);
+        if (r.category) document.dispatchEvent(new CustomEvent('orbit:catrefresh', { detail: { dataset: r.category.dataset, fresh: true } }));
+      }
       pendingFile = null; $('fileInput').value = '';
       $('dropText').textContent = 'Drop .xlsx or .csv here, or click to choose';
       renderDataFile(r.dataset);
       setUploadStatus(`Loaded ${nf(r.dataset.rows)} rows in ${nf(r.dataset.parseMs / 1000, 1)}s.` +
+        (r.needsMap === false ? ' This file has no Product column, so the Category dashboard was not updated.' : '') +
         (r.saved ? '' : ' It could not be saved in this browser, so it will be gone after you close the tab.'), !r.saved);
       await loadOverview(true);
     } catch (e) {
@@ -218,24 +252,26 @@
     overview = await engine.call('overview');
     const saved = fresh ? null : readSaved();
     $('fPg').innerHTML = overview.productGroups.map(g => `<option>${esc(g.name)}</option>`).join('');
-    $('fDaypart').innerHTML = '<option value="">All dayparts</option>' +
-      overview.dayparts.map(d => `<option value="${esc(d.name)}">${esc(dpLabel(d.name))}</option>`).join('');
     const { minDate, maxDate } = overview;
     $('fFrom').min = $('fTo').min = minDate; $('fFrom').max = $('fTo').max = maxDate;
 
     const groups = overview.productGroups.map(g => g.name);
     if (saved && groups.includes(saved.pg)) {
-      Object.assign(state, { adType: 'All', tagCommercial: false }, saved);
+      Object.assign(state, { adType: 'All', tagCommercial: false, mb: '', sub: '' }, saved);
     } else {
-      Object.assign(state, defaultDates(), { pg: groups[0], mine: [], comps: [], medium: 'All', channel: '', daypart: '', adType: 'All', tagCommercial: false });
+      Object.assign(state, defaultDates(), { pg: groups[0], mine: [], comps: [], medium: 'All', channel: '', slot: '', adType: 'All', tagCommercial: false, mb: '', sub: '' });
     }
+    // Without campaign names the cube cannot re-sort Tag, so it keeps the choice the agency made.
+    delete state.daypart; // older saved filters used a daypart; it is now prime time / non prime time
+    if (SHARE && noCampaigns()) state.tagCommercial = !!overview.meta.tagCommercial;
+    applyCubeUi();
     await loadOptions(!(saved && saved.pg === state.pg && saved.mine && saved.mine.length));
     writeForm();
     await refresh();
   }
 
-  const dpInfo = name => (overview && overview.dayparts.find(d => d.name === name)) || null;
-  const dpLabel = name => { const d = dpInfo(name); return d && /^\d/.test(d.time) ? `${d.name} (${d.time})` : name; };
+  // Prime time is 6pm to 11pm, non prime time 7am to 6pm (by Advt_time). Other hours, and Press, are only in All.
+  const slotLabel = v => ({ PT: 'Prime time (6pm–11pm)', NPT: 'Non prime time (7am–6pm)' }[v] || '');
   function defaultDates() {
     const { minDate, maxDate } = overview, jan = maxDate.slice(0, 4) + '-01-01';
     return { from: jan > minDate ? jan : minDate, to: maxDate };
@@ -247,23 +283,51 @@
     if (resetSelection) {
       state.mine = names.slice(0, 1);
       state.comps = names.slice(1, 4);
-      state.channel = '';
+      state.channel = ''; state.mb = ''; state.sub = '';
     } else {
       state.mine = state.mine.filter(n => names.includes(n));
       state.comps = state.comps.filter(n => names.includes(n) && !state.mine.includes(n));
       if (state.channel && !options.channels.some(c => c.name === state.channel)) state.channel = '';
     }
+    const brands = options.brands || [];
+    if (state.mb && !brands.some(b => b.mother === state.mb)) state.mb = '';
+    if (state.sub && !brands.some(b => (!state.mb || b.mother === state.mb) && b.sub === state.sub)) state.sub = '';
+  }
+
+  // A shared data cube leaves out what it cannot answer: ad lengths, prime time at the compact level, campaigns.
+  function applyCubeUi() {
+    const cube = isCube(), lvl = cube ? overview.meta.level : 'full';
+    $('cardDur').style.display = cube && lvl !== 'full' ? 'none' : '';
+    $('fSlotWrap').style.display = cube && lvl === 'compact' ? 'none' : '';
+    document.body.classList.toggle('share-nocampaign', noCampaigns());
+    $('secBrand').style.display = 'none';
+  }
+  // Mother brand and sub category pick lists (data cubes with a Brand Map).
+  function renderBrandSelects() {
+    const brands = options.brands || [];
+    const show = isCube() && overview.meta.hasMap && brands.length > 0;
+    $('secBrand').style.display = show ? '' : 'none';
+    if (!show) return;
+    const mothers = [...new Set(brands.map(b => b.mother))];
+    $('fMb').innerHTML = `<option value="">All mother brands (${mothers.length})</option>` + mothers.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+    $('fMb').value = state.mb || '';
+    const subs = [...new Set(brands.filter(b => (!state.mb || b.mother === state.mb) && b.sub).map(b => b.sub))];
+    $('fSub').innerHTML = `<option value="">All sub categories (${subs.length})</option>` + subs.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+    $('fSub').value = state.sub || '';
+    $('fSubWrap').style.display = subs.length ? '' : 'none';
   }
 
   function writeForm() {
     $('fFrom').value = state.from; $('fTo').value = state.to;
     $('fPg').value = state.pg;
-    $('fDaypart').value = state.daypart || '';
+    [...$('fSlot').children].forEach(b => b.classList.toggle('on', b.dataset.v === (state.slot || '')));
     [...$('fMedium').children].forEach(b => b.classList.toggle('on', b.dataset.v === state.medium));
     [...$('fAdType').children].forEach(b => b.classList.toggle('on', b.dataset.v === (state.adType || 'All')));
+    [...$('fYearType').children].forEach(b => b.classList.toggle('on', b.dataset.v === (state.yearType || 'CY')));
     writeTag();
     renderAdvLists();
     renderChannelSelect();
+    renderBrandSelects();
   }
 
   function renderAdvLists() {
@@ -329,11 +393,18 @@
   }
   $('fTagCommercial').addEventListener('change', e => { state.tagCommercial = e.target.checked; writeTag(); });
   $('fChannel').addEventListener('change', e => { state.channel = e.target.value; });
-  $('fDaypart').addEventListener('change', e => { state.daypart = e.target.value; });
+  $('fSlot').addEventListener('click', e => {
+    const b = e.target.closest('.seg');
+    if (!b) return;
+    state.slot = b.dataset.v;
+    [...$('fSlot').children].forEach(x => x.classList.toggle('on', x === b));
+  });
+  $('fMb').addEventListener('change', e => { state.mb = e.target.value; state.sub = ''; renderBrandSelects(); });
+  $('fSub').addEventListener('change', e => { state.sub = e.target.value; });
   $('resetBtn').addEventListener('click', async () => {
     if (!overview) return;
     const keepPg = state.pg;
-    Object.assign(state, defaultDates(), { medium: 'All', channel: '', daypart: '', adType: 'All', tagCommercial: false });
+    Object.assign(state, defaultDates(), { medium: 'All', channel: '', slot: '', adType: 'All', tagCommercial: false, mb: '', sub: '' });
     state.pg = keepPg;
     $('mineSearch').value = ''; $('compSearch').value = '';
     await loadOptions(true);
@@ -370,7 +441,7 @@
     ['k1v', 'k2v'].forEach(id => { $(id).textContent = 'LKR 0'; }); $('k3v').textContent = '0%';
     ['k1', 'k2', 'k3'].forEach(id => $(id).removeAttribute('data-detail'));
     ['donut', 'trend', 'drill', 'sosTable', 'chMix', 'duration'].forEach(id => { $(id).innerHTML = ''; });
-    $('fPg').innerHTML = ''; $('mineList').innerHTML = ''; $('compList').innerHTML = ''; $('fChannel').innerHTML = ''; $('fDaypart').innerHTML = '';
+    $('fPg').innerHTML = ''; $('mineList').innerHTML = ''; $('compList').innerHTML = ''; $('fChannel').innerHTML = '';
   }
 
   // ---------- render ----------
@@ -386,8 +457,9 @@
     if (f.adType === 'Commercial') chips.push('<span class="chip">Commercials only</span>');
     if (f.adType === 'Sponsorship') chips.push('<span class="chip s">Value Additions only</span>');
     if (f.tagCommercial) chips.push('<span class="chip">Tag = commercial</span>');
+    if (f.yearType === 'FY') chips.push('<span class="chip">Financial year (Apr–Mar)</span>');
     if (f.channel) chips.push(`<span class="chip">${esc(f.channel)}</span>`);
-    if (f.daypart) chips.push(`<span class="chip">${esc(dpLabel(f.daypart))}</span>`);
+    if (f.slot) chips.push(`<span class="chip">${esc(slotLabel(f.slot))}</span>`);
     const busy = $('busyChip');
     $('chips').innerHTML = chips.join('');
     $('chips').querySelectorAll('.chip').forEach(c => { if (!c.title) c.title = c.textContent; });
@@ -417,6 +489,8 @@
     if (!rows.length) { $('sosTable').innerHTML = '<div class="nodata">Pick your advertiser and competitors in Filters</div>'; return; }
     const scopeOf = (r, extra) => (r.mine ? { title: r.name + ' (mine)', mine: true, ...extra } : r.others ? { title: 'All advertisers', ...extra } : { title: r.name, advertiser: r.name, ...extra });
     const cls = r => (r.mine ? 'row me' : r.others ? 'row oth' : 'row');
+    $('sosFlip').hidden = sosView === 'period';
+    if (sosView !== 'period' && sosFlip === 'chart') return renderSosChart(d, rows.filter(r => !r.others), scopeOf);
     if (sosView === 'year') {
       const Y = S.years;
       const max = Math.max(1, ...rows.filter(r => !r.others).flatMap(r => r.yearly.filter(v => v != null)));
@@ -427,17 +501,17 @@
         return `background:rgba(${rgb},${t.toFixed(2)});color:${t > 0.55 ? '#fff' : '#1A1F36'}`;
       };
       const span = y => (y.partial ? `${fmtDate(y.from).slice(3)} to ${fmtDate(y.to).slice(3)}` : 'Full year');
-      const head = `<tr><th class="an">Advertiser</th>${Y.map(y => `<th title="${esc(span(y))}">${y.year}${y.partial ? '*' : ''}</th>`).join('')}</tr>`;
+      const head = `<tr><th class="an">Advertiser</th>${Y.map(y => `<th title="${esc(span(y))}">${esc(y.label)}${y.partial ? '*' : ''}</th>`).join('')}</tr>`;
       const body = rows.map(r => `<tr class="${cls(r)}">
         <td class="an" title="${esc(r.name)}"${detA(scopeOf(r, { tab: r.others ? 'adv' : 'mon' }))}>${esc(r.name)}</td>
         ${r.yearly.map((v, k) => {
           const y = Y[k];
-          return `<td class="c" style="${shade(r, v)}"${tipA(`${r.name} · ${y.year}\nSOS ${v == null ? 'n/a' : pctS(v)} · ${span(y)}\nClick for details`)}${detA(scopeOf(r, { title: `${r.others ? 'All advertisers' : r.name} · ${y.year}`, year: y.year, tab: r.others ? 'adv' : 'mon' }))}>${v == null ? 'n/a' : pctS(v)}</td>`;
+          return `<td class="c" style="${shade(r, v)}"${tipA(`${r.name} · ${y.label}\nSOS ${v == null ? 'n/a' : pctS(v)} · ${span(y)}\nClick for details`)}${detA(scopeOf(r, { title: `${r.others ? 'All advertisers' : r.name} · ${y.label}`, year: y.year, fy: y.fy, tab: r.others ? 'adv' : 'mon' }))}>${v == null ? 'n/a' : pctS(v)}</td>`;
         }).join('')}</tr>`).join('');
       const partial = Y.filter(y => y.partial);
       $('sosTable').innerHTML = `<div class="sost sosm"><table><tbody>${head}${body}</tbody></table></div>
-        ${partial.length ? `<div class="hint" style="color:#8A93AD;margin:6px 2px 0">* ${partial.map(y => `${y.year}: ${span(y)}`).join(' · ')} (data available)</div>` : ''}`;
-      $('p-sos').textContent = 'SOS % of each year in the full data · ignores the date range · click a cell for details';
+        ${partial.length ? `<div class="hint" style="color:#8A93AD;margin:6px 2px 0">* ${partial.map(y => `${y.label}: ${span(y)}`).join(' · ')} (data available)</div>` : ''}`;
+      $('p-sos').textContent = `SOS % of each ${data.filters.yearType === 'FY' ? 'financial year (Apr–Mar)' : 'calendar year'} in the full data · ignores the date range · click a cell for details`;
       return;
     }
     if (sosView === 'month') {
@@ -476,6 +550,66 @@
       </tbody></table></div>`;
     $('p-sos').textContent = 'Selected period · my advertiser vs competitors · click a row for details';
   }
+
+  // Share of spend as a chart: By year = grouped bars (one cluster per year), By month = one line per advertiser.
+  const SOS_COLORS = ['#2F5DBF', '#1FA97A', '#8E5BD9', '#E0B000', '#D6456B', '#1AA3C7', '#7A8CA8', '#6B8E23', '#B5651D'];
+  function renderSosChart(d, rows, scopeOf) {
+    const colorOf = new Map();
+    let ci = 0;
+    rows.forEach(r => colorOf.set(r, r.mine ? C.orange : SOS_COLORS[ci++ % SOS_COLORS.length]));
+    const byYear = sosView === 'year', Y = d.sos.years;
+    const legend = rows.map(r => `<div class="lg"><span class="sw" style="background:${colorOf.get(r)};height:${byYear ? 10 : 3}px;width:${byYear ? 12 : 18}px"></span>${r.mine ? '<strong>' + esc(r.name) + ' (mine)</strong>' : esc(r.name)}</div>`).join('');
+    $('sosTable').innerHTML = `<div class="trendbox" id="sosBox"></div><div class="legend">${legend}</div>`;
+    const box = $('sosBox'), W = Math.max(300, box.clientWidth), H = Math.max(140, box.clientHeight);
+    const cats = byYear ? Y.map(y => ({ label: y.label + (y.partial ? '*' : '') })) : d.months.map(m => ({ label: monthLabel(m, d.months) }));
+    const val = (r, k) => (byYear ? r.yearly[k] : r.monthly[k]);
+    const n = cats.length;
+    const X0 = 40, X1 = W - 10, Y0 = H - 22, Y1 = 14;
+    const max = niceMax(Math.max(1, ...rows.flatMap(r => Array.from({ length: n }, (_, k) => val(r, k) || 0))));
+    const y = v => Y0 - (v / max) * (Y0 - Y1);
+    const grid = [0, 1, 2, 3, 4].map(k => {
+      const yy = Y0 - (k * (Y0 - Y1)) / 4;
+      return `<line x1="${X0}" y1="${yy}" x2="${W - 6}" y2="${yy}" stroke="#EEF1F7"></line><text x="${X0 - 6}" y="${yy + 3.5}" text-anchor="end">${nf((max * k) / 4, max < 4 ? 1 : 0)}%</text>`;
+    }).join('');
+    const slot = (X1 - X0) / n;
+    const every = Math.ceil(n / Math.max(4, Math.floor((X1 - X0) / 52)));
+    const xl = cats.map((c, k) => (k % every === 0 || k === n - 1 ? `<text x="${X0 + slot * (k + 0.5)}" y="${H - 6}" text-anchor="middle">${esc(c.label)}</text>` : '')).join('');
+    let body = '';
+    if (byYear) {
+      const gw = slot * 0.8, bw = gw / rows.length;
+      rows.forEach((r, j) => {
+        Y.forEach((yr, k) => {
+          const v = r.yearly[k];
+          if (v == null) return;
+          const bx = X0 + slot * k + (slot - gw) / 2 + j * bw, top = y(v);
+          const lab = bw >= 20 ? `<text x="${bx + bw / 2}" y="${top - 3}" font-size="8.5" font-weight="700" fill="#4A5570" text-anchor="middle">${nf(v, 0)}</text>` : '';
+          body += `<rect x="${bx + 0.5}" y="${top}" width="${Math.max(1, bw - 1)}" height="${Y0 - top}" rx="2" fill="${colorOf.get(r)}"${tipA(`${r.name} · ${yr.label}\nSOS ${pctS(v)}\nClick for details`)}${detA(scopeOf(r, { title: `${r.name} · ${yr.label}`, year: yr.year, fy: yr.fy, tab: 'mon' }))}></rect>${lab}`;
+        });
+      });
+    } else {
+      rows.forEach(r => {
+        const pts = cats.map((_, k) => (val(r, k) == null ? null : [X0 + slot * (k + 0.5), y(val(r, k))]));
+        const path = pts.map((q, k) => (q ? `${pts[k - 1] ? 'L' : 'M'}${q[0].toFixed(1)},${q[1].toFixed(1)}` : '')).join('');
+        body += `<path d="${path}" fill="none" stroke="${colorOf.get(r)}" stroke-width="${r.mine ? 3 : 2}" stroke-linejoin="round" stroke-linecap="round"></path>`;
+        pts.forEach((q, k) => {
+          if (!q) return;
+          const m = d.months[k];
+          body += `<circle cx="${q[0]}" cy="${q[1]}" r="${n > 18 ? 2.5 : 3.5}" fill="${colorOf.get(r)}"${tipA(`${r.name} · ${m.label} ${m.year}\nSOS ${pctS(val(r, k))}\nClick for details`)}${detA(scopeOf(r, { title: `${r.name} · ${m.label} ${m.year}`, month: m.key, tab: 'ch' }))}></circle>`;
+        });
+      });
+    }
+    box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><g font-size="10" fill="#9AA3BC">${grid}</g>${body}<g font-size="10" fill="#8A93AD">${xl}</g></svg>`;
+    $('p-sos').textContent = byYear
+      ? `SOS % of each ${d.filters.yearType === 'FY' ? 'financial' : 'calendar'} year, clustered by advertiser · ignores the date range${Y.some(y => y.partial) ? ' · * partial year' : ''}`
+      : 'SOS % of each month · one line per advertiser · click a point for details';
+  }
+  document.querySelector('.tgl[data-sosflip]').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || !data) return;
+    sosFlip = b.dataset.v;
+    [...b.parentNode.children].forEach(x => x.classList.toggle('on', x === b));
+    renderSos(data);
+  });
   document.querySelector('.tgl[data-sosview]').addEventListener('click', e => {
     const b = e.target.closest('button');
     if (!b || !data) return;
@@ -541,6 +675,8 @@
   }
 
   function renderTrend(d) {
+    syncTrendUi();
+    if (trendUi.flip === 'bars') return renderBars(d);
     const months = d.months, n = months.length;
     const legendHtml = trendLegend(d);
     $('trend').innerHTML = `<div class="trendbox" id="trendBox"></div><div class="legend">${legendHtml}</div>`;
@@ -548,7 +684,7 @@
     const X0 = 40, X1 = W - 18, Y0 = H - 24, Y1 = 30, XR = W - 8;
     const toMn = v => v / 1e6;
     const shown = name => !hiddenSeries.has(name);
-    const series = [shown('__mine') ? d.trend.mine : [], shown('__avg') ? d.trend.categoryAvg : []]
+    const series = [shown('__mine') ? d.trend.mine : [], shown('__avg') ? d.trend.categoryAvg : [], shown('__cat') ? d.trend.categoryTotal : []]
       .concat(d.trend.competitors.filter(c => shown(c.name)).map(c => c.values));
     const max = niceMax(Math.max(0, ...series.flat().map(toMn)));
     const x = i => (n === 1 ? (X0 + X1) / 2 : X0 + (i * (X1 - X0)) / (n - 1));
@@ -562,6 +698,9 @@
     const xl = months.map((m, i) => (i % every === 0 || i === n - 1 ? `<text x="${x(i)}" y="${H - 6}">${esc(monthLabel(m, months))}</text>` : '')).join('');
     const comps = d.trend.competitors.map((c, i) => !shown(c.name) ? '' : `<path fill="none" stroke="${C.compLines[i % C.compLines.length]}" stroke-width="${i === 0 ? 2.4 : 2}" stroke-linecap="round" stroke-linejoin="round" d="${smoothPath(pts(c.values))}"></path>`).reverse().join('');
     const avg = !shown('__avg') ? '' : `<path fill="none" stroke="#B4BCD0" stroke-width="1.5" stroke-dasharray="2 4" stroke-linecap="round" d="${smoothPath(pts(d.trend.categoryAvg))}"></path>`;
+    const catOn = shown('__cat') && n > 1;
+    const cp = pts(d.trend.categoryTotal);
+    const catArea = catOn ? `<path fill="#A9B0C2" fill-opacity="0.22" stroke="#A9B0C2" stroke-width="1.2" d="${smoothPath(cp)} L${cp[n - 1][0]},${Y0} L${cp[0][0]},${Y0} Z"></path>` : '';
     const mp = pts(d.trend.mine);
     const minePath = smoothPath(mp);
     const mineOn = shown('__mine');
@@ -585,20 +724,140 @@
       if (mineOn) lines.push(`${d.mineLabel} (mine): ${mn(d.trend.mine[i])}`);
       d.trend.competitors.forEach(c => { if (shown(c.name)) lines.push(`${c.name}: ${mn(c.values[i])}`); });
       if (shown('__avg')) lines.push(`Category avg.: ${mn(d.trend.categoryAvg[i])}`);
+      if (shown('__cat')) lines.push(`Category total: ${mn(d.trend.categoryTotal[i])}`);
       lines.push('Click for month details');
       return `<rect class="hit" fill="#2F5DBF" fill-opacity="0" x="${x(i) - colW / 2}" y="${Y1 - 10}" width="${colW}" height="${Y0 - Y1 + 10}"${tipA(lines.join('\n'))}${detA({ title: `${m.label} ${m.year}`, month: m.key, tab: 'adv' })}></rect>`;
     }).join('');
     box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
       <g font-size="10" fill="#9AA3BC" stroke-width="1">${grid}</g>
-      ${area}${comps}${avg}
+      ${catArea}${area}${comps}${avg}
       ${mineOn ? `<path fill="none" stroke="${C.orange}" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" d="${minePath}"></path>` : ''}
       ${dots}${callout}${hits}
       <g font-size="10.5" fill="#8A93AD" text-anchor="middle">${xl}</g></svg>`;
   }
+
+  // ---------- YOY / quarter / half-year stacked bars ----------
+  const MEDIA_NAMES = ['TV', 'Radio', 'Press'];
+  function syncTrendUi() {
+    const bars = trendUi.flip === 'bars';
+    document.querySelector('.tgl[data-trpart]').hidden = !bars;
+    document.querySelector('.tgl[data-trside]').hidden = !bars;
+    $('trHideWrap').hidden = !bars;
+    $('h-line').textContent = bars ? `Spend by Medium: ${{ yoy: 'Year on Year', q: 'Quarterly', h: 'Half-yearly' }[trendUi.part]}` : 'Monthly Spend Trend: Us vs Competitors';
+    const on = (sel, v) => document.querySelectorAll(sel + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+    on('.tgl[data-trflip]', trendUi.flip); on('.tgl[data-trpart]', trendUi.part); on('.tgl[data-trside]', trendUi.side);
+    $('trHide').checked = trendUi.hideInc;
+    if (bars) {
+      const fy = state.yearType === 'FY';
+      $('p-line').textContent = `LKR Mn · % of ${trendUi.side === 'mine' ? 'our' : 'category'} spend by medium · ${fy ? 'Financial year (Apr–Mar)' : 'Calendar year (Jan–Dec)'} · hatched = incomplete period`;
+    } else {
+      $('p-line').textContent = 'LKR Mn · smoothed curves · my advertiser emphasised · dotted line is the category average';
+    }
+  }
+  // Groups the months into years / quarters / halves for the chosen year type and marks the ones the range does not fully cover.
+  function groupPeriods(d) {
+    const fy = state.yearType === 'FY', part = trendUi.part, len = { yoy: 12, q: 3, h: 6 }[part];
+    const eff = { from: d.filters.from > overview.minDate ? d.filters.from : overview.minDate, to: d.filters.to < overview.maxDate ? d.filters.to : overview.maxDate };
+    const groups = new Map();
+    d.months.forEach((m, i) => {
+      const off = fy ? (MON.indexOf(m.label) + 9) % 12 : MON.indexOf(m.label); // months since the year started
+      const yr = fy ? (MON.indexOf(m.label) >= 3 ? m.year : m.year - 1) : m.year;
+      const idx = Math.floor(off / len), start = yr * 12 + (fy ? 3 : 0) + idx * len;
+      if (!groups.has(start)) groups.set(start, { start, yr, idx, idxs: [] });
+      groups.get(start).idxs.push(i);
+    });
+    const iso = (y, mo) => `${y}-${String(mo + 1).padStart(2, '0')}-01`;
+    const endIso = (y, mo) => new Date(Date.UTC(y, mo + 1, 0)).toISOString().slice(0, 10);
+    return [...groups.values()].sort((a, b) => a.start - b.start).map(g => {
+      const y0 = Math.floor(g.start / 12), m0 = g.start % 12, last = g.start + len - 1;
+      const complete = iso(y0, m0) >= eff.from && endIso(Math.floor(last / 12), last % 12) <= eff.to;
+      const yrLabel = fy ? `${String(g.yr).slice(2)}/${String(g.yr + 1).slice(2)}` : String(g.yr);
+      const grp = (fy ? 'FY ' : '') + yrLabel;
+      const sub = part === 'yoy' ? grp : `${part === 'q' ? 'Q' : 'H'}${g.idx + 1}`;
+      const label = part === 'yoy' ? grp : `${sub} ${grp}`;
+      const src = trendUi.side === 'mine' ? d.trend.mediumMine : d.trend.mediumCat;
+      const med = [0, 0, 0];
+      g.idxs.forEach(i => src[i].forEach((v, k) => { med[k] += v; }));
+      return { label, sub, grp, complete, med, total: med[0] + med[1] + med[2], monthsIn: g.idxs.length, key: g.idxs.map(i => d.months[i].key) };
+    });
+  }
+  function renderBars(d) {
+    let periods = groupPeriods(d);
+    const hidden = periods.filter(p => !p.complete).length;
+    if (trendUi.hideInc) periods = periods.filter(p => p.complete);
+    const mine = trendUi.side === 'mine', pal = C.medium;
+    const legendHtml = MEDIA_NAMES.map((nm, k) => `<div class="lg"><span class="sw" style="background:${pal[k]};height:10px;width:14px;border-radius:2px"></span>${nm}</div>`).join('')
+      + `<div class="lg"><span class="sw" style="background:repeating-linear-gradient(45deg,#fff 0 2px,#8A93AD 2px 3px);height:10px;width:14px;border-radius:2px;border:1px solid #C7CEDF"></span>Incomplete period</div>`;
+    $('trend').innerHTML = `<div class="trendbox" id="trendBox"></div><div class="legend">${legendHtml}</div>`;
+    const box = $('trendBox'), W = Math.max(300, box.clientWidth), H = Math.max(120, box.clientHeight);
+    if (!periods.length) {
+      box.innerHTML = `<div class="empty" style="padding:30px 10px;text-align:center;color:#8A93AD;font-size:12px">No complete ${{ yoy: 'years', q: 'quarters', h: 'half-years' }[trendUi.part]} in this date range${hidden ? ` (${hidden} incomplete hidden)` : ''}. Widen the dates or untick “Hide incomplete periods”.</div>`;
+      return;
+    }
+    const two = trendUi.part !== 'yoy';        // quarters / halves: short label under each bar, the year once as a group heading
+    const X0 = 40, X1 = W - 12, Y0 = H - (two ? 50 : 34), Y1 = 34;
+    const max = niceMax(Math.max(0, ...periods.map(p => p.total / 1e6)));
+    const y = v => Y0 - (v / 1e6 / max) * (Y0 - Y1);
+    const slot = (X1 - X0) / periods.length, bw = Math.min(64, Math.max(6, slot * (two ? 0.7 : 0.62))), tight = slot < 40;
+    const grid = [0, 1, 2, 3, 4].map(k => {
+      const yy = Y0 - (k * (Y0 - Y1)) / 4, val = (max * k) / 4;
+      return `<line x1="${X0}" y1="${yy}" x2="${W - 8}" y2="${yy}" stroke="#EEF1F7"></line><text x="${X0 - 8}" y="${yy + 3.5}" text-anchor="end">${nf(val, max < 4 ? 1 : 0)}</text>`;
+    }).join('');
+    const body = periods.map((p, i) => {
+      const cx = X0 + slot * (i + 0.5), bx = cx - bw / 2;
+      let acc = 0, labels = '';
+      const segs = p.med.map((v, k) => {
+        if (v <= 0) return '';
+        const y1 = y(acc), y2 = y(acc + v); acc += v;
+        const h = y1 - y2, pc = p.total ? (v / p.total) * 100 : 0;
+        const lab = h >= 13 && bw >= 24 ? `<text x="${cx}" y="${y2 + h / 2 + 3.5}" font-size="${bw >= 36 ? 9.5 : 8.5}" font-weight="700" fill="${textOn(pal[k])}" text-anchor="middle">${nf(pc, 0)}%</text>` : '';
+        labels += lab;
+        return `<rect x="${bx}" y="${y2}" width="${bw}" height="${h}" fill="${pal[k]}"></rect>`;
+      }).join('');
+      const top = y(p.total);
+      const hatch = p.complete ? '' : `<rect x="${bx}" y="${top}" width="${bw}" height="${Y0 - top}" fill="url(#incHatch)" stroke="#8A93AD" stroke-dasharray="3 2"></rect>`;
+      const tip = [`${p.label}${p.complete ? '' : ' (incomplete: ' + p.monthsIn + ' month' + (p.monthsIn === 1 ? '' : 's') + ' of data)'}`, `${mine ? 'Our' : 'Category'} total: ${mn(p.total)}`]
+        .concat(p.med.map((v, k) => `${MEDIA_NAMES[k]}: ${mn(v)} · ${p.total ? nf((v / p.total) * 100, 1) : '0.0'}%`)).join('\n');
+      const lbl = `<text x="${cx}" y="${Y0 + 14}" font-size="${tight ? 9.5 : 10.5}" fill="#4A5570" text-anchor="middle" font-weight="600">${esc(two ? p.sub : p.label)}${p.complete || !tight ? '' : '*'}</text>`
+        + (p.complete || tight ? '' : `<text x="${cx}" y="${Y0 + 25}" font-size="8.5" fill="#E4702A" text-anchor="middle" font-weight="700">Incomplete</text>`);
+      const tot = `<text x="${cx}" y="${top - 6}" font-size="${tight ? 8.5 : 10.5}" font-weight="800" fill="#1A1F36" text-anchor="middle">${nf(p.total / 1e6, tight ? 0 : 1)}</text>`;
+      return `<g${tipA(tip)}>${segs}${hatch}${labels}${tot}${lbl}<rect x="${cx - slot / 2}" y="${Y1 - 14}" width="${slot}" height="${Y0 - Y1 + 14}" fill="#2F5DBF" fill-opacity="0"></rect></g>`;
+    }).join('');
+    let groupsSvg = '';
+    if (two) {
+      for (let i = 0; i < periods.length;) {
+        let j = i;
+        while (j + 1 < periods.length && periods[j + 1].grp === periods[i].grp) j++;
+        const xa = X0 + slot * i, xb = X0 + slot * (j + 1);
+        groupsSvg += `<line x1="${xa + 3}" y1="${Y0 + 33}" x2="${xb - 3}" y2="${Y0 + 33}" stroke="#C7CEDF" stroke-width="1.5"></line>`
+          + `<text x="${(xa + xb) / 2}" y="${Y0 + 45}" font-size="10" font-weight="700" fill="#1A1F36" text-anchor="middle">${esc(periods[i].grp)}</text>`;
+        if (i > 0) groupsSvg += `<line x1="${xa}" y1="${Y1 - 6}" x2="${xa}" y2="${Y0 + 33}" stroke="#E3E8F2" stroke-dasharray="3 3"></line>`;
+        i = j + 1;
+      }
+    }
+    box.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+      <defs><pattern id="incHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#fff" stroke-opacity="0.55" stroke-width="2"></line></pattern></defs>
+      <g font-size="10" fill="#9AA3BC" stroke-width="1">${grid}</g>${groupsSvg}${body}</svg>`;
+  }
+  document.querySelectorAll('.tgl[data-trflip],.tgl[data-trpart],.tgl[data-trside]').forEach(t => t.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b || !data) return;
+    const k = t.hasAttribute('data-trflip') ? 'flip' : t.hasAttribute('data-trpart') ? 'part' : 'side';
+    trendUi[k] = b.dataset.v;
+    renderTrend(data);
+  }));
+  $('trHide').addEventListener('change', e => { trendUi.hideInc = e.target.checked; if (data) renderTrend(data); });
+  $('fYearType').addEventListener('click', e => {
+    const b = e.target.closest('.seg');
+    if (!b) return;
+    state.yearType = b.dataset.v === 'FY' ? 'FY' : 'CY';
+    [...$('fYearType').children].forEach(x => x.classList.toggle('on', x === b));
+    if (data) refresh(); // the year-by-year SOS table, drill-downs and exports regroup on the server
+  });
   function trendLegend(d) {
     const off = k => (hiddenSeries.has(k) ? ' off' : '');
     const lgA = k => ` data-series="${esc(k)}" title="Click to show or hide"`;
-    return [`<div class="lg${off('__mine')}"${lgA('__mine')}><span class="sw" style="background:${C.orange};height:4px;width:18px"></span><strong>${esc(d.mineLabel)} (mine)</strong></div>`]
+    return [`<div class="lg${off('__mine')}"${lgA('__mine')}><span class="sw" style="background:${C.orange};height:4px;width:18px"></span><strong>${esc(d.mineLabel)} (mine)</strong></div>`, `<div class="lg${off('__cat')}"${lgA('__cat')}><span class="sw" style="background:#A9B0C2;opacity:.5;height:10px;width:18px"></span>Category total</div>`]
       .concat(d.trend.competitors.map((c, i) => `<div class="lg${off(c.name)}"${lgA(c.name)}><span class="sw" style="background:${C.compLines[i % C.compLines.length]};height:3px;width:18px"></span>${esc(c.name)}</div>`))
       .concat([`<div class="lg${off('__avg')}"${lgA('__avg')}><span class="sw" style="background:repeating-linear-gradient(90deg,#B4BCD0 0 3px,transparent 3px 6px);height:2px;width:18px"></span>Category avg.</div>`]).join('');
   }
@@ -623,7 +882,7 @@
       let body = 'No spend recorded this month.';
       if (L) {
         body = `Leader <b style="color:${L.mine ? C.deep : '#1A1F36'}">${esc(L.name)}</b> <strong>${money(L.spend)}</strong> · ${nf(m.category ? (L.spend / m.category) * 100 : 0, 1)}% SOS`;
-        if (m.campaign) {
+        if (m.campaign && !noCampaigns()) {
           const me = d.filters.mine.includes(m.campaign.advertiser);
           body += `<span class="camp${me ? ' me' : ''}"${detA({ title: `“${m.campaign.name}” · ${m.label} ${m.year}`, month: m.key, advertiser: m.campaign.advertiser, theme: m.campaign.name, tab: 'ch' })}${tipA('Click to see where this campaign ran in ' + m.label)}><span class="cn">“${esc(m.campaign.name)}”</span><br>
             <span class="by">by <b>${esc(m.campaign.advertiser)}</b>${me ? ' (mine)' : ''} · ${mn(m.campaign.spend)} · ${nf(m.campaign.spots)} spots</span></span>`;
@@ -631,7 +890,7 @@
         const tail = [];
         if (m.runnerUp) tail.push(`Runner up ${esc(m.runnerUp.name)} ${mn(m.runnerUp.spend)}.`);
         if (!L.mine && !(m.runnerUp && m.runnerUp.mine)) tail.push(m.mineSpend > 0 ? `Mine ${mn(m.mineSpend)}.` : 'No spend from mine.');
-        body += tail.join(' ');
+        body += (m.campaign && !isCube() ? '' : ' ') + tail.join(' ');
         body += `<br><span class="mlink"${detA({ title: `${m.label} ${m.year}`, month: m.key, tab: 'adv' })}>View ${m.label} details ›</span>`;
       }
       return `<details${i === 0 ? ' open' : ''}><summary><span class="chev">▶</span> ${m.label} ${m.year} ${tagFor(L)}</summary>
@@ -732,7 +991,8 @@
   // Only my advertiser's row is highlighted.
   function renderDuration(d) {
     const { buckets, legacy } = d.duration;
-    const rows = durMedium === 'All' ? d.duration.rows : d.duration.byMedium[durMedium];
+    const allRows = durMedium === 'All' ? d.duration.rows : d.duration.byMedium[durMedium];
+    const rows = allRows.filter(r => r.avg || r.ads > 0);
     const med = durMedium === 'All' ? undefined : durMedium;
     const cell = r => (v, j) => {
       const share = r.ads ? pctS((v / r.ads) * 100) : '0%';
@@ -752,6 +1012,7 @@
         <span class="durname" title="${esc(r.name)} · ${nf(r.ads)} ads"${detA(scope)}><span class="nm2">${esc(r.name)}</span></span>
         ${cells}${acd}</div>`;
     }).join('');
+    if (!rows.some(r => !r.avg)) { $('duration').innerHTML = '<div class="nodata">No TV or Radio ads in this selection</div>'; return; }
     const cols = `grid-template-columns:minmax(70px,1.1fr) repeat(${buckets.length},minmax(32px,1fr)) 34px`;
     $('duration').innerHTML = `${legacy ? '<div class="durnote">Re-upload your file to apply the new length buckets and ACD</div>' : ''}
       <div class="bgrid" style="${cols}">
@@ -834,6 +1095,7 @@
   // ---------- detail pop-up ----------
   const modal = $('modal');
   let detailStack = [], detailData = null, detailTab = 'adv';
+  let campSort = { k: 'spend', dir: -1 }; // sort of the Commercials / Value additions table in the pop-up
   function closeDetail() { modal.classList.remove('on'); detailStack = []; }
   $('mClose').addEventListener('click', closeDetail);
   modal.addEventListener('click', e => { if (e.target === modal) closeDetail(); });
@@ -844,6 +1106,14 @@
     if (!b) return;
     detailTab = b.dataset.t;
     renderDetailBody();
+  });
+  // Column headers of the campaign table sort it; a second click flips the direction.
+  $('mBody').addEventListener('click', e => {
+    const th = e.target.closest('th[data-sort]');
+    if (!th) return;
+    const k = th.dataset.sort;
+    campSort = { k, dir: campSort.k === k ? -campSort.dir : (k === 'name' || k === 'advertiser' || k === 'brand' ? 1 : -1) };
+    renderDetailBody(true);
   });
   // Rows inside the pop-up drill one level deeper.
   $('mBody').addEventListener('click', e => {
@@ -857,7 +1127,7 @@
   const scopeText = sc => {
     const parts = [];
     if (sc.month) { const [y, m] = sc.month.split('-'); parts.push(`${MON[+m - 1]} ${y}`); }
-    else if (sc.year) parts.push(`${sc.year} (full year of data)`);
+    else if (sc.year) parts.push(`${sc.fy ? 'FY ' + String(sc.year).slice(2) + '/' + String(sc.year + 1).slice(2) : sc.year} (full year of data)`);
     else if (sc.from) parts.push(`${fmtDate(sc.from)} to ${fmtDate(sc.to)}`);
     else parts.push(`${fmtDate(data.filters.from)} to ${fmtDate(data.filters.to)}`);
     parts.push(data.filters.pg);
@@ -868,7 +1138,7 @@
     if (sc.dur) parts.push(`${sc.dur} TV and Radio ads`);
     if (sc.mine) parts.push('mine only');
     if (data.filters.medium !== 'All' && !sc.medium) parts.push(data.filters.medium + ' only');
-    if (data.filters.daypart) parts.push(dpLabel(data.filters.daypart));
+    if (data.filters.slot) parts.push(slotLabel(data.filters.slot));
     if (data.filters.adType === 'Commercial') parts.push('commercials only');
     if (data.filters.adType === 'Sponsorship') parts.push('value additions only');
     if (data.filters.tagCommercial) parts.push('Tag counted as commercial');
@@ -877,14 +1147,15 @@
 
   // The filters behind what is on screen (the drawer may hold unapplied edits).
   function appliedFilters() {
-    const { from, to, pg, mine, comps, medium, channel, daypart, adType, tagCommercial } = data.filters;
-    return { from, to, pg, mine: mine.slice(), comps: comps.slice(), medium, channel, daypart, adType: adType || 'All', tagCommercial: !!tagCommercial };
+    const { from, to, pg, mine, comps, medium, channel, slot, adType, tagCommercial, yearType, mb, sub } = data.filters;
+    return { mb: mb || '', sub: sub || '', from, to, pg, mine: mine.slice(), comps: comps.slice(), medium, channel, slot: slot || '', adType: adType || 'All', tagCommercial: !!tagCommercial, yearType: yearType === 'FY' ? 'FY' : 'CY' };
   }
 
   async function openDetail(scope, fresh) {
     if (fresh) detailStack = [];
     detailStack.push(scope);
     detailTab = scope.tab || 'adv';
+    campSort = { k: 'spend', dir: -1 };
     $('mTitle').textContent = scope.title || 'Details';
     $('mSub').textContent = scopeText(scope);
     $('mBack').style.display = detailStack.length > 1 ? '' : 'none';
@@ -926,7 +1197,7 @@
     const sc = detailStack[detailStack.length - 1];
     Object.assign(state, appliedFilters());
     if (b.dataset.act === 'month' && sc.year) {
-      const fy = `${sc.year}-01-01`, ly = `${sc.year}-12-31`;
+      const fy = sc.fy ? `${sc.year}-04-01` : `${sc.year}-01-01`, ly = sc.fy ? `${sc.year + 1}-03-31` : `${sc.year}-12-31`;
       state.from = fy < overview.minDate ? overview.minDate : fy;
       state.to = ly > overview.maxDate ? overview.maxDate : ly;
     } else if (b.dataset.act === 'month' && sc.from) {
@@ -949,9 +1220,17 @@
     toast('Dashboard updated');
   });
 
-  function renderDetailBody() {
+  function renderDetailBody(keepScroll) {
     const x = detailData;
     if (!x) return;
+    const split = state.adType === 'All';
+    if (!split && detailTab === 'va') detailTab = 'camp';
+    const tb = $('mTabs').querySelector('[data-t="camp"]');
+    tb.hidden = false;
+    tb.textContent = split ? 'Commercials' : state.adType === 'Sponsorship' ? 'Value additions' : 'Commercials';
+    $('mTabs').querySelector('[data-t="va"]').hidden = !split;
+    if (noCampaigns() && (detailTab === 'camp' || detailTab === 'va')) detailTab = 'ch';
+    if (noCampaigns()) { $('mTabs').querySelector('[data-t="camp"]').hidden = true; $('mTabs').querySelector('[data-t="va"]').hidden = true; }
     [...$('mTabs').children].forEach(b => b.classList.toggle('on', b.dataset.t === detailTab));
     const sub = o => ` data-sub="${esc(JSON.stringify(o))}"`;
     const bar = (v, max) => `<span class="sharebar" style="width:${max ? Math.max(2, (v / max) * 60) : 0}px"></span>`;
@@ -966,13 +1245,21 @@
             <td class="num">${bar(a.spend, max)}${money(a.spend, false)}</td><td class="num">${x.total ? pctS((a.spend / x.total) * 100) : ''}</td>
             <td class="num">${nf(a.spots)}</td><td class="num">${money(a.spots ? a.spend / a.spots : 0, false)}</td></tr>`).join('') + '</tbody></table>';
       if (!rows.length) html = '<div class="mload">No spend in this selection</div>';
-    } else if (detailTab === 'camp') {
-      const max = x.campaigns.length ? x.campaigns[0].spend : 0;
-      html = `<table><tbody><tr><th>#</th><th>Campaign (Advt_Theme)</th><th>Advertiser</th><th class="num">Spend</th><th class="num">Share</th><th class="num">Spots</th></tr>` +
-        x.campaigns.map((c, i) => `<tr class="${c.role === 'mine' ? 'me' : ''}"${sub({ advertiser: c.advertiser, theme: c.name, title: `“${c.name}”`, tab: 'ch' })} style="cursor:pointer" title="Click to see where this campaign ran">
-          <td class="rk">${i + 1}</td><td class="nm">“${esc(c.name)}”</td><td class="nm">${esc(c.advertiser)}${tag(c.role)}</td>
+    } else if (detailTab === 'camp' || detailTab === 'va') {
+      const wantVa = detailTab === 'va' || state.adType === 'Sponsorship';
+      const base = state.adType === 'All' ? x.campaigns.filter(c => !!c.va === wantVa) : x.campaigns;
+      const val = { name: c => c.name, advertiser: c => c.advertiser, brand: c => c.brand || '', spend: c => c.spend, share: c => c.spend, spots: c => c.spots }[campSort.k];
+      const list = [...base].sort((a, b) => { const va = val(a), vb = val(b); return (typeof va === 'string' ? va.localeCompare(vb, undefined, { sensitivity: 'base' }) : va - vb) * campSort.dir || b.spend - a.spend; });
+      const max = list.reduce((m, c) => Math.max(m, c.spend), 0);
+      const tot = (x.campaignTotals || {})[wantVa ? 'V' : 'C'] || { spend: list.reduce((a, c) => a + c.spend, 0), spots: list.reduce((a, c) => a + c.spots, 0), count: list.length };
+      const sh = (k, label, cls) => `<th class="srt${cls ? ' ' + cls : ''}${campSort.k === k ? ' on' : ''}" data-sort="${k}" title="Sort by ${label}">${label}<span class="sa">${campSort.k === k ? (campSort.dir > 0 ? '▲' : '▼') : '↕'}</span></th>`;
+      html = `<table><tbody><tr><th>#</th>${sh('name', `${wantVa ? 'Value addition' : 'Commercial'} (Advt_Theme)`)}${sh('advertiser', 'Advertiser')}${sh('brand', 'Brand')}${sh('spend', 'Spend', 'num')}${sh('share', 'Share', 'num')}${sh('spots', 'Spots', 'num')}</tr>
+        <tr class="totrow"><td></td><td class="nm">Total · ${nf(tot.count)} ${wantVa ? 'value additions' : 'commercials'}${tot.count > list.length ? ` <small>(top ${list.length} listed)</small>` : ''}</td><td></td><td></td>
+          <td class="num">${money(tot.spend, false)}</td><td class="num">${x.total ? pctS((tot.spend / x.total) * 100) : ''}</td><td class="num">${nf(tot.spots)}</td></tr>` +
+        list.map((c, i) => `<tr class="${c.role === 'mine' ? 'me' : ''}"${sub({ advertiser: c.advertiser, theme: c.name, title: `“${c.name}”`, tab: 'ch' })} style="cursor:pointer" title="Click to see where this campaign ran">
+          <td class="rk">${i + 1}</td><td class="nm">“${esc(c.name)}”</td><td class="nm">${esc(c.advertiser)}${tag(c.role)}</td><td class="nm">${c.brand ? esc(c.brand) + (c.brands > 1 ? ` <small style="color:#8A93AD">+${c.brands - 1}</small>` : '') : '<span style="color:#B4BCD0">–</span>'}</td>
           <td class="num">${bar(c.spend, max)}${money(c.spend, false)}</td><td class="num">${x.total ? pctS((c.spend / x.total) * 100) : ''}</td><td class="num">${nf(c.spots)}</td></tr>`).join('') + '</tbody></table>';
-      if (!x.campaigns.length) html = '<div class="mload">No campaigns in this selection</div>';
+      if (!list.length) html = `<div class="mload">No ${wantVa ? 'value additions' : 'commercials'} in this selection</div>`;
     } else if (detailTab === 'mon') {
       const rows = x.months;
       const max = Math.max(0, ...rows.map(m => m.spend));
@@ -990,8 +1277,9 @@
           <td class="num">${nf(c.spots)}</td><td class="num mineval">${money(c.mine, false)}</td><td class="num mineval">${pctS(c.spend ? (c.mine / c.spend) * 100 : 0)}</td></tr>`).join('') + '</tbody></table>';
       if (!x.channels.length) html = '<div class="mload">No spend in this selection</div>';
     }
+    const keep = keepScroll === true ? $('mBody').scrollTop : 0;
     $('mBody').innerHTML = html;
-    $('mBody').scrollTop = 0;
+    $('mBody').scrollTop = keep;
   }
 
   // ---------- export and share ----------
@@ -1003,7 +1291,7 @@
     if (!b) return;
     menu.classList.remove('on');
     if (!data) return toast('Nothing to export yet');
-    ({ jpg: exportImage, pdf: exportPdf, ppt: exportPpt, plan: exportPlanning, send: sendToPlanning, json: exportCompetitorJson, csv: exportCsv })[b.dataset.x]();
+    ({ jpg: exportImage, pdf: exportPdf, ppt: exportPpt, plan: exportPlanning, send: sendToPlanning, json: exportCompetitorJson, csv: exportCsv, report: () => (window.REPORT ? window.REPORT.open() : toast('The report tool did not load')) })[b.dataset.x]();
   });
   const fileBase = () => `Ogilvy_Orbit_Chub_${data.filters.pg.replace(/[^\w]+/g, '-')}_${data.filters.from}_to_${data.filters.to}`;
   const loadScript = src => new Promise((ok, fail) => {
@@ -1013,23 +1301,27 @@
     document.head.appendChild(el);
   });
   // Exports carry the stacked Ogilvy Orbit Chub logo (the screen keeps the one-line logo).
-  const EXPORT_LOGO = 'ogilvy-orbit-chub-stacked.png';
+  const EXPORT_LOGO = '/ogilvy-orbit-chub-stacked.png'; // absolute: a client's link lives under /share/, where a relative path would not find it
   const imgSize = src => new Promise(ok => { const i = new Image(); i.onload = () => ok({ w: i.naturalWidth, h: i.naturalHeight }); i.onerror = () => ok({ w: 1, h: 1 }); i.src = src; });
 
   // Renders the whole dashboard (every card) to one JPEG, leaving out the drawer, menus and buttons.
   async function captureDashboard() {
-    await loadScript('vendor/html-to-image/html-to-image.js');
+    await loadScript('/vendor/html-to-image/html-to-image.js');
     $('drawerToggle').checked = false;
     await new Promise(r => setTimeout(r, 320));
-    const b = document.body, w = b.offsetWidth, h = b.offsetHeight;
+    const b = document.body, w = b.offsetWidth;
+    // A customized dashboard can be taller than the window: the picture takes the whole canvas, not just what is on screen.
+    const cu = [...document.querySelectorAll('.cu-scroll')].find(e => e.offsetParent !== null);
+    const extra = b.classList.contains('custom-client') && cu ? Math.max(0, cu.scrollHeight - cu.clientHeight) : 0;
+    const h = b.offsetHeight + extra;
     const logo = document.querySelector('.logo img'), screenLogo = logo.getAttribute('src');
     logo.setAttribute('src', EXPORT_LOGO); logo.classList.add('xlogo');
     await logo.decode().catch(() => {});
     b.classList.add('exporting');
-    const skip = new Set(['drawer', 'drawerToggle', 'toast', 'overlay', 'filterBtn', 'tright', 'modal', 'tip', 'exportStage']);
+    const skip = new Set(['drawer', 'drawerToggle', 'catDrawer', 'catDrawerToggle', 'catModal', 'toast', 'overlay', 'filterBtn', 'tright', 'modal', 'tip', 'exportStage', 'rpModal']);
     const url = await window.htmlToImage.toJpeg(b, {
       quality: 0.95, pixelRatio: 2, backgroundColor: '#F4F6FA', width: w, height: h,
-      style: { transform: 'none' },
+      style: extra ? { transform: 'none', height: h + 'px' } : { transform: 'none' },
       filter: node => !(node.id && skip.has(node.id)) && !(node.classList && node.classList.contains('scrim')),
     }).finally(() => { b.classList.remove('exporting'); logo.setAttribute('src', screenLogo); logo.classList.remove('xlogo'); });
     return { url, w, h };
@@ -1058,28 +1350,35 @@
     ['01_KPIs', 'kpis'], ['02_Medium_Split', 'cardMedium'], ['03_Monthly_Spend_Trend', 'cardTrend'], ['04_Month_Drill_Down', 'cardDrill'],
     ['05_Share_of_Spend', 'cardSos'], ['06_Channel_Mix', 'cardMix'], ['07_Duration_Mix', 'cardDur'],
   ];
+  // A customized client dashboard hands over only the charts that are on it, never the ones the agency left out.
+  function exportParts() {
+    if (!document.body.classList.contains('custom-client')) return EXPORT_PARTS;
+    const placed = id => !!($(id) && $(id).closest('#cuClientGrid'));
+    const kp = [['01_Total_category_spend', 'k1'], ['01_My_advertiser_spend', 'k2'], ['01_Share_of_spend', 'k3']];
+    return [...kp, ...EXPORT_PARTS.filter(p => p[1] !== 'kpis')].filter(p => placed(p[1]));
+  }
   async function exportImage() {
     toast('Preparing JPG images');
     try {
-      const [{ url }] = await Promise.all([captureDashboard(), loadScript('vendor/jszip/jszip.min.js')]);
+      const [{ url }] = await Promise.all([captureDashboard(), loadScript('/vendor/jszip/jszip.min.js')]);
       const zip = new window.JSZip();
       const b64 = u => u.split(',')[1];
       zip.file('00_Full_Dashboard.jpg', b64(url), { base64: true });
       document.body.classList.add('exporting');
       try {
-        for (const [name, id] of EXPORT_PARTS) zip.file(`${name}.jpg`, b64(await captureCard($(id))), { base64: true });
+        for (const [name, id] of exportParts()) zip.file(`${name}.jpg`, b64(await captureCard($(id))), { base64: true });
       } finally { document.body.classList.remove('exporting'); }
       const blob = await zip.generateAsync({ type: 'blob' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = fileBase() + '_JPG.zip'; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      toast('ZIP downloaded: full dashboard + 7 charts');
+      toast(`ZIP downloaded: full dashboard + ${exportParts().length} chart${exportParts().length === 1 ? '' : 's'}`);
     } catch (e) { toast('Export failed: ' + e.message); }
   }
   async function exportPdf() {
     toast('Preparing PDF');
     try {
-      const [{ url, w, h }] = await Promise.all([captureDashboard(), loadScript('vendor/jspdf/jspdf.umd.min.js')]);
+      const [{ url, w, h }] = await Promise.all([captureDashboard(), loadScript('/vendor/jspdf/jspdf.umd.min.js')]);
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({ orientation: w >= h ? 'landscape' : 'portrait', unit: 'pt', format: [w, h] });
       pdf.setProperties({ title: 'Ogilvy Orbit – Chub', author: 'Ogilvy' });
@@ -1092,7 +1391,7 @@
   async function exportPpt() {
     toast('Preparing PowerPoint');
     try {
-      const [{ url: full, w: fw, h: fh }] = await Promise.all([captureDashboard(), loadScript('vendor/pptxgenjs/pptxgen.bundle.js')]);
+      const [{ url: full, w: fw, h: fh }] = await Promise.all([captureDashboard(), loadScript('/vendor/pptxgenjs/pptxgen.bundle.js')]);
       const logoSize = await imgSize(EXPORT_LOGO);
       const logoData = await fetch(EXPORT_LOGO).then(r => r.blob()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); }));
       const period = $('periodText').textContent.replace(/\s+/g, ' ').trim();
@@ -1220,7 +1519,7 @@
     const d = data, q = v => `"${String(v).replace(/"/g, '""')}"`;
     const lines = [
       ['Ogilvy Orbit – Chub'], ['Period', `${fmtDate(d.filters.from)} to ${fmtDate(d.filters.to)}`], ['Product group', d.filters.pg],
-      ['Medium', d.filters.medium], ['Ad type', { Sponsorship: 'Value Additions', Commercial: 'Commercials' }[d.filters.adType] || 'All'], ['Tag counted as', d.filters.tagCommercial ? 'Commercial' : 'Value Addition'], ['Channel', d.filters.channel || 'All'], ['Daypart', d.filters.daypart || 'All'], ['Spend basis', 'Rate card (LKR)'], [],
+      ['Medium', d.filters.medium], ['Year type', d.filters.yearType === 'FY' ? 'Financial year (Apr–Mar)' : 'Calendar year (Jan–Dec)'], ['Ad type', { Sponsorship: 'Value Additions', Commercial: 'Commercials' }[d.filters.adType] || 'All'], ['Tag counted as', d.filters.tagCommercial ? 'Commercial' : 'Value Addition'], ['Channel', d.filters.channel || 'All'], ['Time of day', slotLabel(d.filters.slot) || 'All'], ['Spend basis', 'Rate card (LKR)'], [],
       ['KPI', 'Value'], ['Category spend', d.kpi.catSpend], ['My spend', d.kpi.mineSpend], ['Share of spend %', d.kpi.sos.toFixed(2)],
       ['Rank', d.kpi.rank ? `${d.kpi.rank} of ${d.kpi.rankOf}` : ''], ['Category spots', d.kpi.catSpots], ['My spots', d.kpi.mineSpots], [],
       ['Month', d.mineLabel + ' (mine)'].concat(d.trend.competitors.map(c => c.name), ['Category avg per advertiser', 'Category total', 'Top spender', 'Lead campaign', 'Campaign advertiser']),
@@ -1228,7 +1527,7 @@
     d.months.forEach((m, i) => {
       const dr = d.drill[i];
       lines.push([m.key, Math.round(d.trend.mine[i])].concat(d.trend.competitors.map(c => Math.round(c.values[i])),
-        [Math.round(d.trend.categoryAvg[i]), Math.round(dr.category), dr.leader ? dr.leader.name : '', dr.campaign ? dr.campaign.name : '', dr.campaign ? dr.campaign.advertiser : '']));
+        [Math.round(d.trend.categoryAvg[i]), Math.round(dr.category), dr.leader ? dr.leader.name : '', dr.campaign && !noCampaigns() ? dr.campaign.name : '', dr.campaign && !noCampaigns() ? dr.campaign.advertiser : '']));
     });
     const csv = lines.map(r => r.map(v => (typeof v === 'number' ? v : q(v))).join(',')).join('\r\n');
     const a = document.createElement('a');
@@ -1237,10 +1536,17 @@
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
-  $('shareBtn').addEventListener('click', async () => {
+  async function copyFilterLink() {
     const url = location.origin + location.pathname + '#' + encodeURIComponent(JSON.stringify(state));
     try { await navigator.clipboard.writeText(url); toast('Link with current filters copied'); } catch (e) { prompt('Copy this link', url); }
-  });
+  }
+  // Share opens the client-dashboard dialog (share.js); the old filters-only link stays inside it.
+  $('shareBtn').addEventListener('click', () => { if (window.SHAREDASH) window.SHAREDASH.open(); else copyFilterLink(); });
+  // For the full report (report.js): pictures of the dashboard and its cards, and the click-through pop-up.
+  const relayout = () => { if (data) { renderTrend(data); if (typeof renderSos === 'function') renderSos(data); } };
+  const reportHooks = () => ({ dashboard: captureDashboard, card: captureCard, openDetail: scope => openDetail(scope, true), setDetailTab: t => { detailTab = t; renderDetailBody(); }, closeDetail });
+  window.ORBIT.spot = { getState: () => JSON.parse(JSON.stringify(state)), hasData: () => !!overview && !isCube(), dataMeta: () => (overview ? overview.meta : null), copyFilterLink, get cap() { return reportHooks(); },
+    relayout, fileName: () => (overview && overview.meta ? overview.meta.fileName : '') };
 
   // ---------- signed-in user ----------
   const userMenu = $('userMenu');
@@ -1266,12 +1572,33 @@
   }
 
   // ---------- boot ----------
+  // A client's link: load the shared data cube into memory, nothing else.
+  async function bootShared() {
+    const fail = (title, text) => { document.body.classList.add('share-fail'); showOverlay(title, text); };
+    try {
+      const r = await fetch('/api/shared-dashboards/' + encodeURIComponent(SHARE), { cache: 'no-store' });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { fail(r.status === 410 ? 'This link is no longer active' : 'This link is not valid', (j.error || 'Please ask the person who sent it for a new link.') + ' Please ask the person who sent it for a new link.'); return; }
+      sharePayload = j;
+      document.title = `${j.title} · Ogilvy Orbit`;
+      $('shareBanner').innerHTML = `<b>${esc(j.title)}</b>${j.clientName ? `<span>Prepared for ${esc(j.clientName)}</span>` : ''}<span>${j.expiresAt ? 'Link valid until ' + fmtDate(j.expiresAt.slice(0, 10)) : ''}</span>`;
+      const init = await engine.call('initShared', { cube: j.cube });
+      // Category included: the Switch to Category button stays, and the Category dashboard starts from the agency's view.
+      if (init.category) { window.ORBIT.shareCatState = j.cube.category.state || null; document.body.classList.remove('share-nocat'); window.ORBIT.ready = true; document.dispatchEvent(new Event('orbit:ready')); }
+      sharePayload.cube = null;
+      await loadOverview(false);
+      if (j.lockedFilters && j.lockedFilters.layout && window.CUSTOM) window.CUSTOM.enterClient(j.lockedFilters.layout);
+    } catch (e) { fail('Could not open this dashboard', e.message); }
+  }
+
   (async function boot() {
+    if (SHARE) { await bootShared(); return; }
     try {
       // Each person gets their own saved data in this browser; a new person (or computer) starts empty.
       await loadUser();
       const s = await engine.call('init', { user: me ? me.email : 'local' });
       renderDataFile(s.dataset);
+      window.ORBIT.ready = true; document.dispatchEvent(new Event('orbit:ready')); // the Category dashboard starts here
       if (s.storageError) setUploadStatus('This browser does not allow saving data, so you will need to load your file each time.', true);
       if (s.dataset) await loadOverview(false);
       else { showEmpty(); showPane('paneData'); }

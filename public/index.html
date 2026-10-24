@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ogilvy Orbit – Chub</title>
-<link rel="icon" href="favicon.png">
-<link rel="stylesheet" href="vendor/inter/400.css">
-<link rel="stylesheet" href="vendor/inter/500.css">
-<link rel="stylesheet" href="vendor/inter/600.css">
-<link rel="stylesheet" href="vendor/inter/700.css">
+<link rel="icon" href="/favicon.png">
+<link rel="stylesheet" href="/vendor/inter/400.css">
+<link rel="stylesheet" href="/vendor/inter/500.css">
+<link rel="stylesheet" href="/vendor/inter/600.css">
+<link rel="stylesheet" href="/vendor/inter/700.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{background:#F4F6FA;overflow:hidden}
@@ -18,9 +18,9 @@ button,select,input{font-family:inherit}
 /* ---------- Drawer ---------- */
 #drawerToggle{display:none}
 .scrim{position:fixed;inset:0;background:rgba(20,26,46,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:8}
-#drawerToggle:checked ~ .scrim{opacity:1;pointer-events:auto}
+#drawerToggle:checked ~ #spotScrim{opacity:1;pointer-events:auto}
 .drawer{position:fixed;top:0;left:0;width:320px;height:100%;background:#141A2E;color:#C9D1E4;display:flex;flex-direction:column;transform:translateX(-330px);transition:transform .25s ease;z-index:9;box-shadow:6px 0 26px rgba(0,0,0,.25)}
-#drawerToggle:checked ~ .drawer{transform:translateX(0)}
+#drawerToggle:checked ~ #drawer{transform:translateX(0)}
 .dhead{padding:16px 16px 0;position:relative;flex-shrink:0}
 .brand{padding:2px 22px 12px 0}
 .brand img{height:22px;display:block;max-width:250px}
@@ -302,6 +302,10 @@ tr[data-detail]:hover td{background:#F6F8FC}
 .tgl{display:flex;background:#F0F3F9;border-radius:7px;padding:2px;flex-shrink:0}
 .tgl button{border:none;background:none;font-size:10px;font-weight:700;color:#8A93AD;padding:4px 9px;border-radius:5px;cursor:pointer;white-space:nowrap}
 .tgl button.on{background:#fff;color:#1A1F36;box-shadow:0 1px 2px rgba(20,26,46,.12)}
+.tick.trtick{margin:0 0 4px;padding:0;background:none;border:none;color:#4A5570;font-size:10px;align-items:center;flex-shrink:0}
+.tgl[hidden],.trtick[hidden]{display:none}
+.sosflip{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px;flex-shrink:0;font-size:10px;font-weight:700;color:#8A93AD}
+.sosflip[hidden]{display:none}
 .tgl.sm button{font-size:9px;padding:3px 7px}
 .tgl.sm button.on.o{color:#E4702A}
 .heatbar{display:flex;align-items:center;gap:8px;margin-top:8px;flex-shrink:0}
@@ -338,6 +342,9 @@ tr[data-detail]:hover td{background:#F6F8FC}
 .ms .v{font-size:16px;font-weight:700;margin-top:2px;letter-spacing:-.3px}
 .mtabs{display:flex;gap:4px;padding:0 20px;border-bottom:1px solid #EEF1F7}
 .mtabs button{border:none;background:none;font-size:12px;font-weight:700;color:#8A93AD;padding:9px 12px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.mtabs button[hidden]{display:none}
+.mbody th.srt{cursor:pointer;user-select:none;white-space:nowrap}.mbody th.srt:hover{color:#1A1F36}.mbody th.srt .sa{margin-left:4px;font-size:9px;color:#B4BCD0}.mbody th.srt.on,.mbody th.srt.on .sa{color:#E8651A}
+.mbody tr.totrow td{background:#F6F8FC;font-weight:800;border-bottom:2px solid #DDE3EF}
 .mtabs button.on{color:#1A1F36;border-bottom-color:#FF8A3D}
 .mbody{flex:1;overflow-y:auto;padding:6px 20px 14px;min-height:160px}
 .mbody table td{font-size:11.5px;padding:7px 8px}
@@ -366,15 +373,21 @@ tr.me .sharebar{background:#FF8A3D}
 .exporting .card{opacity:1}
 .exporting .acc{overflow:hidden}
 </style>
+<link rel="stylesheet" href="/category.css?v=1">
+<link rel="stylesheet" href="/brandmap.css?v=1">
+<link rel="stylesheet" href="/share.css?v=1">
+<link rel="stylesheet" href="/brandview.css?v=1">
+<link rel="stylesheet" href="/report.css?v=1">
+<link rel="stylesheet" href="/custom.css?v=1">
 </head>
 <body>
 
 <input type="checkbox" id="drawerToggle">
-<label class="scrim" for="drawerToggle"></label>
+<label class="scrim" id="spotScrim" for="drawerToggle"></label>
 <div class="drawer" id="drawer">
   <div class="dhead">
     <label class="closeX" for="drawerToggle">✕</label>
-    <div class="brand"><img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"></div>
+    <div class="brand"><img src="/ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"></div>
     <div class="tabs">
       <button class="tab on" data-pane="paneFilters">Filters</button>
       <button class="tab" data-pane="paneData">Data file<span class="dot" id="dataDot" style="display:none"></span></button>
@@ -388,6 +401,11 @@ tr.me .sharebar{background:#FF8A3D}
         <div class="sech"><span class="n">1</span> Period and category</div>
         <div class="flabel">Date range</div>
         <div class="dateRow"><input class="inp" type="date" id="fFrom" aria-label="From date"><input class="inp" type="date" id="fTo" aria-label="To date"></div>
+        <div class="flabel">Year type <span class="cnt">for YOY / Q / H bars</span></div>
+        <div class="segbar" id="fYearType">
+          <button class="seg on" data-v="CY">Calendar (Jan–Dec)</button>
+          <button class="seg" data-v="FY">Financial (Apr–Mar)</button>
+        </div>
         <div class="flabel">Product group</div>
         <select class="inp" id="fPg"></select>
       </div>
@@ -424,8 +442,20 @@ tr.me .sharebar{background:#FF8A3D}
         </div>
         <div class="flabel">Channel</div>
         <select class="inp" id="fChannel"></select>
-        <div class="flabel">Daypart</div>
-        <select class="inp" id="fDaypart"></select>
+        <div id="fSlotWrap"><div class="flabel">Time of day <span class="cnt">by Advt_time</span></div>
+        <div class="segbar" id="fSlot">
+          <button class="seg on" data-v="">All</button>
+          <button class="seg" data-v="PT">Prime time</button>
+          <button class="seg" data-v="NPT">Non prime time</button>
+        </div>
+        <div class="hint">Prime time is 6pm to 11pm. Non prime time is 7am to 6pm. Ads aired between 11pm and 7am, and Press (no time), are only in All.</div></div>
+      </div>
+      <div class="sec" id="secBrand" style="display:none">
+        <div class="sech"><span class="n">4</span> Brands</div>
+        <div class="flabel">Mother brand</div>
+        <select class="inp" id="fMb"></select>
+        <div id="fSubWrap"><div class="flabel">Sub category</div>
+        <select class="inp" id="fSub"></select></div>
       </div>
     </div>
 
@@ -461,24 +491,128 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
+<input type="checkbox" id="catDrawerToggle">
+<label class="scrim catscrim" id="catScrim" for="catDrawerToggle"></label>
+<div class="drawer" id="catDrawer">
+  <div class="dhead">
+    <label class="closeX" for="catDrawerToggle">✕</label>
+    <div class="brand"><img src="/ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub"></div>
+    <div class="brandsub">Category dashboard</div>
+    <div class="tabs">
+      <button class="ctab on" data-pane="cpFilters">Filters</button>
+      <button class="ctab" data-pane="cpData">Data file<span class="dot" id="catDataDot" style="display:none"></span></button>
+    </div>
+  </div>
+  <div class="dbodyw">
+    <div class="cpane on" id="cpFilters">
+      <div class="sec">
+        <div class="sech"><span class="n">1</span> Period and category</div>
+        <div class="flabel">Month range</div>
+        <div class="dateRow"><select class="inp" id="cFrom" aria-label="From month"></select><select class="inp" id="cTo" aria-label="To month"></select></div>
+        <div class="flabel">Quarter, half or year <span class="cnt">tick several to add them up</span></div>
+        <div class="segbar" id="cPickKind"><button class="seg on" data-v="q">Quarters</button><button class="seg" data-v="h">Halves</button><button class="seg" data-v="y">Years</button></div>
+        <div class="pchips" id="cPchips"></div>
+        <div class="psel" id="cPsel"></div>
+        <div class="flabel">Year type <span class="cnt">for quarters, halves, years</span></div>
+        <div class="segbar" id="cYearType">
+          <button class="seg on" data-v="CY">Calendar (Jan–Dec)</button>
+          <button class="seg" data-v="FY">Financial (Apr–Mar)</button>
+        </div>
+        <div class="flabel">Product group</div>
+        <select class="inp" id="cPg"></select>
+        <div id="cSubWrap"><div class="flabel">Sub category</div>
+        <select class="inp" id="cSub"></select></div>
+      </div>
+      <div class="sec">
+        <div class="sech"><span class="n">2</span> Advertisers</div>
+        <div class="flabel">My advertiser <span class="cnt" id="cMineCnt"></span></div>
+        <input class="inp search" id="cMineSearch" placeholder="Search advertisers">
+        <div class="olist" id="cMineList"></div>
+        <div class="flabel" style="margin-top:12px">Competitors <span class="cnt" id="cCompCnt"></span></div>
+        <input class="inp search" id="cCompSearch" placeholder="Search advertisers">
+        <div class="olist comp" id="cCompList"></div>
+        <div class="hint">Cards for mother brands of my advertisers are highlighted. Leave competitors empty to rank every mother brand; pick some to show only their mother brands plus mine.</div>
+      </div>
+      <div class="sec">
+        <div class="sech"><span class="n">3</span> Cards</div>
+        <div class="flabel">How many mother brands</div>
+        <div class="segbar" id="cTop">
+          <button class="seg" data-v="5">Top 5</button>
+          <button class="seg on" data-v="10">Top 10</button>
+          <button class="seg" data-v="15">Top 15</button>
+          <button class="seg" data-v="0">All</button>
+        </div>
+      </div>
+    </div>
+    <div class="cpane" id="cpData">
+      <div class="sec">
+        <div class="sech">Category data (this browser)</div>
+        <div id="cDfile"></div>
+        <div class="btnrow"><button class="btn ghost" id="cDeleteBtn" disabled>Remove data</button></div>
+      </div>
+      <div class="sec">
+        <div class="sech">Load a Category file (optional)</div>
+        <div class="cnote">The Category dashboard is built automatically from your main data file once its brands are confirmed in the Brand Map. Load a separate Category file only if you want to use your own.</div>
+        <label class="drop" id="cDrop" for="cFileInput">
+          <span id="cDropText">Drop .xlsx or .csv here, or click to choose</span>
+          <small>Read on this computer, never sent to the server · only you see it</small>
+        </label>
+        <input type="file" id="cFileInput" accept=".xlsx,.xlsm,.csv" style="display:none">
+        <div class="btnrow"><button class="btn pri" id="cUploadBtn" disabled>Upload</button></div>
+        <div class="prog" id="cProg" style="display:none"><div id="cProgBar"></div></div>
+        <div class="ustatus" id="cUstatus"></div>
+      </div>
+      <div class="sec cols">
+        <div class="sech">Columns used</div>
+        <code>Month</code> <code>Product Group</code> <code>Mother Brand</code> <code>Advertiser</code> <code>Brand</code>
+        <code>Tv (000Rs)</code> <code>Radio (000Rs)</code> <code>Press (000Rs)</code>, and optionally <code>Sub Category</code>.
+        Frequency, duration, insertion and Total columns are ignored. Month can be written like Jan-22.
+      </div>
+    </div>
+  </div>
+  <div class="dfoot" id="cDfoot">
+    <button class="resetBtn" id="cResetBtn">Reset</button>
+    <label class="applyBtn" for="catDrawerToggle" id="cApplyBtn">Apply Filters</label>
+  </div>
+</div>
+
 <div class="topbar">
   <div class="logo">
-    <img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub">
+    <img src="/ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub">
   </div>
-  <label class="fbtn" for="drawerToggle" id="filterBtn">☰ Filters</label>
-  <div class="daterange">
+  <button class="modebtn" id="modeBtn" title="Switch between the spot log dashboard and the category dashboard"><span class="mi">⇄</span><span id="modeTxt">Switch to Category</span></button>
+  <div class="sharebanner" id="shareBanner"></div>
+  <button class="modebtn bmbtn" data-open-brandmap title="Mother brand and sub category for every brand (shared by everyone)"><span class="mi">🏷</span><span>Brand map</span></button>
+  <label class="fbtn spot-only" for="drawerToggle" id="filterBtn">☰ Filters</label>
+  <label class="fbtn cat-only" for="catDrawerToggle" id="catFilterBtn">☰ Filters</label>
+  <div class="daterange cat-only">
+    <span class="dr-l">Period</span>
+    <span class="dr-v" id="catPeriodText">No data</span>
+    <span class="chip" id="catPeriodLen" style="background:#F4F6FA;color:#6B7590">0 months</span>
+  </div>
+  <div class="chips cat-only" id="catChips"></div>
+  <div class="daterange spot-only">
     <span class="dr-l">Period</span>
     <span class="dr-v" id="periodText">No data</span>
     <span class="chip" id="periodLen" style="background:#F4F6FA;color:#6B7590">0 months</span>
   </div>
-  <div class="chips" id="chips"></div>
+  <div class="chips spot-only" id="chips"></div>
   <div class="tright" id="tright">
-    <button class="fbtn light" id="exportBtn">Export ▾</button>
-    <button class="fbtn light" id="shareBtn">Share</button>
-    <div class="menu" id="exportMenu">
+    <button class="fbtn light cat-only" id="catShareBtn" title="Copy a link that opens this view with the same filters">Share</button>
+    <button class="fbtn light cat-only" id="catExportBtn">Export ▾</button>
+    <div class="menu cat-only" id="catExportMenu">
+      <button data-x="jpg"><b>JPG images (ZIP)</b><span>Each section (cards, month by month, sub categories) as its own JPG</span></button>
+      <button data-x="ppt"><b>PowerPoint (PPT, editable)</b><span>Native tables, text and shapes: one slide per section</span></button>
+      <hr>
+      <button data-x="report"><b>Full report (PowerPoint)</b><span>Everything: both dashboards with all flips, then advertiser analysis, then brand by brand</span></button>
+    </div>
+    <button class="fbtn light spot-only" id="exportBtn">Export ▾</button>
+    <button class="fbtn light spot-only" id="shareBtn">Share</button>
+    <div class="menu spot-only" id="exportMenu">
       <button data-x="jpg"><b>JPG images (ZIP)</b><span>Full dashboard plus each chart as its own JPG</span></button>
       <button data-x="pdf"><b>PDF</b><span>The whole dashboard on one landscape page</span></button>
       <button data-x="ppt"><b>PowerPoint (PPT)</b><span>Title slide, full dashboard, then one slide per chart</span></button>
+      <button data-x="report"><b>Full report (PowerPoint)</b><span>Everything: both dashboards with all flips, then advertiser analysis, then brand by brand</span></button>
       <hr>
       <button data-x="send"><b>Send to planning tool</b><span>Opens the media planning tool with competitor channels, programmes, breaks, lengths and timing</span></button>
       <button data-x="json"><b>Competitor data for planning tool (JSON)</b><span>The same data as a file, to import by hand</span></button>
@@ -494,6 +628,7 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
+<div class="view" id="viewSpot">
 <div class="kpirow" id="kpis">
   <div class="card kpi" id="k1" data-tip="Click to see every advertiser in the category">
     <div class="kl">Total Category Spend <span class="more">Details ›</span></div>
@@ -516,8 +651,12 @@ tr.me .sharebar{background:#FF8A3D}
     <div class="fill" id="donut"></div>
   </div>
   <div class="card" id="cardTrend">
-    <h3 id="h-line">Monthly Spend Trend: Me vs Competitors</h3>
+    <div class="chead"><div class="ctitle"><h3 id="h-line">Monthly Spend Trend: Us vs Competitors</h3></div>
+      <div class="tgl sm" data-trpart hidden><button data-v="yoy" class="on">YOY</button><button data-v="q">Q</button><button data-v="h">H</button></div>
+      <div class="tgl sm" data-trside hidden><button data-v="cat" class="on">Category</button><button data-v="mine" class="o">Us</button></div>
+      <div class="tgl" data-trflip title="Flip between the monthly lines and the stacked medium bars"><button data-v="lines" class="on">Lines</button><button data-v="bars">Bars</button></div></div>
     <p class="sub" id="p-line">LKR Mn · smoothed curves · my advertiser emphasised · dotted line is the category average</p>
+    <label class="tick trtick" id="trHideWrap" hidden><input type="checkbox" id="trHide"><span>Hide incomplete periods</span></label>
     <div class="fill" id="trend"></div>
   </div>
   <div class="card" id="cardDrill">
@@ -533,6 +672,7 @@ tr.me .sharebar{background:#FF8A3D}
       <div class="tgl" data-sosview><button data-v="period" class="on">Period</button><button data-v="year">By year</button><button data-v="month">By month</button></div></div>
     <p class="sub" id="p-sos">Selected period · my advertiser vs competitors · click a row for details</p>
     <div class="fill" id="sosTable"></div>
+    <div class="sosflip" id="sosFlip" hidden><span>View as</span><div class="tgl" data-sosflip><button data-v="table" class="on">Table</button><button data-v="chart">Chart</button></div></div>
   </div>
   <div class="card" id="cardMix">
     <div class="chead"><div class="ctitle"><h3 id="h-mix">Channel Mix</h3></div>
@@ -543,14 +683,92 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
   <div class="card" id="cardDur">
     <div class="chead"><div class="ctitle"><h3 id="h-dur">Duration Mix</h3></div>
-      <div class="tgl" data-durmed><button data-v="All" class="on">TV + Radio</button><button data-v="TV">TV</button><button data-v="Radio">Radio</button></div></div>
+      <div class="tgl" data-durmed><button data-v="TV" class="on">TV</button><button data-v="Radio">Radio</button></div></div>
     <div class="fill" id="duration"></div>
   </div>
+</div>
+</div>
+
+<div class="view" id="viewCat">
+  <div class="cone" id="catOne">
+    <section class="cpanel cards" id="catS1">
+      <div class="chead2">
+        <div class="ctl"><h2 class="cedit" id="catTitle" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2><p id="catSub"></p></div>
+        <div class="ctot" title="Click for the whole selection"><span id="catTotLabel">TOTAL</span><b id="catTot">0 Mn</b></div>
+      </div>
+      <div class="cstrip">
+        <button type="button" class="cs-arrow l" id="csPrev" aria-label="Show earlier brands" hidden>‹</button>
+        <div class="cgrid" id="catGrid"></div>
+        <button type="button" class="cs-arrow r" id="csNext" aria-label="Show more brands" hidden>›</button>
+      </div>
+      <div class="clegend" id="catLegend" hidden></div>
+    </section>
+    <div class="cmain">
+      <div class="ccolL">
+        <section class="cpanel slidepanel" id="catLeft">
+          <button type="button" class="slidetab" id="catSlide" aria-label="Show the monthly investment by brand chart" aria-pressed="false" title="Slide between category investment and monthly investment by brand"><span class="st-arrow">›</span><span class="st-text">Monthly by brand</span></button>
+          <div class="slider" id="catSlider">
+            <div class="sview" id="catS0">
+              <div class="cph">
+                <span class="cpt label">Category investment</span>
+                <h2 class="cedit" id="catTitle0" contenteditable="true" spellcheck="false" hidden></h2>
+                <p id="catSub0" hidden></p>
+                <label class="opt2" id="catCiHideWrap"><input type="checkbox" id="catCiHide">Hide incomplete</label>
+                <div class="tgl" id="catCiTgl" title="Group by year, half year or quarter (follows Calendar / Financial year)"><button data-v="y" class="on">Years</button><button data-v="h">Halves</button><button data-v="q">Quarters</button></div>
+                <button type="button" class="flipbtn" id="catCiFlip" aria-label="Flip between category and sub category investment" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-15.5-6.2L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 15.5 6.2L21 16"/><path d="M21 21v-5h-5"/></svg><span>Sub categories</span></button>
+              </div>
+              <div class="flipbox" id="catCiBox">
+                <div class="face f" id="ciFront"></div>
+                <div class="face b" id="ciBack"></div>
+              </div>
+              <div class="ci-notes" id="catCiNotes" contenteditable="true" spellcheck="false" title="Click to edit the notes"></div>
+            </div>
+            <div class="sview" id="catS2">
+              <div class="cph">
+                <span class="cpt label">Monthly investment by brand</span>
+                <h2 class="cedit" id="catTitle2" contenteditable="true" spellcheck="false" hidden></h2>
+                <p id="catSub2" hidden></p>
+                <div class="tgl" id="catPartTgl" title="Group the chart by month, quarter, half year or year (follows Calendar / Financial year)"><button data-v="m" class="on">Months</button><button data-v="q">Quarters</button><button data-v="h">Halves</button><button data-v="y">Years</button></div>
+              </div>
+              <div class="cchart" id="catChart"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+      <div class="ccolR">
+        <section class="cpanel slidepanel" id="catS3">
+          <button type="button" class="slidetab" id="catRSlide" hidden aria-label="Show channel preference by brands" aria-pressed="false" title="Slide between investment by mother brand and channel preference by brands"><span class="st-arrow">›</span><span class="st-text">Channel preference</span></button>
+          <div class="slider" id="catRSlider">
+            <div class="sview" id="catR0">
+          <div class="cph">
+            <h2 class="cedit cpt" id="catTitle3" contenteditable="true" spellcheck="false" title="Click to edit the headline"></h2>
+            <p id="catSub3" hidden></p>
+            <button type="button" class="flipbtn" id="catBrFlip" aria-label="Flip between mother brand tables and mix and contribution" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-15.5-6.2L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 15.5 6.2L21 16"/><path d="M21 21v-5h-5"/></svg><span>Mix &amp; contribution</span></button>
+          </div>
+          <div class="flipbox" id="catBrBox">
+            <div class="face f"><div class="csubs" id="catSubs"></div></div>
+            <div class="face b"><div class="csubs mixc" id="catMixC"></div></div>
+          </div>
+            </div>
+            <div class="sview" id="catR1">
+              <div class="cph">
+                <span class="cpt label">Channel preference by brands</span>
+                <p id="catSub4" hidden></p>
+                <div class="tgl" id="catCpMed" title="Which channels to show"><button data-v="TV" class="on">TV</button><button data-v="Radio">Radio</button><button data-v="Press">Press</button><button data-v="">All media</button></div>
+              </div>
+              <div class="cchart" id="catChPref"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+  <div class="coverlay" id="catOverlay"><div class="ovcard"><h3 id="catOvTitle">Load your category file</h3><p id="catOvText"></p><label class="fbtn" for="catDrawerToggle">☰ Open Filters</label></div></div>
 </div>
 
 <div class="overlay" id="overlay">
   <div class="ovcard">
-    <img src="ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub" class="ovlogo">
+    <img src="/ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub" class="ovlogo">
     <h2 id="ovTitle">No data uploaded yet</h2>
     <p id="ovText">Open the filter drawer and upload your spot log as .xlsx or .csv. Large files (400k+ rows) take up to a minute to process.</p>
     <label class="fbtn" for="drawerToggle" id="ovBtn">☰ Open Filters</label>
@@ -572,6 +790,7 @@ tr.me .sharebar{background:#FF8A3D}
     <div class="mtabs" id="mTabs">
       <button data-t="adv" class="on">Advertisers</button>
       <button data-t="camp">Campaigns</button>
+      <button data-t="va" hidden>Value additions</button>
       <button data-t="ch">Channels</button>
       <button data-t="mon">Months</button>
     </div>
@@ -580,6 +799,19 @@ tr.me .sharebar{background:#FF8A3D}
   </div>
 </div>
 
-<script src="app.js?v=31"></script>
+<div class="bvpage" id="bvPage"></div>
+<div class="bmmodal" id="rpModal"></div>
+<div class="bmmodal" id="shareModal"></div>
+<div class="bmmodal" id="bmConfirm"></div>
+<div class="bmmodal" id="bmPage"></div>
+<div class="cmodal" id="catModal"><div class="cmbox" id="catModalBox"></div></div>
+
+<script src="/app.js?v=34"></script>
+<script src="/brandmap.js?v=1"></script>
+<script src="/share.js?v=1"></script>
+<script src="/brandview.js?v=1"></script>
+<script src="/category.js?v=3"></script>
+<script src="/report.js?v=1"></script>
+<script src="/custom.js?v=1"></script>
 </body>
 </html>

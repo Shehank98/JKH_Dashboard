@@ -28,11 +28,12 @@ class Dict {
 class Builder {
   constructor() {
     this.pg = new Dict(); this.adv = new Dict(); this.channel = new Dict(); this.theme = new Dict();
-    this.program = new Dict(); this.adPos = new Dict();
+    this.program = new Dict(); this.adPos = new Dict(); this.product = new Dict();
     // prog/adPos: programme and which break of it (Start / Mid / End); brk: break number; pos/ads: slot in the
     // break and ads in that break (0 = not given); hour: hour the ad aired (255 = no time, e.g. Press).
     this.cols = { pg: [], adv: [], ch: [], theme: [], day: [], mon: [], dp: [], dur: [], durRaw: [], bq: [], cost: [],
-      prog: [], adPos: [], brk: [], pos: [], ads: [], hour: [] };
+      prog: [], adPos: [], brk: [], pos: [], ads: [], hour: [], product: [] };
+    this.hasProduct = false;
     this.header = null; // array index -> key
     this.rows = 0; this.skipped = 0; this.scanned = 0;
   }
@@ -50,6 +51,7 @@ class Builder {
       throw new Error('Missing required column(s): ' + missing.map(k => names[k]).join(', '));
     }
     this.header = map;
+    this.hasProduct = found.has('product');
     return true;
   }
 
@@ -76,6 +78,7 @@ class Builder {
     c.adv.push(this.adv.id(r.adv));
     c.ch.push(this.channel.id(r.channel));
     c.theme.push(this.theme.id(r.theme));
+    c.product.push(this.product.id(r.product));
     c.day.push(day);
     c.mon.push(dt.getUTCFullYear() * 12 + dt.getUTCMonth());
     const minutes = D.parseTime(r.advtTime);
@@ -102,6 +105,7 @@ class Builder {
       theme: Int32Array.from(c.theme), day: Int32Array.from(c.day), mon: Int32Array.from(c.mon),
       dp: Uint8Array.from(c.dp), dur: Uint8Array.from(c.dur), durRaw: Float32Array.from(c.durRaw), bq: Uint8Array.from(c.bq),
       cost: Float64Array.from(c.cost),
+      product: Int32Array.from(c.product),
       prog: Int32Array.from(c.prog), adPos: Int32Array.from(c.adPos),
       brk: Uint8Array.from(c.brk), pos: Uint8Array.from(c.pos), ads: Uint8Array.from(c.ads), hour: Uint8Array.from(c.hour),
     };
@@ -114,10 +118,10 @@ class Builder {
     }
     const channels = this.channel.list;
     return {
-      meta: { ...meta, rows: this.rows, skipped: this.skipped, minDay, maxDay },
+      meta: { ...meta, rows: this.rows, skipped: this.skipped, minDay, maxDay, hasProduct: this.hasProduct },
       dicts: {
         pg: this.pg.list, adv: this.adv.list, channel: channels, theme: this.theme.list,
-        program: this.program.list, adPos: this.adPos.list,
+        program: this.program.list, adPos: this.adPos.list, product: this.product.list,
         channelMedium: channels.map(D.mediumOf), channelName: channels.map(D.channelNameOf),
       },
       cols,

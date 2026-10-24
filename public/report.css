@@ -1,0 +1,11 @@
+.rp-box{width:min(680px,100%)}
+.rp-list{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.rp-sel{font:inherit;font-size:11.5px;padding:1px 4px;border:1px solid #D5DBEA;border-radius:6px;background:#fff;color:#1A1F36}
+.rp-prog{margin-top:14px}
+.rp-bar{height:8px;background:#EEF1F7;border-radius:6px;overflow:hidden}
+.rp-bar i{display:block;height:100%;width:0;background:#FF8A3D;transition:width .25s}
+.rp-step{font-size:11.5px;color:#6B7590;margin-top:6px;min-height:16px}
+/* while the report photographs the Spot Log pop-up: let it grow and keep only the top rows */
+body.rpt #modal .mbox{max-height:none!important;height:auto!important}
+body.rpt #modal .mbody{max-height:none!important;overflow:visible!important}
+body.rpt #modal .mbody table tbody tr:nth-child(n+16){display:none}

@@ -36,6 +36,7 @@ function planning(ds, f, meta = {}) {
   const mediumId = D.MEDIA.indexOf(f.medium);
   const chId = f.channel ? dicts.channel.indexOf(f.channel) : -1;
   const dpId = f.daypart ? D.DAYPARTS.indexOf(f.daypart) : -1;
+  const slot = D.slotId(f.slot);
   const adType = f.adType === 'Sponsorship' ? 2 : f.adType === 'Commercial' ? 1 : 0;
   const role = new Uint8Array(nAdv); // 1 = mine, 2 = competitor
   for (const n of f.comps || []) { const i = dicts.adv.indexOf(n); if (i >= 0) role[i] = 2; }
@@ -62,6 +63,7 @@ function planning(ds, f, meta = {}) {
   let catSpend = 0, catSpots = 0;
 
   const { pg, adv, ch, theme, day, mon, dp, dur, cost } = cols;
+  const hourCol = cols.hour || new Uint8Array(pg.length).fill(255);
   const durRaw = cols.durRaw || null;
   const chMed = dicts.channelMedium;
 
@@ -72,7 +74,7 @@ function planning(ds, f, meta = {}) {
     const c = ch[i], md = chMed[c];
     if (mediumId >= 0 && md !== mediumId) continue;
     if (chId >= 0 && c !== chId) continue;
-    if (dpId >= 0 && dp[i] !== dpId) continue;
+    if ((dpId >= 0 && dp[i] !== dpId) || (slot && !D.slotOk(slot, hourCol[i]))) continue;
     const th = theme[i], sponsor = excluded[th] === 1;
     if (adType && (sponsor ? 2 : 1) !== adType) continue;
     const a = adv[i], v = cost[i], k = mon[i] - m0;
@@ -137,8 +139,9 @@ function planning(ds, f, meta = {}) {
       ['Period', `${toIso(from)} to ${toIso(to)} (${nM} month${nM === 1 ? '' : 's'})`],
       ['Medium', f.medium === 'All' || mediumId < 0 ? 'All media (TV, Radio, Press)' : f.medium + ' only'],
       ['Channel', f.channel || 'All channels'],
-      ['Daypart', f.daypart || 'All dayparts'],
+      ['Time of day', { PT: 'Prime time (18:00 to 23:00)', NPT: 'Non prime time (07:00 to 18:00)' }[f.slot] || (f.daypart || 'All')],
       ['Ad type', adTypeLabel],
+      ['Year type', f.yearType === 'FY' ? 'Financial year (Apr–Mar)' : 'Calendar year (Jan–Dec)'],
       ['Tag (Advt_Theme)', f.tagCommercial ? 'Counted as a commercial' : 'Counted as a Value Addition'],
       ['My advertiser(s)', (f.mine || []).join(', ') || 'None selected'],
       ['Competitors', (f.comps || []).join(', ') || 'None selected'],
@@ -279,13 +282,18 @@ function planning(ds, f, meta = {}) {
     const list = [];
     for (const [k, t] of themes) if (Math.floor(k / nTheme) === a) list.push({ th: k % nTheme, ...t });
     list.sort((x, y) => y.spend - x.spend);
-    const shown = role[a] === 1 ? list : list.slice(0, 10);
-    p(`### ${name(a)}${role[a] === 1 ? ' (mine)' : ''}`, '',
-      table(['Campaign', 'Type', 'Spend (LKR Mn)', '% of advertiser', 'Spots', 'Months active', 'First spot', 'Last spot', 'Channels'],
-        shown.map(t => [dicts.theme[t.th] || '(blank)', excluded[t.th] ? 'VA' : 'Commercial', mn(t.spend), pc(t.spend, spend[a]), int(t.spots), t.months.size,
+    p(`### ${name(a)}${role[a] === 1 ? ' (mine)' : ''}`, '');
+    const heads = ['Campaign', 'Type', 'Spend (LKR Mn)', '% of advertiser', 'Spots', 'Months active', 'First spot', 'Last spot', 'Channels'];
+    const groups = [['Commercials', list.filter(t => !excluded[t.th])], ['Value additions', list.filter(t => excluded[t.th])]].filter(g => g[1].length);
+    for (const [label, items] of groups) {
+      const shown = role[a] === 1 ? items : items.slice(0, 10);
+      p(`#### ${label}`, '',
+        table(heads, shown.map(t => [dicts.theme[t.th] || '(blank)', excluded[t.th] ? 'VA' : 'Commercial', mn(t.spend), pc(t.spend, spend[a]), int(t.spots), t.months.size,
           toIso(t.first), toIso(t.last), [...t.channels].sort((x, y) => chA[y * nAdv + a] - chA[x * nAdv + a]).map(c => dicts.channelName[c]).join(', ')]),
         ['l', 'l', 'r', 'r', 'r', 'r', 'l', 'l', 'l']),
-      list.length > shown.length ? `\n${list.length - shown.length} smaller campaigns not listed.` : '', '');
+        items.length > shown.length ? `\n${items.length - shown.length} smaller ${label.toLowerCase()} not listed.` : '', '');
+    }
+    if (!groups.length) p('No campaigns in this selection.', '');
   }
 
   // ---- 11. monthly lead per month ----

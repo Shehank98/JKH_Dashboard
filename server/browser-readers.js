@@ -5,6 +5,7 @@
 
 const JSZip = require('jszip');
 const { Builder } = require('./builder');
+const { CategoryBuilder } = require('./category-builder');
 
 const yieldNow = () => new Promise(r => setTimeout(r, 0));
 
@@ -192,10 +193,9 @@ async function readXlsx(file, builder, onProgress) {
 }
 
 // Reads a File (or Blob with a name) and returns the dataset. onProgress(fraction 0..1, rowsSoFar).
-async function readSpotFile(file, onProgress = () => {}) {
+async function readSpotFile(file, onProgress = () => {}, builder = new Builder()) {
   const name = file.name || '';
   const ext = (name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
-  const builder = new Builder();
   const started = Date.now();
   if (ext === '.xlsx' || ext === '.xlsm') await readXlsx(file, builder, onProgress);
   else if (ext === '.csv' || ext === '.txt' || ext === '.tsv') await readCsv(file, builder, onProgress);
@@ -204,4 +204,7 @@ async function readSpotFile(file, onProgress = () => {}) {
   return builder.finish({ fileName: name, size: file.size, uploadedAt: new Date().toISOString(), parseMs: Date.now() - started });
 }
 
-module.exports = { readSpotFile };
+// Same readers, feeding the Category builder (Month, Mother Brand, Advertiser, Brand, Tv/Radio/Press 000Rs).
+const readCategoryFile = (file, onProgress) => readSpotFile(file, onProgress, new CategoryBuilder());
+
+module.exports = { readSpotFile, readCategoryFile };

@@ -19,6 +19,27 @@ Ogilvy Orbit – Chub: a full-screen competitive media spend dashboard for Sri L
 
 * **Sign-in** to the Live Dashboard: people create their own account with an Ogilvy email address, confirm it with a 6-digit code sent by email, and reset a forgotten password the same way. The top bar shows who is signed in, with **Sign out**.
 
+## Sharing with a client
+
+**Share** (Spot Log dashboard) saves a summarised copy of the data (a "data cube": monthly records by channel, advertiser, mother brand and sub category, never the raw spots) and gives a link, `/share/<token>`, that opens with no sign-in. Links can expire and be turned off. The detail level (Full, Standard, Compact) decides which cards and tabs exist (campaign names and Duration mix need Full).
+
+* **Full dashboard**: the whole Spot Log dashboard, and optionally the Category dashboard behind a "Switch to Category" button. The Category brand view works for the client too; because a link holds mother brand and sub category only, its Brands tab lists sub categories.
+* **Customized dashboard**: the agency drags the real dashboard cards onto a 12-column grid (charts on the left, canvas on the right), resizes them, adds text boxes, and the client opens that layout read-only, with the filters left on and the usual click-through pop-ups. The Category dashboard can be customized on its own canvas too (its four hidden slide charts are separate widgets); leaving it empty gives the client the whole Category dashboard. **Edit layout** on a shared link updates the same link. The layout is stored with the share (`locked_filters.layout`).
+
+## Full report (PowerPoint)
+
+**Export, Full report (PowerPoint)** builds one deck from the real screens, in the Ogilvy PowerPoint format: cover, agenda, then Overall analysis (every flip and tab of both dashboards), Advertiser analysis (the category, then Commercials, Value additions, Channels and Months for each selected advertiser) and Brand analysis (the top mother brands, tab by tab). Optional **Short note using AI on each slide** adds three "Key insights" per slide, written from the advertiser's side by a local Ollama model (see below).
+
+## AI slide notes (Ollama)
+
+The server only relays text to an Ollama server (`/api/ai/status`, `/api/ai/notes`, and `/api/ai/test` to check speed). Run Ollama with the [`ollama-service/`](ollama-service/README.md) folder (its own Railway service with a volume) and set these on the dashboard service:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `OLLAMA_URL` | `http://127.0.0.1:11434` | Where Ollama is (on Railway: `http://<service-name>.railway.internal:11434`). |
+| `OLLAMA_MODEL` | `llama3.2:3b` | The model used first (`qwen2.5:3b` is the other one the service downloads). |
+| `OLLAMA_THREADS` | `8` | CPU threads for the model. Set it to the vCPUs the Ollama service really has. |
+
 ## Admin panel
 
 A separate admin area at **`/admin`** (link: "Automation team? Admin sign-in" on the login page, or **Admin panel** in the dashboard's user menu for admins). Admins sign in with their normal account at `/admin/login`; the admin session is separate from the dashboard one and lasts 12 hours.

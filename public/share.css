@@ -1,0 +1,47 @@
+.sh-box{background:#fff;border-radius:16px;width:min(640px,100%);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.sh-h{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid #EEF1F7}
+.sh-h h3{font-size:18px;letter-spacing:-.2px;flex:1}
+.sh-body{overflow:auto;padding:6px 20px 14px;flex:1}
+.sh-l{display:block;font-size:11.5px;font-weight:700;color:#1A1F36;margin-top:12px}
+.sh-l small{font-weight:500;color:#8A93AD}
+.sh-l .bm-search{display:block;width:100%;margin-top:5px;box-sizing:border-box;font-weight:500}
+.sh-levels{display:grid;gap:6px;margin-top:6px}
+.sh-lv{display:grid;grid-template-columns:18px 78px 1fr;align-items:center;gap:6px;border:1px solid #DDE3EF;border-radius:10px;padding:8px 10px;cursor:pointer;font-size:11.5px}
+.sh-lv.on{border-color:#FF8A3D;background:#FFF7F1}
+.sh-lv b{font-size:12px}.sh-lv span{color:#6B7590;line-height:1.35}
+.sh-ck{display:flex;gap:8px;align-items:flex-start;font-size:12px;margin-top:12px;cursor:pointer}
+.sh-ck small{color:#8A93AD;font-weight:500}
+.sh-status{margin-top:14px;background:#F6F8FC;border-radius:10px;padding:10px 12px;font-size:12px;color:#1A1F36;min-height:18px}
+.sh-status.err{background:#FDECEC;color:#B42318}
+.sh-spin{display:inline-block;width:11px;height:11px;border:2px solid #DDE3EF;border-top-color:#FF8A3D;border-radius:50%;animation:shspin .8s linear infinite;vertical-align:-2px;margin-right:4px}
+@keyframes shspin{to{transform:rotate(360deg)}}
+.sh-note{font-size:11px;line-height:1.5;color:#6B7590;margin-top:12px}
+.sh-ok{font-size:15px;font-weight:800;color:#14803F;margin-top:14px}
+.sh-link{display:flex;gap:8px;margin-top:10px}.sh-link .bm-search{min-width:0}
+.sh-open{display:inline-block;margin-top:6px;font-size:12px;font-weight:700;color:#2F5DBF}
+.sh-lh{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:#8A93AD;font-weight:700;margin:18px 0 4px}
+.sh-list .bm-t td{padding:6px}
+.sh-f{display:flex;align-items:center;gap:10px;padding:14px 20px;border-top:1px solid #EEF1F7}
+.sh-f .btn{flex:0 0 auto;width:auto;padding:9px 16px}.sh-f .btn.ghost{color:#1A1F36}
+.sh-flink{border:none;background:none;font:inherit;font-size:11px;color:#6B7590;text-decoration:underline;cursor:pointer;padding:0}
+.sh-err{flex:1;color:#D12B2B;font-size:12px;font-weight:600;text-align:right}
+/* The client's read-only view */
+.sharebanner{display:none}
+body.share-mode .sharebanner{display:flex;align-items:baseline;gap:10px;min-width:0;overflow:hidden;white-space:nowrap}
+.sharebanner b{font-size:14px;letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis}
+.sharebanner span{font-size:11.5px;color:#6B7590}
+body.share-nocat #modeBtn,body.share-nocat #viewCat,body.share-nocat #catDrawerToggle,body.share-nocat #catFilterBtn,
+body.share-mode #catShareBtn,body.share-mode .ctab[data-pane="cpData"],body.share-mode #cpData,body.share-mode #cDeleteBtn,
+body.share-mode .bmbtn,body.share-mode #shareBtn,body.share-mode #userBtn,body.share-mode #userMenu,
+body.share-mode .tab[data-pane="paneData"],body.share-mode #paneData,
+body.share-mode #exportMenu [data-x="send"],body.share-mode #exportMenu [data-x="json"],body.share-mode #exportMenu [data-x="plan"],
+body.share-mode #exportMenu hr,body.share-mode #catExportMenu hr,body.share-mode [data-x="report"],body.share-nocampaign label.tick:has(#fTagCommercial){display:none!important}
+body.share-mode #bmPage,body.share-mode #bmConfirm{display:none!important}
+body.share-fail .topbar .fbtn,body.share-fail .tright{display:none}
+.sh-ck.off{opacity:.55;cursor:default}
+.sh-modes{grid-template-columns:repeat(2,minmax(0,1fr))}
+.sh-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.sh-chip{font:inherit;font-size:11.5px;font-weight:600;border:1.5px solid #E5E9F2;border-radius:999px;padding:4px 10px;background:#fff;color:#8A93AD;cursor:pointer}
+.sh-chip.on{border-color:#2F5DBF;background:#E3EBFB;color:#2F5DBF}
+.share-sum{display:flex;align-items:center;gap:12px;margin-top:10px;border:1px solid #E5E9F2;border-radius:10px;padding:10px 12px;font-size:12px;background:#fff}
+.share-sum .btn{width:auto}

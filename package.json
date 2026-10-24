@@ -1,7 +1,7 @@
 {
   "name": "ogilvy-orbit-chub",
   "version": "1.0.0",
-  "description": "Ogilvy Orbit – Chub: competitive media spend for Sri Lankan advertisers. Upload an .xlsx or .csv spot log and compare your spend against competitors.",
+  "description": "Ogilvy Orbit \u2013 Chub: competitive media spend for Sri Lankan advertisers. Upload an .xlsx or .csv spot log and compare your spend against competitors.",
   "main": "server.js",
   "private": true,
   "scripts": {
@@ -13,10 +13,16 @@
     "test:db": "node scripts/db-test.js",
     "test:readers": "node --max-old-space-size=4096 scripts/browser-readers-test.js",
     "check": "node scripts/check-drilldowns.js samples/sample_420000.csv",
-    "verify": "node scripts/verify-drilldowns.js samples/sample_420000.csv"
+    "verify": "node scripts/verify-drilldowns.js samples/sample_420000.csv",
+    "test:category": "node scripts/category-test.js",
+    "sample:category": "node scripts/generate-category-sample.js",
+    "test:brandmap": "node scripts/brandmap-test.js",
+    "test:cube": "node scripts/cube-test.js",
+    "test:shares": "node scripts/shares-test.js",
+    "test:brandview": "node scripts/category-brand-test.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": "22.x"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",

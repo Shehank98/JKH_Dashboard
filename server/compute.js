@@ -29,10 +29,12 @@ function groupOptions(ds, pgName) {
   const chSpend = new Float64Array(ds.dicts.channel.length);
   const advSeen = new Uint8Array(ds.dicts.adv.length);
   const chSeen = new Uint8Array(ds.dicts.channel.length);
+  const prodSpend = ds.dicts.productMother ? new Float64Array(ds.dicts.product.length) : null; // data cubes: mother brand + sub category
   for (let i = 0; i < pg.length; i++) {
     if (pg[i] !== pgId) continue;
     advSpend[adv[i]] += cost[i]; advSeen[adv[i]] = 1;
     chSpend[ch[i]] += cost[i]; chSeen[ch[i]] = 1;
+    if (prodSpend) prodSpend[ds.cols.product[i]] += cost[i];
   }
   const advertisers = [];
   advSeen.forEach((s, i) => { if (s) advertisers.push({ name: ds.dicts.adv[i], spend: advSpend[i] }); });
@@ -42,7 +44,13 @@ function groupOptions(ds, pgName) {
     if (s) channels.push({ name: ds.dicts.channel[i], medium: D.MEDIA[ds.dicts.channelMedium[i]], spend: chSpend[i] });
   });
   channels.sort((a, b) => a.medium.localeCompare(b.medium) || b.spend - a.spend);
-  return { advertisers, channels };
+  const out = { advertisers, channels };
+  if (prodSpend) {
+    out.brands = [];
+    prodSpend.forEach((v, i) => { if (v > 0) out.brands.push({ mother: ds.dicts.productMother[i], sub: ds.dicts.productSub[i] || '', spend: v }); });
+    out.brands.sort((x, y) => y.spend - x.spend);
+  }
+  return out;
 }
 
 // Old saved datasets (no raw Dur) store the previous buckets 5/15/20/30/30+; map them onto 5/10/15/20/30/30+.
@@ -68,9 +76,25 @@ function resolve(ds, f) {
   const { dicts } = ds;
   const pgId = dicts.pg.indexOf(f.pg);
   if (pgId < 0) throw new Error('Unknown product group');
-  const from = toDay(f.from), to = toDay(f.to);
+  let from = toDay(f.from), to = toDay(f.to);
   if (!(to >= from)) throw new Error('Invalid date range');
-  const len = to - from + 1;
+  let len = to - from + 1;
+  // A shared data cube holds whole months only, so the range snaps to whole months and the previous period is the
+  // same number of months just before it.
+  let pFrom0 = null;
+  if (ds.meta.cube) {
+    const a = new Date(from * 86400000), b = new Date(to * 86400000);
+    const ma = a.getUTCFullYear() * 12 + a.getUTCMonth(), mb = b.getUTCFullYear() * 12 + b.getUTCMonth();
+    const first = m => Math.round(Date.UTC(Math.floor(m / 12), m % 12, 1) / 86400000);
+    from = first(ma); to = first(mb + 1) - 1; len = to - from + 1;
+    pFrom0 = first(ma - (mb - ma + 1));
+  }
+  // Mother brand and sub category filters (data cubes only): which "product" entries pass.
+  let prodMask = null;
+  if ((f.mb || f.sub) && dicts.productMother) {
+    prodMask = new Uint8Array(dicts.product.length);
+    dicts.product.forEach((_, i) => { prodMask[i] = (!f.mb || dicts.productMother[i] === f.mb) && (!f.sub || (dicts.productSub[i] || '') === f.sub) ? 1 : 0; });
+  }
   // role: 1 = mine, 2 = competitor. Mine wins if a name is in both lists.
   const role = new Uint8Array(dicts.adv.length);
   const compIds = [];
@@ -78,20 +102,26 @@ function resolve(ds, f) {
   const mineIds = [];
   for (const n of f.mine || []) { const i = dicts.adv.indexOf(n); if (i >= 0) { role[i] = 1; mineIds.push(i); } }
   return {
-    pgId, from, to, pFrom: from - len, pTo: from - 1,
+    pgId, from, to, pFrom: pFrom0 != null ? pFrom0 : from - len, pTo: from - 1, prodMask,
     mediumId: D.MEDIA.indexOf(f.medium),
     chId: f.channel ? dicts.channel.indexOf(f.channel) : -1,
     dpId: f.daypart ? D.DAYPARTS.indexOf(f.daypart) : -1,
+    slot: D.slotId(f.slot),
     role, mineIds, comps: compIds.filter(i => role[i] === 2),
     // Ad type: 0 = all, 1 = commercials only, 2 = sponsorship items only.
     adType: f.adType === 'Sponsorship' ? 2 : f.adType === 'Commercial' ? 1 : 0,
   };
 }
 
+// Calendar year y is Jan-Dec y; financial year y is 1 Apr y to 31 Mar y+1.
+const yearBounds = (y, fy) => (fy ? { from: `${y}-04-01`, to: `${y + 1}-03-31` } : { from: `${y}-01-01`, to: `${y}-12-31` });
+const yearLabel = (y, fy) => (fy ? `FY ${String(y).slice(2)}/${String(y + 1).slice(2)}` : String(y));
+
 function dashboard(ds, f) {
   const { dicts, cols } = ds;
   const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
-  const { pgId, from, to, pFrom, pTo, mediumId, chId, dpId, role, mineIds, comps, adType } = resolve(ds, f);
+  const { pgId, from, to, pFrom, pTo, mediumId, chId, dpId, slot, role, mineIds, comps, adType, prodMask } = resolve(ds, f);
+  const hourCol = cols.hour || new Uint8Array(cols.pg.length).fill(255);
   const excluded = excludedThemes(ds, !!f.tagCommercial);
   // Month Drill Down never picks a sponsorship item as the lead campaign, except when only sponsorships are shown.
   const skipCampaign = adType === 2 ? null : excluded;
@@ -104,6 +134,7 @@ function dashboard(ds, f) {
   const monAdv = new Float64Array(nM * nAdv);
   const monCat = new Float64Array(nM), monMine = new Float64Array(nM);
   const medCat = [0, 0, 0], medMine = [0, 0, 0];
+  const monMedCat = new Float64Array(nM * 3), monMedMine = new Float64Array(nM * 3);
   const chCat = new Float64Array(nM * nCh), chMine = new Float64Array(nM * nCh), chTot = new Float64Array(nCh);
   const NB = D.DUR_BUCKETS.length;
   // Duration counts and ACD sums per medium (0 = TV, 1 = Radio); ACD = sum of raw Dur / ads.
@@ -119,16 +150,18 @@ function dashboard(ds, f) {
   const durRaw = cols.durRaw || null; // missing on datasets saved before raw Dur was stored
   const chMed = dicts.channelMedium;
 
+  const wN = cols.n || null, wS = cols.ns || null, prodCol = cols.product;
   for (let i = 0, n = pg.length; i < n; i++) {
     if (pg[i] !== pgId) continue;
+    if (prodMask && !prodMask[prodCol[i]]) continue;
     const d = day[i];
     if (d < pFrom || d > to) continue;
     const c = ch[i], md = chMed[c];
     if (mediumId >= 0 && md !== mediumId) continue;
     if (chId >= 0 && c !== chId) continue;
-    if (dpId >= 0 && dp[i] !== dpId) continue;
+    if ((dpId >= 0 && dp[i] !== dpId) || (slot && !D.slotOk(slot, hourCol[i]))) continue;
     if (adType && (excluded[theme[i]] ? 2 : 1) !== adType) continue;
-    const a = adv[i], v = cost[i], isMine = role[a] === 1;
+    const a = adv[i], v = cost[i], isMine = role[a] === 1, w = wN ? wN[i] : 1;
 
     if (d < from) {
       prevRows++;
@@ -138,34 +171,37 @@ function dashboard(ds, f) {
     }
 
     const mi = mon[i] - m0;
-    catSpend += v; catSpots++;
-    advSpend[a] += v; advSpots[a]++;
+    catSpend += v; catSpots += w;
+    advSpend[a] += v; advSpots[a] += w;
     monAdv[mi * nAdv + a] += v;
     monCat[mi] += v;
     medCat[md] += v;
+    monMedCat[mi * 3 + md] += v;
     chCat[mi * nCh + c] += v; chTot[c] += v;
     const sponsor = excluded[theme[i]] === 1;
     const raw = durRaw ? D.durSecondsOf(durRaw[i], sponsor) : NaN;
     const du = durRaw ? D.durBucketOf(durRaw[i], sponsor) : (sponsor ? 0 : legacyDur(dur[i]));
     if (md < 2 && du < NB) {
       const M = durM[md];
-      M.adv[a * NB + du]++; M.cat[du]++;
-      if (isMine) M.mine[du]++;
+      M.adv[a * NB + du] += w; M.cat[du] += w;
+      if (isMine) M.mine[du] += w;
       if (raw > 0) {
-        M.acdSum[a] += raw; M.acdN[a]++; M.catSum += raw; M.catN++;
-        if (isMine) { M.mineSum += raw; M.mineN++; }
+        const ws = wS ? wS[i] : 1; // spots that have a length (a data cube keeps their total seconds as raw * ws)
+        M.acdSum[a] += raw * ws; M.acdN[a] += ws; M.catSum += raw * ws; M.catN += ws;
+        if (isMine) { M.mineSum += raw * ws; M.mineN += ws; }
       }
     }
     if (isMine) {
-      mineSpend += v; mineSpots++;
+      mineSpend += v; mineSpots += w;
       monMine[mi] += v;
       medMine[md] += v;
+      monMedMine[mi * 3 + md] += v;
       chMine[mi * nCh + c] += v;
     }
     if (skipCampaign && skipCampaign[theme[i]]) continue;
     const key = (mi * nAdv + a) * nTheme + theme[i];
     const t = themeAgg.get(key);
-    if (t) { t[0] += v; t[1]++; } else themeAgg.set(key, [v, 1]);
+    if (t) { t[0] += v; t[1] += w; } else themeAgg.set(key, [v, w]);
   }
 
   // Rank: my advertisers count as one entity against every other advertiser with spend.
@@ -186,6 +222,10 @@ function dashboard(ds, f) {
   const compSorted = comps.slice().sort((x, y) => advSpend[y] - advSpend[x]);
   const trend = {
     mine: Array.from(monMine),
+    categoryTotal: Array.from(monCat),
+    // Spend per month split by medium [TV, Radio, Press], for the stacked YOY / quarter / half-year bars.
+    mediumCat: months.map((_, k) => [monMedCat[k * 3], monMedCat[k * 3 + 1], monMedCat[k * 3 + 2]]),
+    mediumMine: months.map((_, k) => [monMedMine[k * 3], monMedMine[k * 3 + 1], monMedMine[k * 3 + 2]]),
     competitors: compSorted.map(a => ({ name: dicts.adv[a], values: months.map((_, k) => monAdv[k * nAdv + a]) })),
     categoryAvg: months.map((_, k) => {
       let active = 0;
@@ -287,29 +327,34 @@ function dashboard(ds, f) {
   }
   const restCount = activeAdv - mineIds.filter(a => advSpend[a] > 0).length - compSorted.filter(a => advSpend[a] > 0).length;
   // Year by year over the whole dataset (the date range is ignored; every other filter applies).
-  const y0 = Math.floor(new Date(ds.meta.minDay * 86400000).getUTCFullYear());
-  const y1 = Math.floor(new Date(ds.meta.maxDay * 86400000).getUTCFullYear());
+  // Calendar years run Jan-Dec; financial years (f.yearType === 'FY') run Apr-Mar and are named by the year they start in.
+  const fyMode = f.yearType === 'FY';
+  const yOf = mIdx => Math.floor((mIdx - (fyMode ? 3 : 0)) / 12);
+  const dMin = new Date(ds.meta.minDay * 86400000), dMax = new Date(ds.meta.maxDay * 86400000);
+  const y0 = yOf(dMin.getUTCFullYear() * 12 + dMin.getUTCMonth());
+  const y1 = yOf(dMax.getUTCFullYear() * 12 + dMax.getUTCMonth());
   const nY = y1 - y0 + 1;
   const yCat = new Float64Array(nY), yMine = new Float64Array(nY), yComp = compSorted.map(() => new Float64Array(nY));
   const compIndex = new Int32Array(nAdv).fill(-1);
   compSorted.forEach((a, j) => { compIndex[a] = j; });
   for (let i = 0, n = pg.length; i < n; i++) {
     if (pg[i] !== pgId) continue;
+    if (prodMask && !prodMask[prodCol[i]]) continue;
     const c = ch[i];
     if (mediumId >= 0 && chMed[c] !== mediumId) continue;
     if (chId >= 0 && c !== chId) continue;
-    if (dpId >= 0 && dp[i] !== dpId) continue;
+    if ((dpId >= 0 && dp[i] !== dpId) || (slot && !D.slotOk(slot, hourCol[i]))) continue;
     if (adType && (excluded[theme[i]] ? 2 : 1) !== adType) continue;
-    const y = Math.floor(mon[i] / 12) - y0, a = adv[i], v = cost[i];
+    const y = yOf(mon[i]) - y0, a = adv[i], v = cost[i];
     yCat[y] += v;
     if (role[a] === 1) yMine[y] += v;
     else if (compIndex[a] >= 0) yComp[compIndex[a]][y] += v;
   }
   const yShare = arr => Array.from(arr, (v, k) => (yCat[k] ? (v / yCat[k]) * 100 : null));
   const years = Array.from({ length: nY }, (_, k) => {
-    const y = y0 + k;
-    const first = Math.max(ds.meta.minDay, toDay(`${y}-01-01`)), last = Math.min(ds.meta.maxDay, toDay(`${y}-12-31`));
-    return { year: y, from: toIso(first), to: toIso(last), partial: toIso(first).slice(5) !== '01-01' || toIso(last).slice(5) !== '12-31' };
+    const y = y0 + k, b = yearBounds(y, fyMode);
+    const first = Math.max(ds.meta.minDay, toDay(b.from)), last = Math.min(ds.meta.maxDay, toDay(b.to));
+    return { year: y, fy: fyMode, label: yearLabel(y, fyMode), from: toIso(first), to: toIso(last), partial: toIso(first) !== b.from || toIso(last) !== b.to };
   });
   if (mineIds.length) sosRows[0].yearly = yShare(yMine);
   compSorted.forEach((a, j) => { sosRows[(mineIds.length ? 1 : 0) + j].yearly = yShare(yComp[j]); });
@@ -350,13 +395,15 @@ function detail(ds, f, scope = {}) {
   const { dicts, cols } = ds;
   const nAdv = dicts.adv.length, nCh = dicts.channel.length, nTheme = dicts.theme.length;
   const base = resolve(ds, f);
-  const { pgId, mediumId, chId, dpId, role, adType } = base;
+  const { pgId, mediumId, chId, dpId, slot, role, adType, prodMask } = base;
+  const hourCol = cols.hour || new Uint8Array(cols.pg.length).fill(255);
   let { from, to } = base;
   // A year cell of the SOS table covers that whole year of data, whatever the dashboard dates are.
   if (scope.year) {
-    from = Math.max(ds.meta.minDay, toDay(`${scope.year}-01-01`));
-    to = Math.min(ds.meta.maxDay, toDay(`${scope.year}-12-31`));
-    if (!(to >= from)) throw new Error('No data in ' + scope.year);
+    const b = yearBounds(scope.year, !!scope.fy);
+    from = Math.max(ds.meta.minDay, toDay(b.from));
+    to = Math.min(ds.meta.maxDay, toDay(b.to));
+    if (!(to >= from)) throw new Error('No data in ' + yearLabel(scope.year, !!scope.fy));
   }
   const excluded = excludedThemes(ds, !!f.tagCommercial);
   let mon = -1;
@@ -390,13 +437,16 @@ function detail(ds, f, scope = {}) {
   const chMed = dicts.channelMedium;
   const monCol = cols.mon;
 
+  const wN = cols.n || null, prodCol = cols.product;
+  const themeBrand = new Map(); // campaign (advertiser + theme) -> spend per brand, to name the brand behind each campaign
   for (let i = 0, n = pg.length; i < n; i++) {
     if (pg[i] !== pgId) continue;
+    if (prodMask && !prodMask[prodCol[i]]) continue;
     const d = day[i];
     const c = ch[i], md = chMed[c];
     if (mediumId >= 0 && md !== mediumId) continue;
     if (chId >= 0 && c !== chId) continue;
-    if (dpId >= 0 && dp[i] !== dpId) continue;
+    if ((dpId >= 0 && dp[i] !== dpId) || (slot && !D.slotOk(slot, hourCol[i]))) continue;
     if (adType && (excluded[theme[i]] ? 2 : 1) !== adType) continue;
     if (d < rFrom || d > rTo || (mon >= 0 && monCol[i] !== mon)) continue;
     // Category spend over exactly the same days as the selection, for a fair share of category.
@@ -416,14 +466,16 @@ function detail(ds, f, scope = {}) {
     }
     const v = cost[i];
     if (d < rFrom || d > rTo || (mon >= 0 && monCol[i] !== mon)) continue;
-    total += v; spots++;
-    monSpend[monCol[i] - m0] += v; monSpots[monCol[i] - m0]++;
-    advSpend[a] += v; advSpots[a]++;
-    chSpend[c] += v; chSpots[c]++;
+    const w = wN ? wN[i] : 1;
+    total += v; spots += w;
+    monSpend[monCol[i] - m0] += v; monSpots[monCol[i] - m0] += w;
+    advSpend[a] += v; advSpots[a] += w;
+    chSpend[c] += v; chSpots[c] += w;
     if (role[a] === 1) { chMine[c] += v; mineTotal += v; }
     const key = a * nTheme + theme[i];
     const t = themes.get(key);
-    if (t) { t[0] += v; t[1]++; } else themes.set(key, [v, 1]);
+    if (t) { t[0] += v; t[1] += w; } else themes.set(key, [v, w]);
+    if (prodCol && !ds.meta.cube) { let tb = themeBrand.get(key); if (!tb) { tb = new Map(); themeBrand.set(key, tb); } tb.set(prodCol[i], (tb.get(prodCol[i]) || 0) + v); }
   }
 
   const advertisers = [];
@@ -435,10 +487,17 @@ function detail(ds, f, scope = {}) {
     });
   }
   advertisers.sort((x, y) => y.spend - x.spend);
-  const campaigns = [...themes].map(([key, v]) => {
+  const allCampaigns = [...themes].map(([key, v]) => {
     const t = key % nTheme, a = (key - t) / nTheme;
-    return { name: dicts.theme[t], advertiser: dicts.adv[a], role: role[a] === 1 ? 'mine' : role[a] === 2 ? 'comp' : '', spend: v[0], spots: v[1] };
-  }).sort((x, y) => y.spend - x.spend).slice(0, 50);
+    const tb = [...(themeBrand.get(key) || [])].sort((x, y) => y[1] - x[1]);
+    return { name: dicts.theme[t], advertiser: dicts.adv[a], role: role[a] === 1 ? 'mine' : role[a] === 2 ? 'comp' : '', va: excluded[t] === 1,
+      brand: tb.length && dicts.product ? dicts.product[tb[0][0]] : '', brands: tb.length, spend: v[0], spots: v[1] };
+  }).sort((x, y) => y.spend - x.spend);
+  // Totals over every campaign of each type (the lists below keep the top 50 of each).
+  const campaignTotals = { C: { spend: 0, spots: 0, count: 0 }, V: { spend: 0, spots: 0, count: 0 } };
+  for (const c of allCampaigns) { const t = campaignTotals[c.va ? 'V' : 'C']; t.spend += c.spend; t.spots += c.spots; t.count++; }
+  // Top 50 commercials and top 50 value additions, so each tab is complete on its own.
+  const campaigns = [...allCampaigns.filter(c => !c.va).slice(0, 50), ...allCampaigns.filter(c => c.va).slice(0, 50)].sort((x, y) => y.spend - x.spend);
   const channels = [];
   for (let c = 0; c < nCh; c++) {
     if (chSpend[c] <= 0) continue;
@@ -452,8 +511,8 @@ function detail(ds, f, scope = {}) {
   }
   return {
     scope, total, spots, mineTotal,
-    advertisers, campaigns, channels, months: monthsOut,
+    advertisers, campaigns, campaignTotals, channels, months: monthsOut,
   };
 }
 
-module.exports = { overview, groupOptions, dashboard, detail };
+module.exports = { overview, groupOptions, dashboard, detail, excludedThemes };
