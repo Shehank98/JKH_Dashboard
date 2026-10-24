@@ -34,7 +34,7 @@ body.share-nocat #modeBtn,body.share-nocat #viewCat,body.share-nocat #catDrawerT
 body.share-mode #catShareBtn,body.share-mode .ctab[data-pane="cpData"],body.share-mode #cpData,body.share-mode #cDeleteBtn,
 body.share-mode .bmbtn,body.share-mode #shareBtn,body.share-mode #userBtn,body.share-mode #userMenu,
 body.share-mode .tab[data-pane="paneData"],body.share-mode #paneData,
-body.share-mode #exportMenu [data-x="send"],body.share-mode #exportMenu [data-x="json"],body.share-mode #exportMenu [data-x="plan"],
+body.share-mode #plannerBtn,body.share-mode #pbOverlay,
 body.share-mode #exportMenu hr,body.share-mode #catExportMenu hr,body.share-mode [data-x="report"],body.share-nocampaign label.tick:has(#fTagCommercial){display:none!important}
 body.share-mode #bmPage,body.share-mode #bmConfirm{display:none!important}
 body.share-fail .topbar .fbtn,body.share-fail .tright{display:none}

@@ -379,6 +379,7 @@ tr.me .sharebar{background:#FF8A3D}
 <link rel="stylesheet" href="/brandview.css?v=1">
 <link rel="stylesheet" href="/report.css?v=1">
 <link rel="stylesheet" href="/custom.css?v=1">
+<link rel="stylesheet" href="/plannerBrief.css?v=1">
 </head>
 <body>
 
@@ -606,6 +607,7 @@ tr.me .sharebar{background:#FF8A3D}
       <hr>
       <button data-x="report"><b>Full report (PowerPoint)</b><span>Everything: both dashboards with all flips, then advertiser analysis, then brand by brand</span></button>
     </div>
+    <button class="fbtn light spot-only" id="plannerBtn" title="Send the client and competitors you picked to the TV Media Planning Tool">Send to Planner</button>
     <button class="fbtn light spot-only" id="exportBtn">Export ▾</button>
     <button class="fbtn light spot-only" id="shareBtn">Share</button>
     <div class="menu spot-only" id="exportMenu">
@@ -614,9 +616,6 @@ tr.me .sharebar{background:#FF8A3D}
       <button data-x="ppt"><b>PowerPoint (PPT)</b><span>Title slide, full dashboard, then one slide per chart</span></button>
       <button data-x="report"><b>Full report (PowerPoint)</b><span>Everything: both dashboards with all flips, then advertiser analysis, then brand by brand</span></button>
       <hr>
-      <button data-x="send"><b>Send to planning tool</b><span>Opens the media planning tool with competitor channels, programmes, breaks, lengths and timing</span></button>
-      <button data-x="json"><b>Competitor data for planning tool (JSON)</b><span>The same data as a file, to import by hand</span></button>
-      <button data-x="plan"><b>Planning report (Markdown)</b><span>Every competitor number: spend, SOS, months, media, channels, dayparts, durations, campaigns</span></button>
       <button data-x="csv"><b>CSV data</b><span>Monthly numbers behind the charts</span></button>
     </div>
     <button class="fbtn light ubtn" id="userBtn" hidden><span class="av" id="userAv"></span><span class="un" id="userName"></span></button>
@@ -801,6 +800,7 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="bvpage" id="bvPage"></div>
 <div class="bmmodal" id="rpModal"></div>
+<div class="bmmodal" id="pbOverlay"></div>
 <div class="bmmodal" id="shareModal"></div>
 <div class="bmmodal" id="bmConfirm"></div>
 <div class="bmmodal" id="bmPage"></div>
@@ -813,5 +813,6 @@ tr.me .sharebar{background:#FF8A3D}
 <script src="/category.js?v=3"></script>
 <script src="/report.js?v=1"></script>
 <script src="/custom.js?v=1"></script>
+<script src="/plannerBrief.js?v=1"></script>
 </body>
 </html>
