@@ -1,13 +1,13 @@
 'use strict';
 // The dashboard's data engine, running in the person's own browser (a Web Worker, so the page stays responsive).
 // It reads the spot log they choose, keeps it in memory, saves it in this browser's IndexedDB under their
-// account, and answers the same questions the server used to: overview, options, dashboard, detail, planning.
+// account, and answers the same questions the server used to: overview, options, dashboard, detail, planner brief.
 // The file never leaves the computer. The calculation code is the same as the server's (served from /engine/lib).
 
 importScripts('/vendor/jszip/jszip.min.js');
 
 // ---- a tiny CommonJS loader for the shared modules ----
-const LIB = ['derive', 'brand-derive', 'cube', 'builder', 'compute', 'planning', 'competitor', 'periods', 'category-builder', 'category', 'category-brand', 'browser-readers'];
+const LIB = ['derive', 'brand-derive', 'cube', 'builder', 'compute', 'plannerBrief', 'periods', 'category-builder', 'category', 'category-brand', 'browser-readers'];
 const SRC = {}, CACHE = {};
 function requireLib(name) {
   if (name === 'jszip') return self.JSZip;
@@ -210,8 +210,8 @@ const handlers = {
     return out;
   },
   detail({ filters, scope }) { return requireLib('compute').detail(need(), filters || {}, scope || {}); },
-  planning({ filters, user }) { return requireLib('planning').planning(need(), filters || {}, { user: user || '' }); },
-  competitor({ filters, user }) { return requireLib('competitor').competitorIntel(need(), filters || {}, { user: user || '' }); },
+  plannerOptions({ filters }) { return requireLib('plannerBrief').plannerOptions(need(), filters || {}); },
+  plannerBrief({ filters, choice }) { return requireLib('plannerBrief').plannerBrief(need(), filters || {}, choice || {}); },
 };
 const monKey = m => `${Math.floor(m / 12)}-${String((m % 12) + 1).padStart(2, '0')}`;
 const describeCat = ds => (ds ? { ...ds.meta, minMonth: monKey(ds.meta.minMon), maxMonth: monKey(ds.meta.maxMon), storedIn: 'browser' } : null);

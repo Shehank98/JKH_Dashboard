@@ -14,9 +14,10 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 // Spot-log files are read and analysed in each person's browser (public/engine/worker.js), so people never
 // see or overwrite each other's data and the server holds no datasets. The server handles sign-in and
 // serves the app, including the shared calculation code the browser runs.
-const ENGINE_LIB = ['derive', 'brand-derive', 'cube', 'builder', 'compute', 'planning', 'competitor', 'periods', 'category-builder', 'category', 'category-brand', 'browser-readers'];
-// Where "Send to planning tool" opens. The planning tool must list this dashboard's address as allowed.
-const PLANNING_TOOL_URL = (process.env.PLANNING_TOOL_URL || 'https://media-planing-v2-copy-production.up.railway.app').replace(/\/+$/, '');
+const ENGINE_LIB = ['derive', 'brand-derive', 'cube', 'builder', 'compute', 'plannerBrief', 'periods', 'category-builder', 'category', 'category-brand', 'browser-readers'];
+// "Send to Planner": PLANNER_URL, PLANNER_API_URL and PLANNER_API_TOKEN (see server/planner-relay.js).
+const planner = require('./server/planner-relay');
+const PLANNER = planner.configFrom();
 
 // Sign-in is on unless AUTH_DISABLED=1 (local development and automated tests only).
 const AUTH_DISABLED = process.env.AUTH_DISABLED === '1';
@@ -70,10 +71,11 @@ function start(auth, brandmap, shares) {
 
   app.use('/api/brandmap', brandmap.router(express));
   app.use('/api/ai', require('./server/ai').router(express));
+  app.use('/api/planner', planner.router(express, PLANNER));
 
   // Signed-in check for the page (data lives in the browser, not here).
   app.get('/api/status', (req, res) => res.json({ ok: true, data: 'browser' }));
-  app.get('/api/config', (req, res) => res.json({ planningToolUrl: PLANNING_TOOL_URL }));
+  app.get('/api/config', (req, res) => res.json(planner.publicConfig(PLANNER)));
 
   app.listen(PORT, () => console.log(`Dashboard running on http://localhost:${PORT} (data files are processed in each browser)`));
 }

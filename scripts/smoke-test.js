@@ -7,8 +7,7 @@ const path = require('path');
 const D = require('../server/derive');
 const { ingestFile } = require('../server/ingest');
 const compute = require('../server/compute');
-const { planning } = require('../server/planning');
-const { competitorIntel } = require('../server/competitor');
+const { plannerBrief } = require('../server/plannerBrief');
 
 // Medium and channel name
 assert.strictEqual(D.MEDIA[D.mediumOf('TV - Derana TV')], 'TV');
@@ -110,38 +109,11 @@ assert.strictEqual(D.dayNumber(1, 'Jan', 26), D.dayNumber(1, 1, 2026));
   const spDet = compute.detail(ds, { ...F, adType: 'Sponsorship' }, {});
   assert.deepStrictEqual(spDet.campaigns.map(c => c.name).sort(), ['-BB', 'Summer -BB', 'Time Check']);
   assert.strictEqual(compute.detail(ds, { ...F, adType: 'Commercial' }, {}).total, 4000000);
-  // Planning report: the flat table adds up to the dashboard, and the summary matches the SOS numbers.
-  const md = planning(ds, F, { user: 'Test' });
-  const flat = md.split('## 12.')[1].split('\n').filter(l => /^\| (Me|Rival|Other) \|/.test(l)).map(l => l.split('|').map(x => x.trim()));
-  assert.strictEqual(flat.reduce((s2, r) => s2 + Number(r[6]), 0), out.kpi.catSpend);
-  assert.strictEqual(flat.reduce((s2, r) => s2 + Number(r[7]), 0), out.kpi.catSpots);
-  assert.strictEqual(flat.filter(r => r[1] === 'Me').reduce((s2, r) => s2 + Number(r[6]), 0), out.kpi.mineSpend);
-  assert.ok(md.includes('| 1 | Me | Mine | 6.50 | 72.2 |'));
-  assert.ok(md.includes('| Me (mine) | 3 | 0 | 1 | 0 | 1 | 0 | 60.0 |'), 'duration counts match the dashboard');
-  assert.ok(md.includes('### Me (mine)') && md.includes('| -BB | VA |'));
-  assert.ok(planning(ds, { ...F, from: '2030-01-01', to: '2030-02-01' }).includes('nothing to report'));
   // Channel Mix paired bars: whole-period share of the medium per channel (TV: Derana 6,000,001 of 8,000,001).
   const tvTot = out.tvMix.total;
   assert.deepStrictEqual(out.tvMix.channels, ['Derana TV', 'Sirasa TV']);
   assert.ok(Math.abs(tvTot.category[0] - (6000001 / 8000001) * 100) < 1e-9 && Math.abs(tvTot.mine[0] - 100) < 1e-9);
   assert.ok(Math.abs(tvTot.category.reduce((a, b) => a + b, 0) - 100) < 1e-9);
-  // Competitor package for the planning tool: totals, breaks, positions, programmes and hours.
-  const ci = competitorIntel(ds, { ...F, compare: false }, { user: 'Test' });
-  assert.strictEqual(ci.format, 'ogilvy-orbit-chub/competitor-intel');
-  assert.strictEqual(ci.totals.spend, out.kpi.catSpend); assert.strictEqual(ci.totals.spots, out.kpi.catSpots);
-  const meRow = ci.summary.find(r => r.advertiser === 'Me');
-  assert.strictEqual(meRow.role, 'mine'); assert.strictEqual(meRow.spend, out.kpi.mineSpend); assert.strictEqual(meRow.acd, 12);
-  const meSum = (k, field = 'spots') => ci[k].filter(r => r.advertiser === 'Me').reduce((s2, r) => s2 + r[field], 0);
-  for (const k of ['channels', 'breakPositions', 'dayparts', 'months', 'weeks']) assert.strictEqual(meSum(k), meRow.spots, k + ' spots add up');
-  assert.strictEqual(meSum('durations'), 5); // TV and Radio ads only
-  assert.strictEqual(meSum('hours'), 5);     // ads with an Advt_time
-  // Me's ads: Theme A TV 19:45 (pos 1 of 5), FM 08:10 (pos 2 of 5), -BB 19:50 and Summer -BB 19:51 (pos 1 of 5), Time Check FM 08:10 (pos 1 of 5).
-  const pos = Object.fromEntries(ci.breakPositions.filter(r => r.advertiser === 'Me').map(r => [r.positionInBreak, r.spots]));
-  assert.deepStrictEqual(pos, { First: 4, Second: 1 });
-  const news = ci.programmes.find(r => r.advertiser === 'Me' && r.channel === 'Derana TV' && r.programme === 'News');
-  assert.strictEqual(news.spots, 3); assert.strictEqual(news.usualHour, 19); assert.deepStrictEqual(news.airDays, ['Mon', 'Fri']);
-  assert.strictEqual(ci.hours.find(r => r.advertiser === 'Me' && r.day === 'Fri' && r.hour === 19).spots, 2);
-  assert.deepStrictEqual(ci.warnings, []);
   // "Count Tag as a commercial" tick box: Tag is a Value Addition by default, a commercial when ticked.
   const tagFile = path.join(os.tmpdir(), `cas-tag-${process.pid}.csv`);
   fs.writeFileSync(tagFile, [
@@ -166,12 +138,9 @@ assert.strictEqual(D.dayNumber(1, 'Jan', 26), D.dayNumber(1, 1, 2026));
   assert.deepStrictEqual(td({ tagCommercial: true }).duration.rows[0].counts, [0, 0, 1, 0, 1, 0]); // its real 15s
   assert.strictEqual(compute.detail(tds, { ...TF, adType: 'Sponsorship', tagCommercial: true }, {}).total, 20);
   assert.strictEqual(compute.detail(tds, { ...TF, adType: 'Commercial', tagCommercial: true }, {}).total, 850);
-  const tagMd = planning(tds, { ...TF, tagCommercial: true });
-  assert.ok(tagMd.includes('| Tag (Advt_Theme) | Counted as a commercial |') && tagMd.includes('including Tag') && tagMd.includes('| Tag | Commercial |'));
-  assert.ok(planning(tds, TF).includes('| Tag | VA |'));
-  const tagCi = competitorIntel(tds, { ...TF, tagCommercial: true });
-  assert.strictEqual(tagCi.filters.tagCountsAs, 'Commercial');
-  assert.strictEqual(tagCi.summary.find(r => r.advertiser === 'Me').valueAdditionsShare, 0);
-  assert.strictEqual(competitorIntel(tds, TF).summary.find(r => r.advertiser === 'Me').valueAdditionsShare, 62.5);
+  // The Competitor Brief follows the same switch: Tag is 500 of Me's 800 (62.5%) as a value addition, and none of it as a commercial.
+  const tagBrief = tf => plannerBrief(tds, { ...TF, ...tf }, { client: ['Me'], competitors: ['Rival'] }).advertisers[0].valueAddition;
+  assert.strictEqual(tagBrief({}).spendPct, 62.5);
+  assert.strictEqual(tagBrief({ tagCommercial: true }).spendPct, 0);
   console.log('All smoke tests passed');
 })().catch(e => { console.error(e); process.exit(1); });
