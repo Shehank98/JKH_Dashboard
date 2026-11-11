@@ -129,6 +129,12 @@ tbody tr:last-child td{border-bottom:0}
 .mini{font-size:12.5px;display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #EEF1F7}
 .modal{position:fixed;left:50%;top:50%;width:min(440px,calc(100vw - 32px));background:#fff;border-radius:18px;z-index:22;padding:24px;transform:translate(-50%,-46%) scale(.97);opacity:0;pointer-events:none;transition:transform .25s cubic-bezier(.2,.8,.2,1),opacity .2s;display:flex;flex-direction:column;gap:14px;box-shadow:0 30px 70px rgba(14,19,34,.3)}
 .modal.on{transform:translate(-50%,-50%);opacity:1;pointer-events:auto}
+.brandbox{display:flex;gap:12px;align-items:center}
+.bprev{width:96px;height:64px;border:1px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:#fff;overflow:hidden;font-size:12px}
+.bprev img{max-width:100%;max-height:100%;object-fit:contain}
+.bfields{flex:1;display:flex;flex-direction:column;gap:8px;min-width:0}
+.bfields input[type=text]{border:1px solid var(--line);border-radius:10px;padding:9px 11px;outline:none;font:inherit}
+.brow{display:flex;gap:6px;flex-wrap:wrap}
 .modal h3{font-size:18px}
 .modal p{font-size:13.5px;color:var(--grey);line-height:1.5}
 .modal label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
@@ -303,7 +309,7 @@ tbody tr:last-child td{border-bottom:0}
     signup: ['Signed up', '#3B5BDB'], verified: ['Confirmed email', '#3B5BDB'], reset_requested: ['Asked for reset code', '#F08C00'], password_reset: ['Reset password', '#F08C00'],
     admin_login: ['Admin signed in', '#141A2E'], admin_login_failed: ['Admin wrong password', '#E0383E'], admin_login_denied: ['Admin access denied', '#E0383E'],
     admin_invite: ['Invited', '#7048E8'], admin_disable: ['Disabled', '#B4232A'], admin_enable: ['Enabled', '#1E8E57'], admin_signout: ['Signed out everywhere', '#7048E8'],
-    admin_verify: ['Confirmed by admin', '#7048E8'], admin_unlock: ['Unlocked', '#7048E8'], admin_make_admin: ['Made admin', '#7048E8'], admin_remove_admin: ['Admin removed', '#7048E8'],
+    admin_verify: ['Confirmed by admin', '#7048E8'], admin_unlock: ['Unlocked', '#7048E8'], admin_make_admin: ['Made admin', '#7048E8'], admin_brand: ['Client branding changed', '#7048E8'], admin_remove_admin: ['Admin removed', '#7048E8'],
     admin_reset: ['Reset code sent by admin', '#7048E8'], admin_delete: ['Deleted', '#B4232A'],
   };
   const evGroup = t => /failed|denied|blocked/.test(t) ? 'failed' : t.startsWith('admin_') && t !== 'admin_login' ? 'admin' : /login|logout/.test(t) ? 'login' : /signup|verified/.test(t) ? 'signup' : /reset/.test(t) ? 'reset' : '';
@@ -399,6 +405,17 @@ tbody tr:last-child td{border-bottom:0}
           <dt>Last active</dt><dd>${esc(ago(u.lastSeen || u.lastLogin))}</dd>
           <dt>Failed attempts</dt><dd>${u.failed}${u.failed >= 8 ? ' (locked for 15 min)' : ''}</dd>
         </dl>
+        <div><h4>Client branding</h4>
+          <p class="muted" style="margin-bottom:8px">Replaces the Ogilvy logo in this person's dashboard top bar. A logo wins; with no logo the name is shown. Leave both empty to keep the Ogilvy logo.</p>
+          <div class="brandbox">
+            <div class="bprev" id="bPrev">${u.brand.logo ? `<img src="${esc(u.brand.logo)}" alt="">` : '<span class="muted">No logo</span>'}</div>
+            <div class="bfields">
+              <input type="text" id="bName" maxlength="60" placeholder="Client name, e.g. Maliban" value="${esc(u.brand.name)}">
+              <div class="brow"><label class="btn" for="bFile">Choose logo</label><input type="file" id="bFile" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" hidden>
+                <button class="btn" id="bRemove" ${u.brand.logo ? '' : 'disabled'}>Remove logo</button><button class="btn dark" id="bSave">Save</button></div>
+            </div>
+          </div>
+        </div>
         <div><h4>Actions</h4><div class="acts">
           ${u.disabled ? btn('enable', 'Enable account', 'dark') : btn('disable', 'Disable account', 'danger', self && 'You cannot disable yourself')}
           ${btn('signout', 'Sign out everywhere', '', !u.sessions && 'No active sessions')}
@@ -446,6 +463,54 @@ tbody tr:last-child td{border-bottom:0}
     ok.onclick = async () => { ok.disabled = true; await run(act, email); ok.disabled = false; $('confirm').classList.remove('on'); if (!openEmail) $('scrim').classList.remove('on'); };
     $('confirm').classList.add('on'); $('scrim').classList.add('on');
   }
+
+  // ---- client branding ----
+  let pendingLogo; // undefined = unchanged, '' = removed, data URL = new
+  // Logos are shrunk in the browser first (max 720x240) so they stay small and sharp; SVG is kept as is.
+  function readLogo(file) {
+    return new Promise((ok, no) => {
+      const fr = new FileReader();
+      fr.onerror = () => no(new Error('Could not read that file.'));
+      fr.onload = () => {
+        if (file.type === 'image/svg+xml' || file.type === 'image/gif') return fr.result.length > 150 * 1024 ? no(new Error('That image is too big (max 150 KB).')) : ok(fr.result);
+        const img = new Image();
+        img.onerror = () => no(new Error('That file is not a usable image.'));
+        img.onload = () => {
+          const k = Math.min(1, 720 / img.width, 240 / img.height), c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(img.width * k));
+          c.height = Math.max(1, Math.round(img.height * k));
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          const png = c.toDataURL('image/png');
+          ok(png.length < 150 * 1024 ? png : c.toDataURL('image/jpeg', 0.9));
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+  document.addEventListener('change', async e => {
+    if (e.target.id !== 'bFile' || !e.target.files[0]) return;
+    try {
+      pendingLogo = await readLogo(e.target.files[0]);
+      $('bPrev').innerHTML = `<img src="${esc(pendingLogo)}" alt="">`;
+      $('bRemove').disabled = false;
+    } catch (err) { toast(err.message, true); }
+    e.target.value = '';
+  });
+  async function saveBrand(removeLogo) {
+    try {
+      const body = { email: openEmail, name: $('bName').value };
+      if (removeLogo) body.removeLogo = true; else if (pendingLogo !== undefined) body.logo = pendingLogo;
+      await api('/api/admin/brand', body);
+      pendingLogo = undefined;
+      toast('Client branding saved');
+      await load(true);
+    } catch (err) { toast(err.message, true); }
+  }
+  document.addEventListener('click', e => {
+    if (e.target.id === 'bSave') saveBrand(false);
+    if (e.target.id === 'bRemove') saveBrand(true);
+  });
 
   // ---- events ----
   document.addEventListener('click', e => {

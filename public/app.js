@@ -1314,16 +1314,16 @@
     const cu = [...document.querySelectorAll('.cu-scroll')].find(e => e.offsetParent !== null);
     const extra = b.classList.contains('custom-client') && cu ? Math.max(0, cu.scrollHeight - cu.clientHeight) : 0;
     const h = b.offsetHeight + extra;
-    const logo = document.querySelector('.logo img'), screenLogo = logo.getAttribute('src');
-    logo.setAttribute('src', EXPORT_LOGO); logo.classList.add('xlogo');
-    await logo.decode().catch(() => {});
+    // A client's own logo or name stays as it is on screen; only the Ogilvy logo is swapped for the stacked export version.
+    const logo = document.querySelector('.logo img'), screenLogo = logo.getAttribute('src'), swap = !logo.classList.contains('client') && !logo.classList.contains('off');
+    if (swap) { logo.setAttribute('src', EXPORT_LOGO); logo.classList.add('xlogo'); await logo.decode().catch(() => {}); }
     b.classList.add('exporting');
     const skip = new Set(['drawer', 'drawerToggle', 'catDrawer', 'catDrawerToggle', 'catModal', 'toast', 'overlay', 'filterBtn', 'tright', 'modal', 'tip', 'exportStage', 'rpModal']);
     const url = await window.htmlToImage.toJpeg(b, {
       quality: 0.95, pixelRatio: 2, backgroundColor: '#F4F6FA', width: w, height: h,
       style: extra ? { transform: 'none', height: h + 'px' } : { transform: 'none' },
       filter: node => !(node.id && skip.has(node.id)) && !(node.classList && node.classList.contains('scrim')),
-    }).finally(() => { b.classList.remove('exporting'); logo.setAttribute('src', screenLogo); logo.classList.remove('xlogo'); });
+    }).finally(() => { b.classList.remove('exporting'); if (swap) { logo.setAttribute('src', screenLogo); logo.classList.remove('xlogo'); } });
     return { url, w, h };
   }
   // One chart as its own image: a copy of the card, under a branded header (logo, period, filters) unless
@@ -1489,6 +1489,14 @@
   $('signOutBtn').addEventListener('click', async () => {
     try { await fetch('/api/auth/logout', { method: 'POST' }); } finally { location.replace('/login'); }
   });
+  // The client's own logo or name replaces the Ogilvy logo in the top bar (an admin sets it per person). Logo wins; with no logo, the name shows.
+  function applyBrand(b) {
+    if (!b || (!b.logo && !b.name)) return;
+    const img = $('brandImg'), nm = $('brandName');
+    if (b.logo) { img.src = b.logo; img.alt = b.name || 'Client logo'; img.classList.add('client'); nm.hidden = true; }
+    else { img.classList.add('off'); nm.textContent = b.name; nm.hidden = false; }
+    document.title = (b.name ? b.name + ' – ' : '') + document.title.replace(/^.* – /, '');
+  }
   async function loadUser() {
     try {
       const { user } = await api('/api/auth/me');
@@ -1501,6 +1509,7 @@
       $('userEmail').textContent = user.email;
       $('userBtn').hidden = false;
       $('adminLink').hidden = !user.admin;
+      applyBrand(user.brand);
     } catch (e) { /* api() already redirects on 401 */ }
     return me;
   }

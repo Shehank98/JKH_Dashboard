@@ -96,6 +96,9 @@ input[type=date].inp{color-scheme:dark}
 .lstack{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
 .logo img{height:22px;width:auto;display:block}
 .logo img.xlogo{height:40px}
+.logo img.off,.logo .cname[hidden]{display:none}
+.logo img.client{height:34px;max-width:200px;object-fit:contain}
+.logo .cname{font-size:18px;font-weight:800;color:#141A2E;letter-spacing:-.2px;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
 .logo .t2{font-size:9.5px;color:#8A93AD;font-weight:600;letter-spacing:.3px;white-space:nowrap}
 .fbtn{background:#141A2E;color:#fff;border:none;border-radius:9px;padding:10px 15px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .fbtn.light{background:#fff;color:#4A5570;border:1px solid #DDE3EF}
@@ -579,7 +582,8 @@ tr.me .sharebar{background:#FF8A3D}
 
 <div class="topbar">
   <div class="logo">
-    <img src="/ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub">
+    <img src="/ogilvy-orbit-chub.png" alt="Ogilvy Orbit – Chub" id="brandImg">
+    <span class="cname" id="brandName" hidden></span>
   </div>
   <button class="modebtn" id="modeBtn" title="Switch between the spot log dashboard and the category dashboard"><span class="mi">⇄</span><span id="modeTxt">Switch to Category</span></button>
   <div class="sharebanner" id="shareBanner"></div>

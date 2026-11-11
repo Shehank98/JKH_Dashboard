@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS ooc_users (
   last_seen      timestamptz,
   updated_at     timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE ooc_users ADD COLUMN IF NOT EXISTS brand jsonb;   -- client name / logo shown in this person's top bar
 CREATE TABLE IF NOT EXISTS ooc_sessions (
   token_hash  text PRIMARY KEY,
   kind        text NOT NULL,            -- 'user' (dashboard) or 'admin' (admin panel)
@@ -78,6 +79,7 @@ const toUser = r => {
   if (r.created_at) u.created = iso(r.created_at);
   if (r.last_login) u.lastLogin = iso(r.last_login);
   if (r.last_seen) u.lastSeen = iso(r.last_seen);
+  if (r.brand) u.brand = r.brand;
   return u;
 };
 
@@ -132,11 +134,11 @@ function pgStore(url, dataDir) {
       for (const k of work.users[0]) {
         const u = JSON.parse(users.get(k));
         await client.query(
-          `INSERT INTO ooc_users (email, name, role, verified, disabled, invited, password_salt, password_hash, created_at, last_login, last_seen, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+          `INSERT INTO ooc_users (email, name, role, verified, disabled, invited, password_salt, password_hash, created_at, last_login, last_seen, brand, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now())
            ON CONFLICT (email) DO UPDATE SET name=$2, role=$3, verified=$4, disabled=$5, invited=$6, password_salt=$7, password_hash=$8,
-             created_at=$9, last_login=$10, last_seen=$11, updated_at=now()`,
-          [u.email, u.name, u.role || null, !!u.verified, !!u.disabled, !!u.invited, u.salt, u.hash, u.created || null, u.lastLogin || null, u.lastSeen || null]);
+             created_at=$9, last_login=$10, last_seen=$11, brand=$12, updated_at=now()`,
+          [u.email, u.name, u.role || null, !!u.verified, !!u.disabled, !!u.invited, u.salt, u.hash, u.created || null, u.lastLogin || null, u.lastSeen || null, u.brand || null]);
       }
       if (work.users[1].length) await client.query('DELETE FROM ooc_users WHERE email = ANY($1)', [work.users[1]]);
       for (const k of work.sessions[0]) {

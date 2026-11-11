@@ -172,7 +172,9 @@ async function createAuth(dataDir) {
     if (!s.lastSeen || now() - s.lastSeen > 5 * 60e3) { s.lastSeen = now(); u.lastSeen = new Date().toISOString(); save(); }
     return u;
   }
-  const publicUser = u => ({ name: u.name, email: u.email, admin: isAdmin(u) });
+  // Client branding an admin set for this person: a name and/or a logo that replace the Ogilvy logo in their top bar.
+  const brandOf = u => ({ name: (u.brand && u.brand.name) || '', logo: (u.brand && u.brand.logo) || '' });
+  const publicUser = u => ({ name: u.name, email: u.email, admin: isAdmin(u), brand: brandOf(u) });
   const DISABLED = 'This account has been disabled. Please contact the automation team.';
   const endSessions = email => { for (const [k, s] of Object.entries(db.sessions)) if (s.email === email) delete db.sessions[k]; };
 
@@ -293,6 +295,7 @@ async function createAuth(dataDir) {
       sessions: sess.length,
       devices: sess.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0)).slice(0, 5).map(s => ({ ip: s.ip || '', ua: s.ua || '', lastSeen: s.lastSeen ? new Date(s.lastSeen).toISOString() : s.created })),
       failed: (fails.get(u.email) || {}).n || 0,
+      brand: brandOf(u),
     };
   };
   const needUser = email => {
@@ -369,6 +372,18 @@ async function createAuth(dataDir) {
       await sendCode(email, 'reset', { invite: true, minutes: 72 * 60, link: `${siteUrl(req)}/login?email=${encodeURIComponent(email)}#reset` });
       res.json({ ok: true, user: userRow(db.users[email]) });
     },
+    // Set (or clear) the client name and logo shown in one person's dashboard top bar.
+    async brand(req, res) {
+      const u = needUser(req.body.email);
+      const name = String(req.body.name || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+      let logo = req.body.logo == null ? ((u.brand && u.brand.logo) || '') : String(req.body.logo);
+      if (req.body.removeLogo) logo = '';
+      if (logo && (!/^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(logo) || logo.length > 200 * 1024)) throw new HttpError(400, 'The logo must be a PNG, JPG, WebP, GIF or SVG image under 150 KB.');
+      if (name || logo) u.brand = { ...(name ? { name } : {}), ...(logo ? { logo } : {}) }; else delete u.brand;
+      log(req, 'admin_brand', u.email, { by: req.admin.email });
+      save();
+      res.json({ ok: true, user: userRow(u) });
+    },
     async action(req, res) {
       const u = needUser(req.body.email), me = req.admin, act = String(req.body.action || '');
       switch (act) {
@@ -420,6 +435,7 @@ async function createAuth(dataDir) {
     });
     r.get('/overview', wrap(adminHandlers.overview));
     r.post('/invite', wrap(adminHandlers.invite));
+    r.post('/brand', wrap(adminHandlers.brand));
     r.post('/action', wrap(adminHandlers.action));
     return r;
   }

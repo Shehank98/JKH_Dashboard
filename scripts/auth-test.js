@@ -216,6 +216,19 @@ const wrong = c => String((Number(c) + 1) % 1e6).padStart(6, '0');
     assert.ok(r.json.events.some(e => e.type === 'admin_login_denied' && e.email === bobEmail));
     assert.ok(!JSON.stringify(r.json).includes('"hash"') && !JSON.stringify(r.json).includes('"salt"'), 'no password hashes in the admin API');
 
+    // Client branding: an admin sets a name and logo for one person; it shows up in their /api/auth/me only.
+    const PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    r = await callJar(bob, 'GET', '/api/auth/me'); assert.deepStrictEqual(r.json.user.brand, { name: '', logo: '' }, 'no branding by default');
+    r = await callJar(bob, 'POST', '/api/admin/brand', { email: bobEmail, name: 'Maliban' }); assert.strictEqual(r.status, 401, 'branding is admin only');
+    r = await callJar(adm, 'POST', '/api/admin/brand', { email: bobEmail, name: '  Maliban   Biscuits ', logo: PX });
+    assert.strictEqual(r.status, 200); assert.strictEqual(r.json.user.brand.name, 'Maliban Biscuits'); assert.strictEqual(r.json.user.brand.logo, PX);
+    r = await callJar(bob, 'GET', '/api/auth/me'); assert.strictEqual(r.json.user.brand.name, 'Maliban Biscuits'); assert.strictEqual(r.json.user.brand.logo, PX);
+    r = await call('GET', '/api/auth/me'); assert.strictEqual(r.json.user.brand.name, '', 'other people are not affected');
+    r = await callJar(adm, 'POST', '/api/admin/brand', { email: bobEmail, name: 'Maliban', logo: 'data:text/html;base64,PHNjcmlwdD4=' }); assert.strictEqual(r.status, 400, 'only image data URLs are accepted');
+    r = await callJar(adm, 'POST', '/api/admin/brand', { email: bobEmail, name: 'Maliban' }); assert.strictEqual(r.json.user.brand.logo, PX, 'renaming keeps the logo');
+    r = await callJar(adm, 'POST', '/api/admin/brand', { email: bobEmail, name: 'Maliban', removeLogo: true }); assert.strictEqual(r.json.user.brand.logo, '');
+    r = await callJar(adm, 'POST', '/api/admin/brand', { email: bobEmail, name: '' }); assert.deepStrictEqual(r.json.user.brand, { name: '', logo: '' }, 'empty branding goes back to the Ogilvy logo');
+
     // Promote and demote.
     r = await callJar(adm, 'POST', '/api/admin/action', { action: 'make_admin', email: bobEmail }); assert.strictEqual(r.status, 200); assert.strictEqual(r.json.user.admin, true);
     const bobAdm = { c: '' };
